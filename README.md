@@ -1,2 +1,1 @@
 # fieldsight-cli
-idk
