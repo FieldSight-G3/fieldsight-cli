@@ -4,11 +4,22 @@ version = "0.1.0"
 description = "Multi-agent that reads OSHA incident packets, grounds findings in regulatory text, and drafts a cited dossier for human review."
 requires-python = ">=3.11"
 authors = [{name = "G3-FieldSight Team"}]
-dependencies = []
+dependencies = [
+   "boto3==1.43.96",
+  "Flask==3.1.2",
+  "gunicorn==23.0.0",
+  "langchain-aws==1.7.8",
+  "langchain-core==1.6.3",
+  "langgraph==1.2.11",
+  "pgvector>=0.4,<1.0",
+  "psycopg[binary]==3.3.2",
+  "pydantic==2.13.5",
+  "pydantic-settings==2.15.0",
+  "SQLAlchemy>=2.0,<3.0",]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.4",
+    "pytest>=7.4"
 ]
 
 [tool.setuptools.packages.find]
