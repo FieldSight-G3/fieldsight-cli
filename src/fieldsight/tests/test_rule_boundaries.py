@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -7,8 +7,6 @@ from fieldsight.rules.log_classification import log_classification
 from fieldsight.rules.reporting import reporting_clock
 from fieldsight.schemas.rule_input import R2Inputs, R4Inputs, R5Inputs
 
-
-UTC = timezone.utc
 INCIDENT = datetime(2026, 1, 1, tzinfo=UTC)
 
 
@@ -51,7 +49,6 @@ def test_hospitalization_exactly_24_hours_is_reportable() -> None:
 
     assert result.outcome == "reportable"
 
-
 def test_hospitalization_after_24_hours_is_not_reportable() -> None:
     result = reporting_clock(
         r2_input(
@@ -63,11 +60,7 @@ def test_hospitalization_after_24_hours_is_not_reportable() -> None:
 
     assert result.outcome == "not_reportable"
 
-
-@pytest.mark.parametrize(
-    "reason",
-    ["observation_only", "diagnostic_testing_only"],
-)
+@pytest.mark.parametrize("reason",["observation_only", "diagnostic_testing_only"])
 def test_hospitalization_exclusions(reason: str) -> None:
     result = reporting_clock(
         r2_input(
@@ -79,18 +72,7 @@ def test_hospitalization_exclusions(reason: str) -> None:
     assert result.outcome == "not_reportable"
 
 
-@pytest.mark.parametrize(
-    "detail",
-    [
-        "avulsion",
-        "enucleation",
-        "degloving",
-        "scalping",
-        "severed_ear",
-        "broken_tooth",
-        "chipped_tooth",
-    ],
-)
+@pytest.mark.parametrize("detail",["avulsion","enucleation","degloving","scalping","severed_ear","broken_tooth","chipped_tooth"])
 def test_amputation_exclusions(detail: str) -> None:
     result = reporting_clock(
         r2_input(

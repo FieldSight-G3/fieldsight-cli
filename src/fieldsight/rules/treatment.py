@@ -1,7 +1,6 @@
 from fieldsight.schemas.rule_decision import RuleDecision
 from fieldsight.schemas.rule_input import R3Inputs
 
-
 FIRST_AID = {
     "nonprescription_medication_nonprescription_strength",
     "tetanus_immunization",

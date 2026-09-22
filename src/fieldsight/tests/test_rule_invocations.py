@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fieldsight.rules.engine import evaluate_incident
 from fieldsight.schemas.incidents import NormalizedIncident
@@ -6,7 +6,7 @@ from fieldsight.schemas.incidents import NormalizedIncident
 
 def test_every_rule_invocation_is_recorded() -> None:
     incident_at = datetime(
-        2026, 9, 22, 8, 0, tzinfo=timezone.utc
+        2026, 9, 22, 8, 0, tzinfo=UTC
     )
 
     incident = NormalizedIncident(
@@ -60,7 +60,7 @@ def test_every_rule_invocation_is_recorded() -> None:
     
 def test_low_confidence_stops_after_r5() -> None:
     incident_at = datetime(
-        2026, 9, 22, 8, 0, tzinfo=timezone.utc
+        2026, 9, 22, 8, 0, tzinfo=UTC
     )
 
     incident = NormalizedIncident(

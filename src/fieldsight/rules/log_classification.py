@@ -1,7 +1,6 @@
 from fieldsight.schemas.rule_decision import RuleDecision
 from fieldsight.schemas.rule_input import R4Inputs
 
-
 SOURCES = [
     "29 CFR 1904.7(b)(3)",
     "29 CFR 1904.29(b)(3)",

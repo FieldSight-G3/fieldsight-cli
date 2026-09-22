@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fieldsight.rules.confidence import confidence_floor
 from fieldsight.rules.log_classification import log_classification
@@ -47,9 +47,9 @@ def main() -> None:
         )
     )
     # R2: Is the event reportable, and what is the deadline?
-    incident_at = datetime(2024, 1, 1, 8, 0, tzinfo=timezone.utc)
-    hospitalization_at = datetime(2024, 1, 2, 10, 0, tzinfo=timezone.utc)
-    learned_at = datetime(2024, 1, 2, 12, 0, tzinfo=timezone.utc)
+    incident_at = datetime(2024, 1, 1, 8, 0, tzinfo=UTC)
+    hospitalization_at = datetime(2024, 1, 2, 10, 0, tzinfo=UTC)
+    learned_at = datetime(2024, 1, 2, 12, 0, tzinfo=UTC)
 
     r2 = reporting_clock(
         R2Inputs(

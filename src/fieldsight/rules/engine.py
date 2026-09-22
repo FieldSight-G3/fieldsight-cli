@@ -1,6 +1,8 @@
-from pydantic import BaseModel, ConfigDict,Field
+from datetime import UTC, datetime
 from typing import cast
-from datetime import datetime, timezone
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from fieldsight.rules.confidence import confidence_floor
 from fieldsight.rules.log_classification import log_classification
 from fieldsight.rules.recordability import recordability
@@ -8,8 +10,18 @@ from fieldsight.rules.reporting import reporting_clock
 from fieldsight.rules.treatment import medical_treatment
 from fieldsight.schemas.incidents import NormalizedIncident
 from fieldsight.schemas.rule_decision import RuleDecision
-from fieldsight.schemas.rule_input import AdmissionReason,AmputationDetail,EventType,R1Inputs,R2Inputs, R3Inputs, R4Inputs , R5Inputs
+from fieldsight.schemas.rule_input import (
+    AdmissionReason,
+    AmputationDetail,
+    EventType,
+    R1Inputs,
+    R2Inputs,
+    R3Inputs,
+    R4Inputs,
+    R5Inputs,
+)
 from fieldsight.schemas.run_records import RuleInvocation
+
 
 class IncidentRuleResults(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -52,9 +64,10 @@ def evaluate_incident(
             days_away=incident.days_away,
             restricted_days=incident.restricted_days,
             job_transfer=incident.job_transfer,
-            medical_treatment_beyond_first_aid=(
-                r3.outcome == "beyond_first_aid"
-            ),
+            medical_treatment_beyond_first_aid={
+                "beyond_first_aid": True,
+                "first_aid_only": False
+                }.get(r3.outcome),
             loss_of_consciousness=incident.loss_of_consciousness,
             significant_diagnosis=incident.significant_diagnosis,
         )
@@ -84,14 +97,17 @@ def evaluate_incident(
     invocations.append(create_invocation(incident.incident_id, r2))
 
     r4 = log_classification(
-        R4Inputs(
-            recordable=r1.outcome == "recordable",
-            death=incident.death,
-            days_away=incident.days_away,
-            restricted_days=incident.restricted_days,
-            job_transfer=incident.job_transfer,
-        )
+    R4Inputs(
+        recordable={
+            "recordable": True,
+            "not_recordable": False
+        }.get(r1.outcome),
+        death=incident.death,
+        days_away=incident.days_away,
+        restricted_days=incident.restricted_days,
+        job_transfer=incident.job_transfer
     )
+)
     invocations.append(create_invocation(incident.incident_id, r4))
 
     return IncidentRuleResults(
@@ -109,6 +125,6 @@ def create_invocation(
 ) -> RuleInvocation:
     return RuleInvocation(
         incident_id=incident_id,
-        recorded_at=datetime.now(timezone.utc),
+        recorded_at=datetime.now(UTC),
         decision=decision,
     )

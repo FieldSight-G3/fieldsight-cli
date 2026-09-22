@@ -3,7 +3,6 @@ from datetime import timedelta
 from fieldsight.schemas.rule_decision import RuleDecision
 from fieldsight.schemas.rule_input import R2Inputs
 
-
 SOURCES = [
     "29 CFR 1904.39(a)(1)",
     "29 CFR 1904.39(a)(2)",

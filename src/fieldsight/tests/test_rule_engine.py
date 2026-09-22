@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fieldsight.rules.engine import evaluate_incident
 from fieldsight.schemas.incidents import NormalizedIncident
@@ -6,7 +6,7 @@ from fieldsight.schemas.incidents import NormalizedIncident
 
 def test_complete_incident_through_rules_engine() -> None:
     incident_at = datetime(
-        2026, 9, 22, 8, 0, tzinfo=timezone.utc
+        2026, 9, 22, 8, 0, tzinfo=UTC
     )
 
     incident = NormalizedIncident(
@@ -32,8 +32,8 @@ def test_complete_incident_through_rules_engine() -> None:
             "event_type": 0.97,
             "event_at": 0.94,
             "treatments": 0.91,
-            "days_away": 0.93,
-        },
+            "days_away": 0.93
+        }
     )
 
     results = evaluate_incident(incident)
@@ -49,9 +49,7 @@ def test_complete_incident_through_rules_engine() -> None:
     reporting = results.reporting
     assert reporting.outcome == "reportable"
     assert incident.learned_at is not None
-    assert reporting.deadline == (
-        incident.learned_at + timedelta(hours=24)
-    )
+    assert reporting.deadline == (incident.learned_at + timedelta(hours=24))
 
     assert results.log_classification is not None
     assert results.log_classification.log_column == "H"

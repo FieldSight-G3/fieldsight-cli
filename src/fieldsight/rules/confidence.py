@@ -20,7 +20,6 @@ def confidence_floor(data: R5Inputs) -> RuleDecision:
         for field, score in data.confidences.items()
         if score < data.floor
     )
-
     return RuleDecision(
         rule_id="R5",
         outcome=(
