@@ -1,0 +1,3 @@
+# Definition of done
+
+A story is done when it meets its acceptance criteria, has passing tests (including boundary cases where relevant), is `ruff` clean, follows clean layers with functions split by logic, and has no critical defects open against it. Affected documentation (including the decisions table) is updated, the PR is reviewed by at least one teammate and merged to `main`, and the Jira card is moved to Done with the PR linked. Anything short of this goes under "Not shipped" at sprint review.
