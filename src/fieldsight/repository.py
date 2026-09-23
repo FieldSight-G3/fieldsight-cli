@@ -1,20 +1,35 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, TypeVar
 from uuid import UUID
 
-import psycopg
-from psycopg.rows import dict_row
-from psycopg.types.json import Json
+from pgvector.sqlalchemy import VECTOR as _VECTOR
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import MetaData, Table, create_engine, insert, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from fieldsight.config import settings
 
+RecordType = TypeVar("RecordType", bound=BaseModel)
+
+class _Repository:
+    def __init__(self, table_name: str, dsn: str | None = None) -> None:
+        url = dsn or settings.database_url
+        if url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+        self.engine = create_engine(url, pool_pre_ping=True)
+        self.table = Table(table_name, MetaData(), autoload_with=self.engine)
+
+    def _get(self, key: str, value: UUID | str, model: type[RecordType]) -> RecordType | None:
+        columns = [self.table.c[name] for name in model.model_fields]
+        statement = select(*columns).where(self.table.c[key] == value)
+        with self.engine.connect() as connection:
+            row = connection.execute(statement).mappings().one_or_none()
+        return model.model_validate(dict(row)) if row is not None else None
 
 class IncidentRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
     incident_id: UUID
     establishment: str
     submitted_at: datetime
@@ -24,52 +39,68 @@ class IncidentRecord(BaseModel):
     deciding_rule: str | None
     status: str
 
-
-class IncidentRepository:
-    """Owns every query against the incidents table. No other module
-    should import psycopg or execute SQL against this table directly."""
-
+class IncidentRepository(_Repository):
     def __init__(self, dsn: str | None = None) -> None:
-        self._dsn = dsn or settings.database_url
+        super().__init__("incidents", dsn)
 
-    def create(
-        self,
-        establishment: str,
-        normalized_fields: dict[str, Any],
-        narrative: str | None = None,
-    ) -> UUID:
-        with psycopg.connect(self._dsn) as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO incidents (establishment, normalized_fields, narrative)
-                VALUES (%s, %s, %s)
-                RETURNING incident_id
-                """,
-                (establishment, Json(normalized_fields), narrative),
-            )
-            row = cur.fetchone()
-            conn.commit()
-            return row[0]
+    def create(self, establishment: str, normalized_fields: dict[str, Any], narrative: str | None = None) -> UUID:
+        statement = insert(self.table).values(
+            establishment=establishment,
+            normalized_fields=normalized_fields,
+            narrative=narrative
+        ).returning(self.table.c.incident_id)
+        with self.engine.begin() as connection:
+            return connection.execute(statement).scalar_one()
 
     def get(self, incident_id: UUID) -> IncidentRecord | None:
-        with psycopg.connect(self._dsn, row_factory=dict_row) as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT incident_id, establishment, submitted_at,
-                       normalized_fields, narrative, outcome,
-                       deciding_rule, status
-                FROM incidents
-                WHERE incident_id = %s
-                """,
-                (incident_id,),
-            )
-            row = cur.fetchone()
-            return IncidentRecord(**row) if row else None
+        return self._get("incident_id", incident_id, IncidentRecord)
 
+    def save_analysis(
+        self,
+        incident_id: UUID,
+        correlation_id: UUID,
+        outcome: dict[str, Any],
+        deciding_rule: str,
+        rule_invocations: list[dict[str, Any]],
+        escalation_triggers: dict[str, Any]
+    ) -> UUID:
+        metadata = MetaData()
+        run_records = Table("run_records", metadata, autoload_with=self.engine)
+        review_queue = (
+            Table("review_queue", metadata, autoload_with=self.engine)
+            if escalation_triggers else None
+        )
+        with self.engine.begin() as connection:
+            updated = connection.execute(
+                update(self.table)
+                .where(self.table.c.incident_id == incident_id)
+                .values(outcome=outcome, deciding_rule=deciding_rule)
+                .returning(self.table.c.incident_id)
+            ).scalar_one_or_none()
+            if updated is None:
+                raise LookupError(f"Incident {incident_id} does not exist")
+            run_id = connection.execute(
+                insert(run_records)
+                .values(
+                    correlation_id=correlation_id,
+                    incident_id=incident_id,
+                    command="analyze",
+                    rule_invocations={"items": rule_invocations},
+                    escalation_triggers=escalation_triggers
+                )
+                .returning(run_records.c.run_id)
+            ).scalar_one()
+            if review_queue is not None:
+                connection.execute(
+                    insert(review_queue).values(
+                        incident_id=incident_id,
+                        triggers=escalation_triggers
+                    )
+                )
+        return run_id
 
 class RunRecordRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
     run_id: UUID
     correlation_id: UUID
     incident_id: UUID | None
@@ -81,12 +112,9 @@ class RunRecordRecord(BaseModel):
     model_calls: dict[str, Any] | None
     created_at: datetime
 
-
-class RunRecordRepository:
-    """Owns every query against the run_records table."""
-
+class RunRecordRepository(_Repository):
     def __init__(self, dsn: str | None = None) -> None:
-        self._dsn = dsn or settings.database_url
+        super().__init__("run_records", dsn)
 
     def create(
         self,
@@ -97,53 +125,26 @@ class RunRecordRepository:
         tool_invocations: dict[str, Any] | None = None,
         rule_invocations: dict[str, Any] | None = None,
         escalation_triggers: dict[str, Any] | None = None,
-        model_calls: dict[str, Any] | None = None,
+        model_calls: dict[str, Any] | None = None
     ) -> UUID:
-        with psycopg.connect(self._dsn) as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO run_records (
-                    correlation_id, incident_id, command,
-                    workers_dispatched, tool_invocations, rule_invocations,
-                    escalation_triggers, model_calls
-                )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING run_id
-                """,
-                (
-                    correlation_id,
-                    incident_id,
-                    command,
-                    Json(workers_dispatched) if workers_dispatched is not None else None,
-                    Json(tool_invocations) if tool_invocations is not None else None,
-                    Json(rule_invocations) if rule_invocations is not None else None,
-                    Json(escalation_triggers) if escalation_triggers is not None else None,
-                    Json(model_calls) if model_calls is not None else None,
-                ),
-            )
-            row = cur.fetchone()
-            conn.commit()
-            return row[0]
+        statement = insert(self.table).values(
+            correlation_id=correlation_id,
+            command=command,
+            incident_id=incident_id,
+            workers_dispatched=workers_dispatched,
+            tool_invocations=tool_invocations,
+            rule_invocations=rule_invocations,
+            escalation_triggers=escalation_triggers,
+            model_calls=model_calls
+        ).returning(self.table.c.run_id)
+        with self.engine.begin() as connection:
+            return connection.execute(statement).scalar_one()
 
     def get(self, run_id: UUID) -> RunRecordRecord | None:
-        with psycopg.connect(self._dsn, row_factory=dict_row) as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT run_id, correlation_id, incident_id, command,
-                       workers_dispatched, tool_invocations, rule_invocations,
-                       escalation_triggers, model_calls, created_at
-                FROM run_records
-                WHERE run_id = %s
-                """,
-                (run_id,),
-            )
-            row = cur.fetchone()
-            return RunRecordRecord(**row) if row else None
-
+        return self._get("run_id", run_id, RunRecordRecord)
 
 class ReviewQueueRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
     queue_id: UUID
     incident_id: UUID
     triggers: dict[str, Any]
@@ -151,99 +152,90 @@ class ReviewQueueRecord(BaseModel):
     decision: dict[str, Any] | None
     created_at: datetime
 
-
-class ReviewQueueRepository:
-    """Owns every query against the review_queue table."""
-
+class ReviewQueueRepository(_Repository):
     def __init__(self, dsn: str | None = None) -> None:
-        self._dsn = dsn or settings.database_url
+        super().__init__("review_queue", dsn)
 
     def create(self, incident_id: UUID, triggers: dict[str, Any]) -> UUID:
-        with psycopg.connect(self._dsn) as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO review_queue (incident_id, triggers)
-                VALUES (%s, %s)
-                RETURNING queue_id
-                """,
-                (incident_id, Json(triggers)),
-            )
-            row = cur.fetchone()
-            conn.commit()
-            return row[0]
+        statement = insert(self.table).values(
+            incident_id=incident_id,
+            triggers=triggers
+        ).returning(self.table.c.queue_id)
+        with self.engine.begin() as connection:
+            return connection.execute(statement).scalar_one()
 
     def get(self, queue_id: UUID) -> ReviewQueueRecord | None:
-        with psycopg.connect(self._dsn, row_factory=dict_row) as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT queue_id, incident_id, triggers, status, decision, created_at
-                FROM review_queue
-                WHERE queue_id = %s
-                """,
-                (queue_id,),
-            )
-            row = cur.fetchone()
-            return ReviewQueueRecord(**row) if row else None
+        return self._get("queue_id", queue_id, ReviewQueueRecord)
 
     def list_pending(self) -> list[ReviewQueueRecord]:
-        with psycopg.connect(self._dsn, row_factory=dict_row) as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT queue_id, incident_id, triggers, status, decision, created_at
-                FROM review_queue
-                WHERE status = 'pending'
-                ORDER BY created_at
-                """
-            )
-            rows = cur.fetchall()
-            return [ReviewQueueRecord(**row) for row in rows]
-
+        columns = [self.table.c[name] for name in ReviewQueueRecord.model_fields]
+        statement = select(*columns).where(self.table.c.status == "pending").order_by(self.table.c.created_at)
+        with self.engine.connect() as connection:
+            rows = connection.execute(statement).mappings().all()
+        return [ReviewQueueRecord.model_validate(dict(row)) for row in rows]
 
 class SessionRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
-
     thread_id: str
     analyst_id: UUID
     incident_id: UUID
     participant: str
     created_at: datetime
 
-
-class SessionRepository:
-    """Owns every query against the sessions table."""
-
+class SessionRepository(_Repository):
     def __init__(self, dsn: str | None = None) -> None:
-        self._dsn = dsn or settings.database_url
+        super().__init__("sessions", dsn)
 
-    def create(
-        self,
-        thread_id: str,
-        analyst_id: UUID,
-        incident_id: UUID,
-        participant: str,
-    ) -> str:
-        with psycopg.connect(self._dsn) as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO sessions (thread_id, analyst_id, incident_id, participant)
-                VALUES (%s, %s, %s, %s)
-                RETURNING thread_id
-                """,
-                (thread_id, analyst_id, incident_id, participant),
-            )
-            row = cur.fetchone()
-            conn.commit()
-            return row[0]
+    def create(self, thread_id: str, analyst_id: UUID, incident_id: UUID, participant: str) -> str:
+        statement = insert(self.table).values(
+            thread_id=thread_id,
+            analyst_id=analyst_id,
+            incident_id=incident_id,
+            participant=participant
+        ).returning(self.table.c.thread_id)
+        with self.engine.begin() as connection:
+            return connection.execute(statement).scalar_one()
 
     def get(self, thread_id: str) -> SessionRecord | None:
-        with psycopg.connect(self._dsn, row_factory=dict_row) as conn, conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT thread_id, analyst_id, incident_id, participant, created_at
-                FROM sessions
-                WHERE thread_id = %s
-                """,
-                (thread_id,),
-            )
-            row = cur.fetchone()
-            return SessionRecord(**row) if row else None
+        return self._get("thread_id", thread_id, SessionRecord)
+class SeedSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    analysts_added: int
+    grants_added: int
+    incidents_added: int
+
+class SeedRepository(_Repository):
+    def __init__(self, dsn: str | None = None) -> None:
+        super().__init__("incidents", dsn)
+        metadata = MetaData()
+        self.analysts = Table("analysts", metadata, autoload_with=self.engine)
+        self.grants = Table("grants", metadata, autoload_with=self.engine)
+
+    def seed(
+        self,
+        analysts: list[dict[str, Any]],
+        grants: list[dict[str, Any]],
+        incidents: list[dict[str, Any]]
+    ) -> SeedSummary:
+        added = {"analysts": 0, "grants": 0, "incidents": 0}
+        with self.engine.begin() as connection:
+            for analyst in analysts:
+                statement = pg_insert(self.analysts).values(**analyst).on_conflict_do_nothing(
+                    index_elements=[self.analysts.c.analyst_id]
+                )
+                added["analysts"] += connection.execute(statement).rowcount
+            for grant in grants:
+                statement = pg_insert(self.grants).values(**grant).on_conflict_do_nothing(
+                    index_elements=[self.grants.c.analyst_id, self.grants.c.establishment]
+                )
+                added["grants"] += connection.execute(statement).rowcount
+            for incident in incidents:
+                statement = pg_insert(self.table).values(**incident).on_conflict_do_nothing(
+                    index_elements=[self.table.c.incident_id]
+                )
+                added["incidents"] += connection.execute(statement).rowcount
+        return SeedSummary(
+            analysts_added=added["analysts"],
+            grants_added=added["grants"],
+            incidents_added=added["incidents"]
+        )

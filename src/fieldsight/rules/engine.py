@@ -97,16 +97,16 @@ def evaluate_incident(
     invocations.append(create_invocation(incident.incident_id, r2))
 
     r4 = log_classification(
-    R4Inputs(
-        recordable={
-            "recordable": True,
-            "not_recordable": False
-        }.get(r1.outcome),
-        death=incident.death,
-        days_away=incident.days_away,
-        restricted_days=incident.restricted_days,
-        job_transfer=incident.job_transfer
-    )
+        R4Inputs(
+            recordable={
+                "recordable": True,
+                "not_recordable": False
+            }.get(r1.outcome),
+            death=incident.death,
+            days_away=incident.days_away,
+            restricted_days=incident.restricted_days,
+            job_transfer=incident.job_transfer
+        )
 )
     invocations.append(create_invocation(incident.incident_id, r4))
 
