@@ -1,9 +1,40 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from fieldsight.rules.engine import evaluate_incident
 from fieldsight.schemas.incidents import NormalizedIncident
 
 
+@pytest.fixture
+def incident() -> NormalizedIncident:
+    incident_at = datetime(2026, 9, 22, 8, 0, tzinfo=UTC)
+    return NormalizedIncident(
+       incident_id="INC-001",
+        work_related=True,
+        new_case=True,
+        incident_at=incident_at,
+        event_at=incident_at + timedelta(hours=10),
+        learned_at=incident_at + timedelta(hours=11),
+        event_type="inpatient_hospitalization",
+        admission_reason="care_or_treatment",
+        amputation_detail=None,
+        treatments=["prescription_medication"],
+        death=False,
+        days_away=30,
+        restricted_days=0,
+        job_transfer=False,
+        loss_of_consciousness=False,
+        significant_diagnosis=False,
+        confidences={
+            "work_related": 0.98,
+            "new_case": 0.95,
+            "event_type": 0.97,
+            "event_at": 0.94,
+            "treatments": 0.91,
+            "days_away": 0.93
+        }
+    )
 def test_complete_incident_through_rules_engine() -> None:
     incident_at = datetime(
         2026, 9, 22, 8, 0, tzinfo=UTC
@@ -54,3 +85,26 @@ def test_complete_incident_through_rules_engine() -> None:
     assert results.log_classification is not None
     assert results.log_classification.log_column == "H"
     assert results.log_classification.day_count == 30
+
+def test_missing_treatment_stays_unknown(incident: NormalizedIncident) -> None:
+    missing_treatment = incident.model_copy(update={"treatments": None})
+    results = evaluate_incident(missing_treatment)
+
+    assert results.treatment is not None
+    assert results.treatment.outcome == "insufficient_data"
+    assert results.recordability is not None
+    assert results.recordability.outcome == "insufficient_data"
+    assert results.log_classification is not None
+    assert results.log_classification.outcome == "insufficient_data"
+    assert results.log_classification.missing_field == "recordable"
+
+def test_missing_recordability_fact_stays_unknown(incident: NormalizedIncident) -> None:
+    missing_fact = incident.model_copy(update={"work_related": None})
+    results = evaluate_incident(missing_fact)
+
+    assert results.recordability is not None
+    assert results.recordability.outcome == "insufficient_data"
+    assert results.recordability.missing_field == "work_related"
+    assert results.log_classification is not None
+    assert results.log_classification.outcome == "insufficient_data"
+    assert results.log_classification.missing_field == "recordable"
