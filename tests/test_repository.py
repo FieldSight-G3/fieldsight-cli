@@ -2,8 +2,8 @@ from uuid import uuid4
 
 from fieldsight.repository import (
     IncidentRepository,
-    RunRecordRepository,
     ReviewQueueRepository,
+    RunRecordRepository,
     SessionRepository,
 )
 
