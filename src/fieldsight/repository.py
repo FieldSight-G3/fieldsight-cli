@@ -198,6 +198,7 @@ class SessionRepository(_Repository):
 
     def get(self, thread_id: str) -> SessionRecord | None:
         return self._get("thread_id", thread_id, SessionRecord)
+
 class SeedSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
     analysts_added: int
@@ -222,18 +223,18 @@ class SeedRepository(_Repository):
             for analyst in analysts:
                 statement = pg_insert(self.analysts).values(**analyst).on_conflict_do_nothing(
                     index_elements=[self.analysts.c.analyst_id]
-                )
-                added["analysts"] += connection.execute(statement).rowcount
+                ).returning(self.analysts.c.analyst_id)
+                added["analysts"] += int(connection.execute(statement).scalar_one_or_none() is not None)
             for grant in grants:
                 statement = pg_insert(self.grants).values(**grant).on_conflict_do_nothing(
                     index_elements=[self.grants.c.analyst_id, self.grants.c.establishment]
-                )
-                added["grants"] += connection.execute(statement).rowcount
+                ).returning(self.grants.c.analyst_id)
+                added["grants"] += int(connection.execute(statement).scalar_one_or_none() is not None)
             for incident in incidents:
                 statement = pg_insert(self.table).values(**incident).on_conflict_do_nothing(
                     index_elements=[self.table.c.incident_id]
-                )
-                added["incidents"] += connection.execute(statement).rowcount
+                ).returning(self.table.c.incident_id)
+                added["incidents"] += int(connection.execute(statement).scalar_one_or_none() is not None)
         return SeedSummary(
             analysts_added=added["analysts"],
             grants_added=added["grants"],
