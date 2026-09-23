@@ -7,7 +7,11 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from fieldsight.repository import SeedRepository, SeedSummary
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import MetaData, Table
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+from fieldsight.repository import IncidentRepository
 from fieldsight.schemas.incidents import NormalizedIncident
 
 NORTH = "North Substation"
@@ -76,17 +80,17 @@ CASES = (
 
 def analysts() -> list[dict[str, Any]]:
     return [
-        {"analyst_id": ALICE, "external_subject": "seed:alice", "display_name": "Alice Example"},
-        {"analyst_id": BOB, "external_subject": "seed:bob", "display_name": "Bob Example"},
-        {"analyst_id": CAROL, "external_subject": "seed:carol", "display_name": "Carol Example"}
+        {"analyst_id": ALICE, "name": "Alice Example", "email": "alice@example.invalid"},
+        {"analyst_id": BOB, "name": "Bob Example", "email": "bob@example.invalid"},
+        {"analyst_id": CAROL, "name": "Carol Example", "email": "carol@example.invalid"}
     ]
 
 def grants() -> list[dict[str, Any]]:
     return [
-        {"analyst_id": ALICE, "establishment": NORTH},
-        {"analyst_id": ALICE, "establishment": CENTRAL},
-        {"analyst_id": BOB, "establishment": SOUTH},
-        {"analyst_id": CAROL, "establishment": CENTRAL}
+        {"grant_id": stable_id("grant-alice-north"), "analyst_id": ALICE, "establishment": NORTH},
+        {"grant_id": stable_id("grant-alice-central"), "analyst_id": ALICE, "establishment": CENTRAL},
+        {"grant_id": stable_id("grant-bob-south"), "analyst_id": BOB, "establishment": SOUTH},
+        {"grant_id": stable_id("grant-carol-central"), "analyst_id": CAROL, "establishment": CENTRAL}
     ]
 
 def historical_incidents() -> list[dict[str, Any]]:
@@ -142,6 +146,50 @@ def historical_incidents() -> list[dict[str, Any]]:
             "status": "closed"
         })
     return incidents
+
+class SeedSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    analysts_added: int
+    grants_added: int
+    incidents_added: int
+
+class SeedRepository:
+    def __init__(self, dsn: str | None = None) -> None:
+        incidents = IncidentRepository(dsn)
+        self.engine = incidents.engine
+        self.table = incidents.table
+        metadata = MetaData()
+        self.analysts = Table("analysts", metadata, autoload_with=self.engine)
+        self.grants = Table("grants", metadata, autoload_with=self.engine)
+
+    def seed(
+        self,
+        analysts: list[dict[str, Any]],
+        grants: list[dict[str, Any]],
+        incidents: list[dict[str, Any]]
+    ) -> SeedSummary:
+        added = {"analysts": 0, "grants": 0, "incidents": 0}
+        with self.engine.begin() as connection:
+            for analyst in analysts:
+                statement = pg_insert(self.analysts).values(**analyst).on_conflict_do_nothing(
+                    index_elements=[self.analysts.c.analyst_id]
+                ).returning(self.analysts.c.analyst_id)
+                added["analysts"] += int(connection.execute(statement).scalar_one_or_none() is not None)
+            for grant in grants:
+                statement = pg_insert(self.grants).values(**grant).on_conflict_do_nothing(
+                    index_elements=[self.grants.c.analyst_id, self.grants.c.establishment]
+                ).returning(self.grants.c.grant_id)
+                added["grants"] += int(connection.execute(statement).scalar_one_or_none() is not None)
+            for incident in incidents:
+                statement = pg_insert(self.table).values(**incident).on_conflict_do_nothing(
+                    index_elements=[self.table.c.incident_id]
+                ).returning(self.table.c.incident_id)
+                added["incidents"] += int(connection.execute(statement).scalar_one_or_none() is not None)
+        return SeedSummary(
+            analysts_added=added["analysts"],
+            grants_added=added["grants"],
+            incidents_added=added["incidents"]
+        )
 
 def seed_demo() -> SeedSummary:
     return SeedRepository().seed(analysts(), grants(), historical_incidents())
