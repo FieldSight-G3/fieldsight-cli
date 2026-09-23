@@ -10,16 +10,7 @@ from fieldsight.rules.reporting import reporting_clock
 from fieldsight.rules.treatment import medical_treatment
 from fieldsight.schemas.incidents import NormalizedIncident
 from fieldsight.schemas.rule_decision import RuleDecision
-from fieldsight.schemas.rule_input import (
-    AdmissionReason,
-    AmputationDetail,
-    EventType,
-    R1Inputs,
-    R2Inputs,
-    R3Inputs,
-    R4Inputs,
-    R5Inputs,
-)
+from fieldsight.schemas.rule_input import AdmissionReason,AmputationDetail,EventType,R1Inputs,R2Inputs, R3Inputs,R4Inputs,R5Inputs
 from fieldsight.schemas.run_records import RuleInvocation
 
 
@@ -35,9 +26,7 @@ class IncidentRuleResults(BaseModel):
     invocations: list[RuleInvocation] = Field(default_factory=list)
 
 
-def evaluate_incident(
-    incident: NormalizedIncident,
-) -> IncidentRuleResults:
+def evaluate_incident(incident: NormalizedIncident) -> IncidentRuleResults:
     invocations: list[RuleInvocation] = []
 
     r5 = confidence_floor(
