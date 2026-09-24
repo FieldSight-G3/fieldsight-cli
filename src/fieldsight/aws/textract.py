@@ -4,8 +4,11 @@
     status until it's done, then page through the blocks Textract hands back
 """
 
-from ..config import BUCKET_NAME
+from .. import config
 from .client import get_client
+
+
+BUCKET_NAME = config.settings.packet_bucket
 
 
 def start_analysis(key: str, output_prefix: str | None = None) -> str:

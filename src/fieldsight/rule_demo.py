@@ -10,7 +10,7 @@ from fieldsight.schemas.rule_input import (
     R2Inputs,
     R3Inputs,
     R4Inputs,
-    R5Inputs,
+    R5Inputs
 )
 
 

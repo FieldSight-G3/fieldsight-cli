@@ -1,7 +1,12 @@
 import uuid
 
-from fieldsight.config import BUCKET_NAME
+import fieldsight.config as config
 from fieldsight.aws.client import get_client
+
+
+# Resolve the setting dynamically so this module also works with config
+# implementations that expose settings through module-level __getattr__.
+BUCKET_NAME = config.settings.packet_bucket
 
 
 def pdf_key(name, *, corpus: bool = False) -> str:
