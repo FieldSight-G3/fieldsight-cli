@@ -87,7 +87,9 @@ def test_complete_incident_through_rules_engine() -> None:
     assert results.log_classification.day_count == 30
 
 def test_missing_treatment_stays_unknown(incident: NormalizedIncident) -> None:
-    missing_treatment = incident.model_copy(update={"treatments": None})
+    missing_treatment = incident.model_copy(
+        update={"treatments": None, "days_away": 0}
+    )
     results = evaluate_incident(missing_treatment)
 
     assert results.treatment is not None
