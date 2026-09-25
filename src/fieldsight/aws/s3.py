@@ -1,32 +1,52 @@
-import uuid
+""" reads and writes on the project bucket """
 
-from fieldsight.config import BUCKET_NAME
-from fieldsight.aws.client import get_client
+import json
 
+from fieldsight.aws import clients
+from fieldsight.config import settings
 
-def pdf_key(name, *, corpus: bool = False) -> str:
-    """S3 key for a PDF: packets go under pdfs/, corpus docs under corpus/."""
-    folder = "corpus" if corpus else "pdfs"
-    return f"{folder}/{name}.pdf"
+BUCKET_NAME = settings.packet_bucket
 
 
-def upload_pdf(file_path) -> str:
-    """Upload a PDF document to S3 and return its new document id."""
-    document_id = str(uuid.uuid4())
-    get_client("s3").upload_file(str(file_path), BUCKET_NAME, pdf_key(document_id))
-    return document_id
+def upload(file_path, key: str) -> None:
+    """ upload a local file to a fixed key """
+
+    clients.s3().upload_file(str(file_path), BUCKET_NAME, key)
+
+
+def put_text(key: str, text: str) -> None:
+    """ write a UTF-8 text object """
+
+    clients.s3().put_object(
+        Bucket=BUCKET_NAME, 
+        Key=key, 
+        Body=text.encode("utf-8"), 
+        ContentType="text/plain"
+        )
+
+
+def list_objects(folder: str) -> list[dict]:
+    """ every object under a folder, with its Key and LastModified """
+
+    paginator = clients.s3().get_paginator("list_objects_v2")
+    return [obj for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=f"{folder}/") for obj in page.get("Contents", [])]
 
 
 def list_keys(folder: str) -> list[str]:
-    """List every key under a folder in the S3 bucket, e.g. list_keys("corpus")."""
-    paginator = get_client("s3").get_paginator('list_objects_v2')
-    keys = []
-    for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=f"{folder}/"):
-        for obj in page.get('Contents', []):
-            keys.append(obj['Key'])
-    return keys
+    """ every key under a folder """
+
+    return [obj["Key"] for obj in list_objects(folder)]
 
 
-if __name__ == "__main__":
-    for key in list_keys("corpus"):
-        print(key)
+def read_json(key: str) -> dict:
+    """ a JSON object's contents """
+
+    return json.loads(clients.s3().get_object(Bucket=BUCKET_NAME, Key=key)["Body"].read())
+
+
+def delete_folder(folder: str) -> None:
+    """ delete every object under a folder, e.g. one doc's old chunk files """
+
+    keys = list_keys(folder)
+    for start in range(0, len(keys), 1000):     # delete_objects takes at most 1000 keys
+        clients.s3().delete_objects(Bucket=BUCKET_NAME, Delete={"Objects": [{"Key": key} for key in keys[start:start + 1000]]})
