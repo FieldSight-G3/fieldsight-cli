@@ -3,7 +3,10 @@
 import hashlib
 
 from langchain_core.documents import Document
-from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
+from langchain_text_splitters import (
+    MarkdownHeaderTextSplitter,
+    RecursiveCharacterTextSplitter,
+)
 
 from ...types.corpus import CHUNK_METADATA, CorpusDoc
 from .layout import header_in_force, layout_by_page, page_markdown, tables_by_page

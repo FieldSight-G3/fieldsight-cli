@@ -1,17 +1,18 @@
 """Central construction of AWS SDK clients and Bedrock models."""
 
-from functools import lru_cache, cache
+from functools import cache, lru_cache
 from typing import Any
 
 import boto3
 from botocore.config import Config
-from langchain_aws import AmazonKnowledgeBasesRetriever, BedrockEmbeddings, ChatBedrockConverse
 from langchain_aws import (
     AmazonKnowledgeBasesRetriever,
     BedrockEmbeddings,
     ChatBedrockConverse,
 )
 from langchain_core.embeddings import Embeddings
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.retrievers import BaseRetriever
 
 from fieldsight.config import settings
 
@@ -51,12 +52,7 @@ def s3() -> Any:
     return client("s3")
 
 
-def chat_model(
-    *, 
-    fast: bool = False, 
-    temperature: float = 0.0
-    ) -> BaseChatModel:
-    
+def chat_model(*, fast: bool = False, temperature: float = 0.0) -> BaseChatModel:
     return ChatBedrockConverse(
         model_id=settings.bedrock_fast_model_id if fast else settings.bedrock_model_id,
         region_name=settings.aws_region,

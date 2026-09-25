@@ -3,7 +3,17 @@ from uuid import UUID
 from sqlalchemy import select
 
 from fieldsight.repository import IncidentRepository
-from fieldsight.seed import ALICE, NORTH, SeedRepository, analysts, grants, historical_incidents, seed_demo, stable_id
+from fieldsight.seed import (
+    ALICE,
+    NORTH,
+    SeedRepository,
+    analysts,
+    grants,
+    historical_incidents,
+    seed_demo,
+    stable_id,
+)
+
 
 def test_seed_is_repeatable_and_covers_boundary_cases():
     cases = historical_incidents()

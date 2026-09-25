@@ -2,7 +2,12 @@ from datetime import UTC, datetime
 from typing import Any
 
 from fieldsight.analysis import analyze_incident
-from fieldsight.repository import IncidentRepository, ReviewQueueRepository, RunRecordRepository
+from fieldsight.repository import (
+    IncidentRepository,
+    ReviewQueueRepository,
+    RunRecordRepository,
+)
+
 
 def normalized_fields() -> dict[str, Any]:
     return {
