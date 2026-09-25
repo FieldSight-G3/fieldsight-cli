@@ -1,8 +1,4 @@
-""" run Amazon Textract over PDFs sitting in S3
-
-    multi-page PDFs have to go through the async API: start a job, check its
-    status until it's done, then page through the blocks Textract hands back
-"""
+""" run Textract over PDFs in S3 via the async API, which multi-page PDFs require """
 
 from ..errors import ExtractionError
 from . import clients
@@ -19,10 +15,7 @@ def start_analysis(
     token: str | None = None
     ) -> str:
     
-    """ 
-        start an async Textract job for a PDF in S3 and return its job id; 
-        output_prefix also saves the results to S3 
-    """
+    """ start an async Textract job on a PDF in S3; returns the job id. output_prefix also saves results to S3 """
 
     kwargs = {
         "DocumentLocation": {"S3Object": {"Bucket": BUCKET_NAME, "Name": key}},
@@ -39,7 +32,7 @@ def start_analysis(
 def get_analysis_status(job_id: str) -> str:
     """ current status of the job: IN_PROGRESS, SUCCEEDED, FAILED, or PARTIAL_SUCCESS """
 
-    # we only care about the status here, so don't pull back a full page of blocks
+    # only the status is needed, so skip fetching a page of blocks
     response = clients.textract().get_document_analysis(JobId=job_id, MaxResults=1)
 
     return response["JobStatus"]
@@ -62,9 +55,9 @@ def get_blocks(job_id: str) -> list[dict]:
 
 
 def load_output(prefix: str) -> list[dict]:
-    """ the blocks a job saved under output_prefix, e.g. textract/<doc_id>; if it ran more than once, the newest run wins """
+    """ blocks saved under output_prefix (e.g. textract/<doc_id>), from the newest run """
 
-    # skips Textract's .s3_access_check, keeping only the numbered result parts
+    # keep only numbered result parts, skipping .s3_access_check
     parts = [obj for obj in list_objects(prefix) if obj["Key"].rsplit("/", 1)[-1].isdigit()]
     if not parts:
         raise ExtractionError(f"no Textract output under {prefix}/")

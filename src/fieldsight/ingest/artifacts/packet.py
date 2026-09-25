@@ -1,4 +1,4 @@
-""" crack a packet's form artifacts; a malformed one is skipped and logged, never fatal """
+""" crack a packet's form artifacts; malformed ones are logged and skipped """
 
 import logging
 from pathlib import Path
@@ -20,7 +20,7 @@ def crack_artifact(path: Path) -> list[ExtractedField]:
 
 
 def crack_packet(paths: list[Path]) -> PacketExtraction:
-    """ every artifact's fields; one that fails is recorded and skipped so the incident proceeds """
+    """ every artifact's fields; failures are recorded and skipped so the incident proceeds """
 
     fields, failures = [], []
     for path in paths:

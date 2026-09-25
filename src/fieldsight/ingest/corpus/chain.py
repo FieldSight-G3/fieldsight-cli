@@ -8,6 +8,6 @@ from .loader import TextractLoader
 
 
 def chunk_chain() -> Runnable[CorpusDoc, list[Document]]:
-    """ one doc through the loader into its cited chunks; run over the corpus with .batch() """
+    """ one doc through the loader to cited chunks; use .batch() for the corpus """
 
     return RunnableLambda(lambda doc: TextractLoader(doc).load())
