@@ -1,14 +1,17 @@
 """Central construction of AWS SDK clients and Bedrock models."""
 
-from functools import lru_cache
+from functools import lru_cache, cache
 from typing import Any
 
 import boto3
 from botocore.config import Config
 from langchain_aws import AmazonKnowledgeBasesRetriever, BedrockEmbeddings, ChatBedrockConverse
+from langchain_aws import (
+    AmazonKnowledgeBasesRetriever,
+    BedrockEmbeddings,
+    ChatBedrockConverse,
+)
 from langchain_core.embeddings import Embeddings
-from langchain_core.language_models import BaseChatModel
-from langchain_core.retrievers import BaseRetriever
 
 from fieldsight.config import settings
 
@@ -20,7 +23,7 @@ def session() -> boto3.Session:
     return boto3.Session(region_name=settings.aws_region)
 
 
-@lru_cache(maxsize=None)
+@cache
 def client(service: str) -> Any:
     return session().client(
         service,
