@@ -1,0 +1,13 @@
+Supervisor Statement — Incident INC-0412
+ 
+Date of statement: 2 March 2026
+
+I'm Renata Salas, Safety Coordinator for the Meridian Utilities Fairfax substation. 
+On the morning of February 25, 2026, Marcus Whitfield, one of our relay technicians, was racking a 12.47 kV circuit breaker into its cubicle in 
+the switchgear lineup. The cubicle bus was energized at the time per the work order — this was a live racking operation, not de-energized or locked out, 
+since the breaker needed to be placed into service under load.
+As Marcus operated the manual racking mechanism to move the breaker into the connected position, an arc flash occurred inside the cubicle. 
+He sustained electrical burns to both hands and forearms and was exposed to smoke from the arc. We called an ambulance immediately, and he was 
+transported to Inova Fairfax's burn unit, where he was formally admitted as an in-patient — not held for observation — for burn treatment and 
+monitoring for smoke inhalation. I notified our safety hotline of the in-patient hospitalization the same day, within the hour of learning he'd 
+been admitted. Marcus returned to full duty on August 21, 2026.
