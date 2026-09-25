@@ -28,7 +28,7 @@ def extract_form_fields(blocks: list[dict], artifact: str) -> list[ExtractedFiel
         if not label:
             continue
 
-        # a misread label is as bad as a misread value, so take the weaker of the two
+        # a misread label is as bad as a misread value, so take the lower confidence
         confidence = min(key.get("Confidence", 0.0), value.get("Confidence", 0.0)) / 100
 
         fields.append(EXTRACTED_FIELD.validate_python({

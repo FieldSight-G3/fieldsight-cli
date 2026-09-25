@@ -76,13 +76,13 @@ def embeddings() -> Embeddings:
     )
 
 
-def corpus_retriever(search_filter: dict | None = None) -> BaseRetriever:
-    """ the corpus Knowledge Base, optionally narrowed by a KB metadata filter; hits under the score threshold are dropped by Bedrock """
+def corpus_retriever(search_filter: dict | None = None, gated: bool = True) -> BaseRetriever:
+    """ corpus KB retriever with an optional metadata filter; gated=False keeps below-threshold hits, for threshold tuning """
 
     return AmazonKnowledgeBasesRetriever(
         knowledge_base_id=settings.bedrock_kb_id,
         client=bedrock_agent_runtime(),
         retrieval_config={"vectorSearchConfiguration": {
             "numberOfResults": settings.retrieval_max_chunks, **({"filter": search_filter} if search_filter else {})}},
-        min_score_confidence=settings.retrieval_score_threshold,
+        min_score_confidence=settings.retrieval_score_threshold if gated else None,
     )

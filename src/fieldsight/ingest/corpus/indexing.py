@@ -1,4 +1,4 @@
-""" put corpus chunks where the KB's S3 data source reads them, then sync the KB """
+""" stage corpus chunks in the KB's S3 data source, then sync the KB """
 
 import time
 
@@ -14,7 +14,7 @@ MAX_CHECKS = 120
 
 
 def stage_chunks(chunks: list[Document]) -> list[str]:
-    """ replace one doc's chunk files with these, each beside its .metadata.json; returns the chunk ids """
+    """ replace a doc's chunk files (each with a .metadata.json); returns the chunk ids """
 
     folder = f"{KB_FOLDER}/{chunks[0].metadata['doc_id']}"
     delete_folder(folder)
@@ -30,7 +30,7 @@ def stage_chunks(chunks: list[Document]) -> list[str]:
 
 
 def sync_knowledge_base() -> dict:
-    """ sync the KB and wait for it; returns the job's statistics """
+    """ sync the KB and wait; returns the job statistics """
 
     job_id = start_sync()
     for _ in range(MAX_CHECKS):

@@ -1,4 +1,4 @@
-""" section designations for corpus chunks: what a header names, and which excerpt a page falls in """
+""" section designations for corpus chunks, from headers or excerpt page ranges """
 
 import re
 
@@ -16,7 +16,7 @@ def section_label(header: str) -> str:
 
 
 def excerpt_path(doc: CorpusDoc, page: int) -> str | None:
-    """ the section_path of the excerpt covering a page of the shipped PDF, for docs cut from page ranges """
+    """ section_path of the excerpt covering a page, for docs cut from page ranges """
 
     start = 1
     for excerpt in doc.get("excerpts", []):
@@ -28,6 +28,6 @@ def excerpt_path(doc: CorpusDoc, page: int) -> str | None:
 
 
 def section_path(doc: CorpusDoc, page: int, header: str | None) -> str:
-    """ page-range docs take their excerpt's path (the manifest says finer designations aren't printed); the rest are named by their header """
+    """ the excerpt's path for page-range docs (finer designations aren't printed), else the header's designation """
 
     return excerpt_path(doc, page) or (section_label(header) if header else doc["doc_id"])

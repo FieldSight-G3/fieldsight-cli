@@ -4,9 +4,9 @@ import re
 
 from ...types.artifacts import REDACTED_SPAN, ExtractedField, Redacted, RedactedSpan
 
-# Form 301 labels whose whole value is personal information: names, addresses, date of birth, contact details
+# Form 301 labels whose whole value is PII
 PII_LABEL = re.compile(r"\b(name|street|address|city|zip|phone|date of birth|ssn|social security|e-?mail|completed by)\b")
-# only Form 301 field 1 holds the employee's name; other labels mention "employee" but hold facts about the incident
+# only Form 301 field 1 holds the employee's name; other "employee" labels hold incident facts
 EMPLOYEE_NAME_LABEL = re.compile(r"\bfull name\b")
 
 SSN = re.compile(r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)")
@@ -30,9 +30,9 @@ def patterns(names: set[str]) -> list[tuple[str, re.Pattern]]:
 
 
 def scrub_text(text: str, names: set[str], where: str) -> tuple[str, list[RedactedSpan]]:
-    """ the text with every match masked, and where each one was, as offsets in the original text """
+    """ the text with matches masked, plus each match's offsets in the original """
 
-    # earliest first, and the longest match where two start together, so an email wins over the name inside it
+    # earliest first, longest on ties, so an email beats the name inside it
     matches = sorted(((m.start(), m.end(), kind) for kind, pattern in patterns(names) for m in pattern.finditer(text)),
                      key=lambda match: (match[0], -match[1]))
     parts, spans, cursor = [], [], 0
@@ -46,7 +46,7 @@ def scrub_text(text: str, names: set[str], where: str) -> tuple[str, list[Redact
 
 
 def redact(fields: list[ExtractedField], narrative: str | None) -> Redacted:
-    """ drop PII fields, then scrub what's left, including the employee's name from the narrative; reports every removed span """
+    """ drop PII fields and scrub the rest, including the employee's name in the narrative; reports every removed span """
 
     dropped = [field for field in fields if is_pii_label(field["label"])]
     spans = [REDACTED_SPAN.validate_python({"kind": "field", "where": f["label"], "start": 0, "end": len(f["value"])}) for f in dropped]

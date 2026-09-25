@@ -1,6 +1,6 @@
-""" ingest the regulatory corpus into the Knowledge Base: crack, chunk, stage, sync
+""" ingest the corpus into the KB: crack, chunk, stage, sync
 
-    run from the repo root whenever corpus/ changes:  python script/ingest_corpus.py
+    run from the repo root when corpus/ changes:  python script/ingest_corpus.py
 """
 
 from fieldsight.ingest.corpus.chain import chunk_chain
@@ -13,7 +13,7 @@ if __name__ == "__main__":
     docs = corpus_docs()
     crack_corpus(docs)
 
-    # every doc must chunk before anything is written, so one failure leaves the KB's data source untouched
+    # chunk every doc before writing, so one failure leaves the data source untouched
     chunked = chunk_chain().batch(docs)
 
     for doc, chunks in zip(docs, chunked):

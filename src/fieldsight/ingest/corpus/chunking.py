@@ -12,7 +12,7 @@ from ...types.corpus import CHUNK_METADATA, CorpusDoc
 from .layout import header_in_force, layout_by_page, page_markdown, tables_by_page
 from .sections import section_path
 
-# ~300 / ~50 words: small enough that one chunk is about one regulatory provision
+# ~300 / ~50 words, so a chunk covers about one provision
 CHUNK_CHARS = 1800
 OVERLAP_CHARS = 300
 
@@ -21,14 +21,14 @@ SIZE = RecursiveCharacterTextSplitter(chunk_size=CHUNK_CHARS, chunk_overlap=OVER
 
 
 def chunk_metadata(doc: CorpusDoc, page: int, header: str | None) -> dict:
-    """ what the KB filters and cites on; chunk_id is added once the chunks are final """
+    """ metadata the KB filters and cites on; chunk_id is added later """
 
     return {"doc_id": doc["doc_id"], "title": doc["title"], "doc_type": doc["doc_type"],
             "section_path": section_path(doc, page, header), "page": page}
 
 
 def split_pages(doc: CorpusDoc, layout: dict[int, list[tuple[str, str]]]) -> list[Document]:
-    """ each page split on its headers; a page that opens mid-section carries the header from the page before """
+    """ split each page on headers; a page opening mid-section inherits the previous header """
 
     in_force, carried, chunks = header_in_force(layout), None, []
     for page, items in sorted(layout.items()):
@@ -40,7 +40,7 @@ def split_pages(doc: CorpusDoc, layout: dict[int, list[tuple[str, str]]]) -> lis
 
 
 def split_tables(doc: CorpusDoc, blocks: list[dict], in_force: dict[int, str | None]) -> list[Document]:
-    """ one whole chunk per table, never size-split, so its rows and columns stay together """
+    """ one unsplit chunk per table, keeping rows and columns together """
 
     return [
         Document(page_content=table, metadata=chunk_metadata(doc, page, in_force.get(page)))
@@ -50,13 +50,13 @@ def split_tables(doc: CorpusDoc, blocks: list[dict], in_force: dict[int, str | N
 
 
 def has_body(chunk: Document) -> bool:
-    """ False for a chunk that is only a heading, e.g. a table caption whose table is chunked on its own """
+    """ False for a heading-only chunk, e.g. a caption whose table is chunked separately """
 
     return any(not line.startswith("## ") for line in chunk.page_content.splitlines() if line.strip())
 
 
 def chunk_id(chunk: Document) -> str:
-    """ stable across runs: the same text in the same section and page always gets the same id """
+    """ stable id: the same text, section and page always give the same id """
 
     meta = chunk.metadata
     digest = hashlib.sha256(f"{meta['section_path']}|{meta['page']}|{chunk.page_content}".encode()).hexdigest()[:12]
@@ -64,7 +64,7 @@ def chunk_id(chunk: Document) -> str:
 
 
 def with_chunk_id(chunk: Document) -> Document:
-    """ the chunk with its id added, its metadata checked against the ChunkMetadata type """
+    """ the chunk with its id, metadata validated as ChunkMetadata """
 
     metadata = CHUNK_METADATA.validate_python({**chunk.metadata, "chunk_id": chunk_id(chunk)})
     return Document(page_content=chunk.page_content, metadata=metadata)

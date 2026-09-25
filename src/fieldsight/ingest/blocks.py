@@ -1,4 +1,4 @@
-""" helpers for walking Textract blocks, shared by packet field extraction and corpus chunking """
+""" Textract block helpers shared by packet and corpus extraction """
 
 
 def index_blocks(blocks: list[dict]) -> dict[str, dict]:
@@ -8,7 +8,7 @@ def index_blocks(blocks: list[dict]) -> dict[str, dict]:
 
 
 def related(block: dict, by_id: dict[str, dict], relation: str) -> list[dict]:
-    """ every block linked to this one by the given relationship type, e.g. CHILD or VALUE """
+    """ blocks linked by a relationship type, e.g. CHILD or VALUE """
 
     return [
         by_id[block_id]
@@ -20,7 +20,7 @@ def related(block: dict, by_id: dict[str, dict], relation: str) -> list[dict]:
 
 
 def text_of(block: dict, by_id: dict[str, dict]) -> str:
-    """ the words under a block joined up, with a ticked checkbox read as "true" """
+    """ a block's child words joined, with a ticked checkbox as "true" """
 
     words = []
     for child in related(block, by_id, "CHILD"):

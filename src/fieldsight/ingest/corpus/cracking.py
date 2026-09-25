@@ -1,4 +1,4 @@
-""" crack the corpus PDFs with Textract, saving the output under textract/<doc_id> for the loader """
+""" crack corpus PDFs with Textract, saving output under textract/<doc_id> for the loader """
 
 import hashlib
 
@@ -13,7 +13,7 @@ CORPUS_FEATURES = ["TABLES", "LAYOUT"]
 
 
 def start_crack(doc: CorpusDoc) -> str:
-    """ upload the doc's PDF and start its Textract job; the file's hash makes a re-run hand back the same job """
+    """ upload the doc's PDF and start its Textract job; the file hash lets a re-run reuse the job """
 
     upload(pdf_path(doc), pdf_key(doc))
     token = hashlib.sha256(pdf_path(doc).read_bytes()).hexdigest()
@@ -26,11 +26,11 @@ def start_crack(doc: CorpusDoc) -> str:
 
 
 def crack_corpus(docs: list[CorpusDoc]) -> None:
-    """ start every doc's job first so they run side by side, then wait on each """
+    """ start every job so they run in parallel, then wait on each """
 
     jobs = {doc["doc_id"]: start_crack(doc) for doc in docs}
 
-    # the corpus has to be complete, so a partial result counts as a failure here
+    # the corpus must be complete, so a partial result is a failure
     failed = [doc_id for doc_id, job_id in jobs.items() if wait_until_done(job_id) != "SUCCEEDED"]
     if failed:
         raise ExtractionError(f"Textract didn't fully succeed for: {', '.join(failed)}")
