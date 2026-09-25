@@ -15,18 +15,18 @@ A reference document, not an essay. Fill every section.
 | max tool invocations per turn | | calls | |
 | max graph recursion depth | | steps | |
 | max reviewer iterations | | iterations | |
-| max retrieved chunks / tokens | | | |
-| per-turn wall clock / per-call HTTP timeout | | s | |
+| max retrieved chunks / tokens | `RETRIEVAL_MAX_CHUNKS` per search, max 3 hops | chunks | Bounds context size |
+| per-turn wall clock / per-call HTTP timeout | TBD / 5 connect, 30 read, 4 attempts | s | Adaptive retry absorbs throttling |
 | session cost ceiling | | USD | |
 | near-boundary margin — 24h clock | | hours | |
 | near-boundary margin — 30-day fatality window | | days | |
 | near-boundary margin — 180-day cap | | days | |
 | near-boundary margin — 0.60 floor | | confidence (absolute) | |
-| similarity refusal threshold | | score | see evaluation report |
-| chunk size / overlap | | tokens | |
+| similarity refusal threshold | TBD (`script/tune_threshold.py`) | score | see evaluation report |
+| chunk size / overlap | 1800 / 300 | chars | ~One provision per chunk; tables kept whole |
 | boundary inclusivity (24h, 30 days) | | | |
 | day-count convention (is return day counted?) | | | |
-| model tier per agent | | | |
+| model tier per agent | retrieval: standard, temp 0 | | Citation accuracy over speed |
 | judge model + version | | | |
 | pinned versions: python, boto3, langgraph, langgraph-checkpoint-postgres, langchain-aws, pydantic, pydantic-settings, bedrock-agentcore, flask | | | |
 
