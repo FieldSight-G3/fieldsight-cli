@@ -6,14 +6,14 @@ after it. Persist SessionUsage between turns; start_turn resets only turn counts
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from decimal import Decimal
 from os import environ
-from typing import Literal, Mapping
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
 
 AgentName = Literal["coordinator", "recordability", "reportability", "hazard_control", "reviewer"]
 LegKind = Literal["model", "tool", "retrieval", "graph", "reviewer"]
@@ -89,7 +89,7 @@ class SessionUsage(BaseModel):
 
     session_id: str = Field(min_length=1)
     incident_id: UUID
-    cost_usd: Decimal = Field(default=Decimal("0"), ge=0)
+    cost_usd: Decimal = Field(default=Decimal(0), ge=0)
     turn: TurnUsage
 
 
@@ -119,7 +119,7 @@ class UsageEvent(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    cost_usd: Decimal = Field(default=Decimal("0"), ge=0)
+    cost_usd: Decimal = Field(default=Decimal(0), ge=0)
     tool_invocations: int = Field(default=0, ge=0)
     graph_steps: int = Field(default=0, ge=0)
     reviewer_iterations: int = Field(default=0, ge=0)
@@ -199,5 +199,5 @@ def preflight(usage: SessionUsage, limits: BoundsConfig, request: LegRequest, *,
     return BoundDecision(allowed=True)
 
 
-def _stop(reason: BoundName, current: Decimal | float | int, limit: Decimal | float | int) -> BoundDecision:
+def _stop(reason: BoundName, current: Decimal | float, limit: Decimal | float) -> BoundDecision:
     return BoundDecision(allowed=False, reason_code=reason, current=current, limit=limit)

@@ -1,17 +1,24 @@
 """Check-and-stop budgets, including cost across ask turns and isolation."""
 
+import unittest
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
-import unittest
 from uuid import UUID
 
 from pydantic import ValidationError
 
 from fieldsight.bounds import (
-    AgentName, BoundsConfig, LegKind, LegRequest, SessionUsage, TurnUsage, UsageEvent,
-    preflight, record_usage, start_turn,
+    AgentName,
+    BoundsConfig,
+    LegKind,
+    LegRequest,
+    SessionUsage,
+    TurnUsage,
+    UsageEvent,
+    preflight,
+    record_usage,
+    start_turn,
 )
-
 
 CASE_A = UUID("00000000-0000-0000-0000-000000000001")
 CASE_B = UUID("00000000-0000-0000-0000-000000000002")
@@ -79,7 +86,7 @@ class BoundsTests(unittest.TestCase):
         a = record_usage(a, UsageEvent(cost_usd=Decimal("5.00"), tool_invocations=12))
         self.assertEqual(preflight(a, BoundsConfig(), LegRequest(kind="tool"), now=ORIGIN).reason_code, "session_cost_usd")
         self.assertTrue(preflight(b, BoundsConfig(), LegRequest(kind="tool"), now=ORIGIN).allowed)
-        self.assertEqual(b.cost_usd, Decimal("0"))
+        self.assertEqual(b.cost_usd, Decimal(0))
 
     def test_environment_overrides_and_invalid_requests(self) -> None:
         values = {"FIELDSIGHT_BOUNDS_SESSION_COST_CEILING_USD": "2.25", "FIELDSIGHT_BOUNDS_MAX_REVIEWER_ITERATIONS": "3"}

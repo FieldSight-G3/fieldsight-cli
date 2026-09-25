@@ -7,7 +7,6 @@
 from .. import config
 from .client import get_client
 
-
 BUCKET_NAME = config.settings.packet_bucket
 
 

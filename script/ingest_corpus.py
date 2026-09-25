@@ -1,7 +1,6 @@
 from fieldsight.aws.s3 import pdf_key
 from fieldsight.aws.textract import start_analysis
 from fieldsight.ingest.chunking import corpus_doc_ids
-from fieldsight.errors import ExtractionError
 from fieldsight.ingest.crack import wait_until_done
 
 if __name__ == "__main__":

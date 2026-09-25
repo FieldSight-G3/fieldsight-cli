@@ -1,8 +1,8 @@
 """Boundary and external-signal checks for the pure escalation policy."""
 
-from datetime import UTC, datetime, timedelta
 import unittest
-from fieldsight.escalation import TriggerName
+from datetime import UTC, datetime, timedelta
+
 from pydantic import ValidationError
 
 from fieldsight.escalation import (
@@ -13,7 +13,6 @@ from fieldsight.escalation import (
 )
 from fieldsight.rules.engine import evaluate_incident
 from fieldsight.schemas.incidents import NormalizedIncident
-
 
 ORIGIN = datetime(2026, 1, 1, 9, tzinfo=UTC)
 ALL_CLEAR = EscalationSignals(

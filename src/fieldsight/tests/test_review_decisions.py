@@ -1,17 +1,21 @@
 """Review-card decisions and edits are validated without touching the DB."""
 
+import unittest
 from datetime import UTC, datetime
 from typing import Any
-import unittest
 from uuid import UUID
 
 from pydantic import ValidationError
 
 from fieldsight.review_decisions import (
-    CitationReference, CitationRepoint, ReviewAction, ReviewContext, ReviewEdit,
-    ReviewRequest, decide_review,
+    CitationReference,
+    CitationRepoint,
+    ReviewAction,
+    ReviewContext,
+    ReviewEdit,
+    ReviewRequest,
+    decide_review,
 )
-
 
 SUBMITTER = UUID("00000000-0000-0000-0000-000000000001")
 REVIEWER = UUID("00000000-0000-0000-0000-000000000002")
@@ -88,7 +92,7 @@ class ReviewDecisionTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             ReviewContext.model_validate({**context().model_dump(), "reviewer_id": SUBMITTER})
         with self.assertRaises(ValidationError):
-            ReviewContext.model_validate({**context().model_dump(), "decided_at": datetime(2026, 9, 24)})
+            ReviewContext.model_validate({**context().model_dump(), "decided_at": datetime(2026, 9, 24)})  # noqa: DTZ001
 
 
 if __name__ == "__main__":

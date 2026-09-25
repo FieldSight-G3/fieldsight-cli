@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from copy import deepcopy
 from datetime import datetime
-from typing import Any, Callable, Literal, Mapping
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
-
 
 ReviewAction = Literal["approve", "edit_then_approve", "reject"]
 ChunkSource = Callable[[str], str | None]

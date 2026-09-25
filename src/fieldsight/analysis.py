@@ -9,6 +9,7 @@ from fieldsight.repository import IncidentRepository
 from fieldsight.rules.engine import IncidentRuleResults, evaluate_incident
 from fieldsight.schemas.incidents import NormalizedIncident
 
+
 class AnalysisRun(BaseModel):
     model_config = ConfigDict(extra="forbid")
     run_id: UUID

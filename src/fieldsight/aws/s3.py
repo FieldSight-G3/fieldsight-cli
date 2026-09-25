@@ -1,8 +1,7 @@
 import uuid
 
-import fieldsight.config as config
+from fieldsight import config
 from fieldsight.aws.client import get_client
-
 
 # Resolve the setting dynamically so this module also works with config
 # implementations that expose settings through module-level __getattr__.

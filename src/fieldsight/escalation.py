@@ -14,7 +14,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from fieldsight.rules.engine import IncidentRuleResults
 from fieldsight.schemas.incidents import NormalizedIncident
 
-
 Score = Annotated[float, Field(ge=0.0, le=1.0)]
 TriggerName = Literal[
     "confidence_gate",
