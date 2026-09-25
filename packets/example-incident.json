@@ -1,0 +1,72 @@
+{
+  "incident_id": "INC-DEMO-001",
+  "analyst_id": "analyst-alpha",
+  "establishment_id": "substation-17",
+  "event_type": {
+    "value": "inpatient_hospitalization",
+    "confidence": 0.98,
+    "artifact": "demo-form.pdf",
+    "page": 1
+  },
+  "learned_at": {
+    "value": "2026-09-17T09:00:00+00:00",
+    "confidence": 0.97,
+    "artifact": "demo-form.pdf",
+    "page": 1
+  },
+  "work_related": {
+    "value": true,
+    "confidence": 0.99,
+    "artifact": "demo-form.pdf",
+    "page": 1
+  },
+  "new_case": {
+    "value": true,
+    "confidence": 0.96,
+    "artifact": "demo-form.pdf",
+    "page": 1
+  },
+  "treatments": {
+    "value": ["prescription_medication"],
+    "confidence": 0.94,
+    "artifact": "medical-note.pdf",
+    "page": 1
+  },
+  "days_away": {
+    "value": 30,
+    "confidence": 0.95,
+    "artifact": "demo-form.pdf",
+    "page": 1
+  },
+  "restricted_days": {
+    "value": 0,
+    "confidence": 0.95,
+    "artifact": "demo-form.pdf",
+    "page": 1
+  },
+  "job_transfer": {
+    "value": false,
+    "confidence": 0.95,
+    "artifact": "demo-form.pdf",
+    "page": 1
+  },
+  "observation_only": {
+    "value": false,
+    "confidence": 0.96,
+    "artifact": "medical-note.pdf",
+    "page": 1
+  },
+  "injury_description": {
+    "value": "Electrical contact injury requiring formal inpatient admission.",
+    "confidence": 0.91,
+    "artifact": "demo-form.pdf",
+    "page": 1
+  },
+  "energized_equipment": {
+    "value": true,
+    "confidence": 0.93,
+    "artifact": "demo-form.pdf",
+    "page": 1
+  },
+  "failed_artifacts": []
+}
