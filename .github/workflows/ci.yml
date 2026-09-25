@@ -39,8 +39,25 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
+
     env:
-      DATABASE_URL: postgresql://fieldsight:fieldsight_dev@localhost:5432/fieldsight
+      FIELDSIGHT_ENVIRONMENT: ci
+      FIELDSIGHT_AWS_REGION: us-east-1
+      FIELDSIGHT_BEDROCK_MODEL_ID: ci-placeholder
+      FIELDSIGHT_BEDROCK_FAST_MODEL_ID: ci-placeholder
+      FIELDSIGHT_BEDROCK_JUDGE_MODEL_ID: ci-placeholder
+      FIELDSIGHT_BEDROCK_EMBEDDING_MODEL_ID: ci-placeholder
+      FIELDSIGHT_BEDROCK_KB_ID: ci-placeholder
+      FIELDSIGHT_BEDROCK_KB_DATA_SOURCE_ID: ci-placeholder
+      FIELDSIGHT_BEDROCK_GUARDRAIL_ID: ci-placeholder
+      FIELDSIGHT_BEDROCK_GUARDRAIL_VERSION: "1"
+      FIELDSIGHT_PACKET_BUCKET: ci-placeholder
+      FIELDSIGHT_DATABASE_URL: postgresql://fieldsight:fieldsight_dev@localhost:5432/fieldsight
+      FIELDSIGHT_RETRIEVAL_SCORE_THRESHOLD: "0.5"
+      FIELDSIGHT_RETRIEVAL_MAX_CHUNKS: "8"
+      FIELDSIGHT_CONFIDENCE_FLOOR: "0.7"
+      FIELDSIGHT_GATEWAY_API_KEY: ci-placeholder
+      FIELDSIGHT_ALLOW_DEV_IDENTITY: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
