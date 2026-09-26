@@ -12,7 +12,7 @@ A reference document, not an essay. Fill every section.
 | Decision | Value | Unit | Reasoning |
 |---|---|---|---|
 | max tokens per call — coordinator / each worker / reviewer | | tokens | |
-| max tool invocations per turn | | calls | |
+| max tool invocations per turn | 10 model calls per specialist (`MAX_SPECIALIST_TOOL_ROUNDS`) | rounds | Hard cap independent of the model stopping |
 | max graph recursion depth | | steps | |
 | max reviewer iterations | | iterations | |
 | max retrieved chunks / tokens | `RETRIEVAL_MAX_CHUNKS` per search, max 3 hops | chunks | Bounds context size |
@@ -26,7 +26,7 @@ A reference document, not an essay. Fill every section.
 | chunk size / overlap | 1800 / 300 | chars | ~One provision per chunk; tables kept whole |
 | boundary inclusivity (24h, 30 days) | | | |
 | day-count convention (is return day counted?) | | | |
-| model tier per agent | retrieval: standard, temp 0 | | Citation accuracy over speed |
+| model tier per agent | retrieval, recordability, reportability: standard, temp 0 | | Citation accuracy over speed |
 | judge model + version | | | |
 | pinned versions: python, boto3, langgraph, langgraph-checkpoint-postgres, langchain-aws, pydantic, pydantic-settings, bedrock-agentcore, flask | | | |
 
