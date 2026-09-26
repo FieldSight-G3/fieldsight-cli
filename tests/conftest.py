@@ -30,6 +30,7 @@ for key, value in TEST_ENVIRONMENT.items():
 
 import psycopg
 import pytest
+from langchain_core.documents import Document
 
 from fieldsight.config import settings
 
@@ -47,3 +48,38 @@ def clean_db():
             )
         conn.commit()
     yield
+
+
+class ScriptedModel:
+    """ stands in for Bedrock: replays one reply per model call """
+
+    def __init__(self, replies):
+        self.replies = list(replies)
+
+    def bind_tools(self, tools):
+        return self
+
+    def invoke(self, messages):
+        return self.replies.pop(0)
+
+
+@pytest.fixture
+def script(monkeypatch):
+    """ replace Bedrock with scripted replies for the specialists; every corpus search returns chunk CFR-1904-a """
+
+    from fieldsight.aws import clients
+    from fieldsight.graph import specialists
+    from fieldsight.tools import tools
+
+    hit = Document(page_content="text of 1904.39", metadata={"score": 0.82, "source_metadata": {
+        "chunk_id": "CFR-1904-a", "doc_id": "CFR-1904", "title": "29 CFR Part 1904", "doc_type": "regulation",
+        "section_path": "1904.39", "page": 1}})
+    monkeypatch.setattr(tools, "search", lambda query, doc_type=None, section_path=None: [hit])
+
+    def use(replies):
+        model = ScriptedModel(replies)
+        monkeypatch.setattr(clients, "chat_model", lambda: model)
+        # drop the cached specialists so they're rebuilt on the scripted model
+        monkeypatch.setattr(specialists, "_SPECIALISTS", None)
+
+    return use

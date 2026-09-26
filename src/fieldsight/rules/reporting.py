@@ -73,14 +73,14 @@ def reporting_clock(data: R2Inputs) -> RuleDecision:
             "observation_only",
             "diagnostic_testing_only",
         }:
-            return _decision(inputs, "not_reportable")
+            return _decision(inputs, "not_reportable", exclusion=data.admission_reason)
 
     if data.event_type == "amputation":
         if data.amputation_detail is None:
             return _insufficient(inputs, "amputation_detail")
 
         if data.amputation_detail in AMPUTATION_EXCLUSIONS:
-            return _decision(inputs, "not_reportable")
+            return _decision(inputs, "not_reportable", exclusion=data.amputation_detail)
 
     return _decision(
         inputs,
@@ -94,6 +94,7 @@ def _decision(
     outcome: str,
     *,
     deadline=None,
+    exclusion=None,
 ) -> RuleDecision:
     return RuleDecision(
         rule_id="R2",
@@ -101,6 +102,7 @@ def _decision(
         inputs=inputs,
         sources=SOURCES,
         deadline=deadline,
+        exclusion=exclusion,
     )
 
 
