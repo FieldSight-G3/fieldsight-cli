@@ -15,3 +15,7 @@ class IndexingError(FieldSightError):
 
 class RetrievalError(FieldSightError):
     """ the corpus Knowledge Base couldn't be searched, so nothing can be grounded """
+
+
+class RuleError(FieldSightError):
+    """ a rule couldn't run, e.g. the rule whose decision it uses hasn't run yet """
