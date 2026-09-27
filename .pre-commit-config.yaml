@@ -1,0 +1,8 @@
+# Mirrors the lint job in .github/workflows/ci.yml.
+# Setup: pip install -e ".[dev]" && pre-commit install
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      - id: ruff-check
+        exclude: ^corpus/

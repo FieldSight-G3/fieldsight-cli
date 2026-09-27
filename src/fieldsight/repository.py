@@ -4,6 +4,9 @@ from datetime import datetime
 from typing import Any, TypeVar
 from uuid import UUID
 
+from pgvector.sqlalchemy import (
+    VECTOR as _VECTOR,  # noqa: F401 - registers vector type for reflection
+)
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import MetaData, Table, create_engine, insert, select, update
 

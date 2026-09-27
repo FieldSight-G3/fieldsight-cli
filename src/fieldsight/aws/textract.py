@@ -1,36 +1,39 @@
-""" run Amazon Textract over PDFs sitting in S3
+""" run Textract over PDFs in S3 via the async API, which multi-page PDFs require """
 
-    multi-page PDFs have to go through the async API: start a job, check its
-    status until it's done, then page through the blocks Textract hands back
-"""
-
-from .. import config
-from .client import get_client
-
-BUCKET_NAME = config.settings.packet_bucket
+from ..errors import ExtractionError
+from . import clients
+from .errors import raises
+from .s3 import BUCKET_NAME, list_objects, read_json
 
 
-def start_analysis(key: str, output_prefix: str | None = None) -> str:
-    """ start an async Textract job for a PDF already in S3, returns the job id
-
-        with output_prefix, Textract also writes its results into the bucket at <output_prefix>/<job_id>/1, /2, ...
-    """
+@raises(ExtractionError, "Textract couldn't start the job")
+def start_analysis(
+    key: str, 
+    output_prefix: str | None = None, 
+    *, 
+    features: list[str] | None = None, 
+    token: str | None = None
+    ) -> str:
+    
+    """ start an async Textract job on a PDF in S3; returns the job id. output_prefix also saves results to S3 """
 
     kwargs = {
         "DocumentLocation": {"S3Object": {"Bucket": BUCKET_NAME, "Name": key}},
-        "FeatureTypes": ["FORMS", "TABLES"],
+        "FeatureTypes": features or ["FORMS", "TABLES"],
     }
+    if token:
+        kwargs["ClientRequestToken"] = token[:64]
     if output_prefix:
         kwargs["OutputConfig"] = {"S3Bucket": BUCKET_NAME, "S3Prefix": output_prefix}
 
-    return get_client("textract").start_document_analysis(**kwargs)["JobId"]
+    return clients.textract().start_document_analysis(**kwargs)["JobId"]
 
 
 def get_analysis_status(job_id: str) -> str:
     """ current status of the job: IN_PROGRESS, SUCCEEDED, FAILED, or PARTIAL_SUCCESS """
 
-    # we only care about the status here, so don't pull back a full page of blocks
-    response = get_client("textract").get_document_analysis(JobId=job_id, MaxResults=1)
+    # only the status is needed, so skip fetching a page of blocks
+    response = clients.textract().get_document_analysis(JobId=job_id, MaxResults=1)
 
     return response["JobStatus"]
 
@@ -38,7 +41,7 @@ def get_analysis_status(job_id: str) -> str:
 def get_blocks(job_id: str) -> list[dict]:
     """ page through every block of a finished job """
 
-    textract = get_client("textract")
+    textract = clients.textract()
 
     blocks: list[dict] = []
     kwargs = {"JobId": job_id}
@@ -51,12 +54,21 @@ def get_blocks(job_id: str) -> list[dict]:
         kwargs["NextToken"] = response["NextToken"]
 
 
-if __name__ == "__main__":
-    import sys
-    import time
+def load_output(prefix: str) -> list[dict]:
+    """ blocks saved under output_prefix (e.g. textract/<doc_id>), from the newest run """
 
-    job_id = start_analysis(sys.argv[1])
-    while (status := get_analysis_status(job_id)) == "IN_PROGRESS":
-        time.sleep(5)
+    # keep only numbered result parts, skipping .s3_access_check
+    parts = [obj for obj in list_objects(prefix) if obj["Key"].rsplit("/", 1)[-1].isdigit()]
+    if not parts:
+        raise ExtractionError(f"no Textract output under {prefix}/")
 
-    print(f"{sys.argv[1]}: {status}, {len(get_blocks(job_id))} blocks")
+    newest_job = max(
+        parts, 
+        key=lambda obj: obj["LastModified"]
+        )["Key"].split("/")[-2]
+    
+    keys = sorted((
+        obj["Key"] for obj in parts if obj["Key"].split("/")[-2] == newest_job), 
+        key=lambda key: int(key.rsplit("/", 1)[-1])
+        )
+    return [block for key in keys for block in read_json(key)["Blocks"]]

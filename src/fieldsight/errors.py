@@ -7,3 +7,15 @@ class FieldSightError(Exception):
 
 class ExtractionError(FieldSightError):
     """ Textract couldn't crack an artifact or corpus doc """
+
+
+class IndexingError(FieldSightError):
+    """ the corpus couldn't be written to, or synced into, the Knowledge Base """
+
+
+class RetrievalError(FieldSightError):
+    """ the corpus Knowledge Base couldn't be searched, so nothing can be grounded """
+
+
+class RuleError(FieldSightError):
+    """ a rule couldn't run, e.g. the rule whose decision it uses hasn't run yet """
