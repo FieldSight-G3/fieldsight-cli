@@ -2,7 +2,8 @@ from datetime import UTC, datetime
 
 from langchain_core.messages import AIMessage
 
-from fieldsight.graph.specialists import MAX_SPECIALIST_TOOL_ROUNDS, get_specialists
+from fieldsight.graph.nodes.supervision import recordability_specialist_node
+from fieldsight.prompts import RECORDABILITY_GOAL
 from fieldsight.schemas.incidents import NormalizedIncident
 
 AT = datetime(2026, 3, 2, 9, 0, tzinfo=UTC)
@@ -19,30 +20,33 @@ def calls(*requests) -> AIMessage:
     return AIMessage("", tool_calls=[{"name": name, "args": args, "id": f"{name}-{i}"} for i, (name, args) in enumerate(requests)])
 
 
-def run(replies: list, script) -> dict:
-    script(replies)
-    return get_specialists()["recordability"].invoke(
-        {"task": "test", "incident": INCIDENT, "messages": [], "rounds": 0, "decisions": [], "retrieved": {},
-         "proposal": None})
-
-
-def test_loops_on_its_tools_until_it_decides_it_is_done_and_applies_r3_r1_r4(script):
-    state = run([
-        calls(("get_incident_extraction", {}), ("evaluate_rule", {"rule_id": "R3"})),
+def test_leg_carries_the_proposal_and_only_what_it_rests_on(script):
+    script([
+        calls(("evaluate_rule", {"rule_id": "R3"})),
         calls(("evaluate_rule", {"rule_id": "R1"})),
         calls(("evaluate_rule", {"rule_id": "R4"}), ("search_knowledge_base", {"query": "days away"})),
         calls(("propose_classification", {"proposal": {"outcome": "recordable", "log_column": "H", "day_count": 3,
                                                        "rationale": "Days away [1].", "chunk_ids": ["CFR-1904-a"]}})),
         AIMessage("Proposed."),
-    ], script)
+    ])
 
-    assert state["proposal"]["log_column"] == "H"
-    assert [decision["rule_id"] for decision in state["decisions"]] == ["R3", "R1", "R4"]
+    leg = recordability_specialist_node({"incident": INCIDENT})["dossier"]["recordability"]
+
+    assert leg["task"] == RECORDABILITY_GOAL
+    assert leg["proposal"]["log_column"] == "H"
+    assert set(leg["decisions"]) == {"R1", "R3", "R4"}
+    assert leg["cited"]["CFR-1904-a"]["text"] == "text of 1904.39"
+    # the worker's transcript never reaches the dossier
+    assert set(leg) == {"task", "proposal", "decisions", "cited"}
 
 
-def test_stops_at_the_round_budget(script):
-    state = run([calls(("get_incident_extraction", {})) for _ in range(MAX_SPECIALIST_TOOL_ROUNDS)], script)
+def test_a_narrowed_task_is_recorded_and_no_proposal_cites_nothing(script):
+    script([AIMessage("Nothing to propose.")])
 
-    assert state["rounds"] == MAX_SPECIALIST_TOOL_ROUNDS
-    assert state["messages"][-1].tool_calls
-    assert state["proposal"] is None
+    leg = recordability_specialist_node(
+        {"incident": INCIDENT, "tasks": {"recordability": "Check the day count against the 180-day cap."}}
+    )["dossier"]["recordability"]
+
+    assert leg["task"] == "Check the day count against the 180-day cap."
+    assert leg["proposal"] is None
+    assert leg["cited"] == {}

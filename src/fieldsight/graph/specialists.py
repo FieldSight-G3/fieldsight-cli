@@ -1,26 +1,26 @@
-""" factory to create the specialist agents (graphs): the Recordability and Reportability Workers """
+""" factory to create the specialist agents (graphs): the Recordability, Reportability and Hazard Control Workers """
 
 import operator
 from typing import Annotated, TypedDict
 
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 from ..aws import clients
-from ..prompts import PROMPTS
-from ..tools.tools import RECORDABILITY_TOOLS, REPORTABILITY_TOOLS
+from ..prompts import HAZARD_CONTROL_PROMPT, RECORDABILITY_PROMPT, REPORTABILITY_PROMPT
+from ..tools.tools import HAZARD_CONTROL_TOOLS, RECORDABILITY_TOOLS, REPORTABILITY_TOOLS
 
 MAX_SPECIALIST_TOOL_ROUNDS = 10
 
 
 class SpecialistState(TypedDict):
-    """ a specialist's private state, so running two in parallel never mixes their transcripts """
+    """ a worker's private state. Deliberately tiny so each worker only has what it needs, and two running in parallel never mix transcripts """
 
     # input
-    worker: str
     task: str
     incident: dict
     messages: Annotated[list[AnyMessage], add_messages]
@@ -28,25 +28,25 @@ class SpecialistState(TypedDict):
 
     # what the tools found, written by the tools themselves
     decisions: Annotated[list[dict], operator.add]
-    retrieved: Annotated[list[str], operator.add]
+    retrieved: Annotated[dict[str, dict], operator.or_]
 
-    # output: set by the propose tool once it accepts a proposal, which ends the loop
+    # output: set by the propose tool once it accepts a proposal
     proposal: dict | None
 
 
-def build_specialist(name: str, tools: list[BaseTool]):
-    """ each specialist is just its own graph; this factory builds any of them """
+def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer: BaseCheckpointSaver | None = None):
+    """ each specialist is just its own graph. this is a factory function that can build multiple types of specialists """
 
-    system = PROMPTS[name]
     model = clients.chat_model().bind_tools(tools)
 
-    # node for prompting the model: it chooses which tool to call, and when it's done
+    # node for prompting the model: it investigates with its tools, then proposes its finding through its propose tool
     def agent(state: SpecialistState) -> dict:
         history = list(state.get("messages") or [])
         seed: list = []
-        if not history:
-            seed = [SystemMessage(system), HumanMessage(state["task"])]
-            history = seed
+        # every run starts with its task; a thread that's reused (the Reviewer's) already has the brief
+        if not state.get("rounds"):
+            seed = ([] if history else [SystemMessage(brief)]) + [HumanMessage(state["task"])]
+            history += seed
 
         reply = model.invoke(history)
         return {"messages": seed + [reply], "rounds": state.get("rounds", 0) + 1}
@@ -55,8 +55,8 @@ def build_specialist(name: str, tools: list[BaseTool]):
     def run_tools(state: SpecialistState, config) -> dict:
         return ToolNode(tools).invoke(state, config)
 
-    # route after the model, in plain Python: back to the tools while it asks for them and the budget allows
-    def route_after_agent(state: SpecialistState) -> str:
+    # route after the model: it decides it's done by not asking for tools; the budget caps a model that never does
+    def route(state: SpecialistState) -> str:
         last = state["messages"][-1]
         if isinstance(last, AIMessage) and last.tool_calls:
             if state.get("rounds", 0) >= MAX_SPECIALIST_TOOL_ROUNDS:
@@ -64,25 +64,29 @@ def build_specialist(name: str, tools: list[BaseTool]):
             return "tools"
         return END
 
-    # route after the tools: an accepted proposal is the structured event that ends the loop
-    def route_after_tools(state: SpecialistState) -> str:
-        return END if state.get("proposal") else "agent"
-
     # putting the graph together
     g = StateGraph(SpecialistState)
     g.add_node("agent", agent)
     g.add_node("tools", run_tools)
     g.add_edge(START, "agent")
-    g.add_conditional_edges("agent", route_after_agent, {"tools": "tools", END: END})
-    g.add_conditional_edges("tools", route_after_tools, {"agent": "agent", END: END})
+    g.add_conditional_edges("agent", route, {"tools": "tools", END: END})
+    g.add_edge("tools", "agent")
 
-    # creating the specialist sub-graph and naming it for tracing
-    return g.compile(name=name)
+    # creating the specialist sub-graph and naming it for tracing; a checkpointer keeps its state on its own thread
+    return g.compile(name=name, checkpointer=checkpointer)
 
+
+# each specialist's brief carries its goal, corpus and rules (spec section 5); its tools follow spec section 9
+SPECIALIST_BRIEFS = {
+    "recordability": RECORDABILITY_PROMPT,
+    "reportability": REPORTABILITY_PROMPT,
+    "hazard_control": HAZARD_CONTROL_PROMPT,
+}
 
 _TOOLSETS = {
     "recordability": RECORDABILITY_TOOLS,
     "reportability": REPORTABILITY_TOOLS,
+    "hazard_control": HAZARD_CONTROL_TOOLS,
 }
 
 # lazily loading the specialists so that just importing this module doesn't create them
@@ -94,5 +98,5 @@ def get_specialists() -> dict:
 
     global _SPECIALISTS
     if _SPECIALISTS is None:
-        _SPECIALISTS = {name: build_specialist(name, tools) for name, tools in _TOOLSETS.items()}
+        _SPECIALISTS = {name: build_specialist(name, brief, _TOOLSETS[name]) for name, brief in SPECIALIST_BRIEFS.items()}
     return _SPECIALISTS

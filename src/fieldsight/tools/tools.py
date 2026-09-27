@@ -7,15 +7,18 @@ from langchain_core.messages import ToolMessage
 from langchain_core.tools import InjectedToolCallId, tool
 from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
+from pydantic import BaseModel
 
 from ..errors import RetrievalError, RuleError
 from ..retrieval.corpus import meta, search
 from ..rules import proposal_review
 from ..rules.engine import evaluate_rule as run_rule
-from ..schemas.rule_proposal import ClassificationProposal, ReportingProposal
-
-# the rules each specialist may run
-HELD_RULES = {"recordability": {"R1", "R3", "R4"}, "reportability": {"R2"}}
+from ..schemas.review import ReviewVerdict
+from ..schemas.rule_proposal import (
+    ClassificationProposal,
+    HazardControlProposal,
+    ReportingProposal,
+)
 
 
 def respond(result: dict, tool_call_id: str, **state_update) -> Command:
@@ -67,7 +70,8 @@ def search_knowledge_base(
         {**{key: meta(doc)[key] for key in ("chunk_id", "doc_id", "title", "doc_type", "section_path")},
          "score": doc.metadata["score"], "text": doc.page_content}
         for doc in docs]
-    return respond({"results": results}, tool_call_id, retrieved=[hit["chunk_id"] for hit in results])
+    # keep each hit, not just its id, so the Reviewer can judge a claim against the text it cites
+    return respond({"results": results}, tool_call_id, retrieved={hit["chunk_id"]: hit for hit in results})
 
 
 @tool(parse_docstring=True)
@@ -85,9 +89,6 @@ def evaluate_rule(
         rule_id: R3 medical treatment beyond first aid, R1 recordability, R4 the 300-Log column, R2 the reporting clock.
     """
 
-    held = HELD_RULES[state["worker"]]
-    if rule_id not in held:
-        return {"error": f"this specialist holds {', '.join(sorted(held))}"}
     try:
         decision = run_rule(rule_id, state["incident"], latest_decisions(state))
     except RuleError as error:
@@ -95,7 +96,7 @@ def evaluate_rule(
     return respond({"decision": decision}, tool_call_id, decisions=[decision])
 
 
-def propose(proposal: ClassificationProposal | ReportingProposal, problems: list[str], tool_call_id: str) -> Command:
+def propose(proposal: BaseModel, problems: list[str], tool_call_id: str) -> Command:
     """ the verdict goes back to the model; an accepted proposal also goes into state, which ends the loop """
 
     if problems:
@@ -142,6 +143,46 @@ def propose_reporting_determination(
     return propose(proposal, problems, tool_call_id)
 
 
+@tool(parse_docstring=True)
+def propose_hazard_control(
+    proposal: HazardControlProposal,
+    state: Annotated[dict, InjectedState],
+    tool_call_id: Annotated[str, InjectedToolCallId],
+) -> Command:
+    """ Propose the control 29 CFR 1910.269(l) requires here. Writes nothing.
+
+    A proposed control needs its control type and the specific paragraph (l) provision or
+    approach-distance table it rests on, carried by the first chunk id, a 1910.269 chunk
+    retrieved this run. Where the corpus supports no control, propose insufficient_data.
+    Returns accepted, or the problems to fix before proposing again.
+
+    Args:
+        proposal: The outcome, control type, provision, a rationale, and its chunk ids with the provision's chunk first.
+    """
+
+    problems = proposal_review.review_hazard_control(proposal, set(state["retrieved"]))
+    return propose(proposal, problems, tool_call_id)
+
+
+@tool(parse_docstring=True)
+def submit_review(
+    verdict: ReviewVerdict,
+    tool_call_id: Annotated[str, InjectedToolCallId],
+) -> Command:
+    """ Submit your verdict on the dossier. Writes nothing.
+
+    Approve only when every leg is grounded, cited, attributed and descriptive; otherwise
+    list one rejection per claim that can't stand, each with a narrowed goal for its worker.
+
+    Args:
+        verdict: approved, or the rejections: the worker, the quoted claim, the problem, and the narrowed goal.
+    """
+
+    return propose(verdict, [], tool_call_id)
+
+
 # creating lists of the tools to BIND to each specialist's model
 RECORDABILITY_TOOLS = [get_incident_extraction, search_knowledge_base, evaluate_rule, propose_classification]
 REPORTABILITY_TOOLS = [get_incident_extraction, search_knowledge_base, evaluate_rule, propose_reporting_determination]
+HAZARD_CONTROL_TOOLS = [search_knowledge_base, propose_hazard_control]
+REVIEWER_TOOLS = [search_knowledge_base, submit_review]

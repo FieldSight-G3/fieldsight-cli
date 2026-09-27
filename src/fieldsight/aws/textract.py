@@ -29,6 +29,20 @@ def start_analysis(
     return clients.textract().start_document_analysis(**kwargs)["JobId"]
 
 
+@raises(ExtractionError, "Textract couldn't analyze the document")
+def analyze_bytes(document: bytes, features: list[str] | None = None, queries: dict[str, str] | None = None) -> list[dict]:
+    """ the synchronous API over a file's bytes, no S3 needed; single-page documents only, so not for ingestion
+
+        queries maps an alias to a question; each answer comes back as a QUERY_RESULT block with its own confidence
+    """
+
+    kwargs: dict = {"Document": {"Bytes": document}, "FeatureTypes": features or ["FORMS", "TABLES"]}
+    if queries:
+        kwargs["FeatureTypes"] = [*kwargs["FeatureTypes"], "QUERIES"]
+        kwargs["QueriesConfig"] = {"Queries": [{"Text": text, "Alias": alias} for alias, text in queries.items()]}
+    return clients.textract().analyze_document(**kwargs)["Blocks"]
+
+
 def get_analysis_status(job_id: str) -> str:
     """ current status of the job: IN_PROGRESS, SUCCEEDED, FAILED, or PARTIAL_SUCCESS """
 

@@ -1,37 +1,66 @@
 # Graph
 
-## Specialist loop
+## Chart
 
 ```
-{incident, tasks}                                     parent state (GF-50)
+{analyst_id, incident, tasks}                                    parent state (not built)
       |
-RECORDABILITY / REPORTABILITY node                    nodes/recordability.py, nodes/reportability.py
-      |  invoke {worker, task, incident}
+COORDINATOR (not built) --dispatch--> <worker>_specialist_node   nodes/supervision.py
+                                          |  invoke {task, incident}, recursion_limit from config
+                                          v
+                                    agent <-> tools              specialists.py (build_specialist)
+                                          |  the model stops asking for tools,
+                                          |  or MAX_SPECIALIST_TOOL_ROUNDS is spent
+                                          v
+                                    {"dossier": {worker: DossierLeg}}   the transcript stays behind
+      |
+reviewer_node --invoke on thread {analyst_id}:{incident_id}:reviewer-->  agent <-> tools (submit_review)
+      |                                                                  nodes/review.py
+      |  {"reviews": [verdict], "review_iterations": n + 1, "tasks": {worker: narrowed goal}}
       v
-   agent  -- tool calls, rounds < MAX -->  tools      specialists.py
-     ^                                       |        (ToolNode over tools/tools.py; the tools write
-     +------- no proposal accepted yet ------+         decisions, retrieved and proposal into state)
-      |
-      |  proposal accepted, the model stopped asking, or the budget is spent
-      v
-state["proposal"], state["decisions"]                 specialists.py
-      |
-{recordability | reportability: typed proposal or None, rule_invocations}
+route_after_review --rejected, n < max_review_iterations--> "coordinator"
+                   --approved, no verdict, or out of iterations--> "eligibility_check" (not built)
 ```
 
 ## Files
 
 | File | Contains |
 |---|---|
-| `graph/specialists.py` | `SpecialistState`, `MAX_SPECIALIST_TOOL_ROUNDS`, and `build_specialist`, which makes each worker its own graph: the model picks tools and `ToolNode` runs them. Plain-Python routers end the loop on a structured event (an accepted proposal in state), when the model stops asking, or when the budget is spent. `get_specialists` builds both once. |
-| `graph/nodes/recordability.py` | The RECORDABILITY node: runs the Recordability Worker on the incident and returns only its `ClassificationProposal` and the rule invocations its tools made. |
-| `graph/nodes/reportability.py` | The REPORTABILITY node: the same for the Reportability Worker and its `ReportingProposal`. |
-| `tools/tools.py` | The `@tool` functions (`get_incident_extraction`, `search_knowledge_base`, `evaluate_rule`, `propose_classification`, `propose_reporting_determination`) and each worker's tool list. The propose tools take a typed proposal (section 9); the others take plain arguments. All read the incident from the injected state, never from the model. `evaluate_rule`, `search_knowledge_base` and the propose tools write what they found into the specialist's state with `Command`, so nothing is read back out of messages. |
-| `rules/proposal_review.py` | `review_classification` and `review_reporting` take a typed proposal and return its problems, like `enforce_grounding` in the trainer's `rag.py`: it is accepted only if its fields match the rule decisions and every cited chunk was retrieved. Nothing is written. |
-| `prompts.py` | Each worker's system prompt and default goal. |
-| `rules/engine.py` | `evaluate_rule`, the plain-dict way into the rules for the tools. It owns the rule ordering (`NEEDS`: R1 uses R3, R4 uses R1) and raises `RuleError` when a rule's prerequisite hasn't run, which the tool hands back to the model as an error. Also the `r*_inputs` builders shared with `evaluate_incident`. |
-| `rules/reporting.py` | R2 names the 1904.39(b)(10) or (b)(11) exclusion it applied, which is how a proposal that stops at the clock gets rejected. |
+| `graph/specialists.py` | `SpecialistState`, `MAX_SPECIALIST_TOOL_ROUNDS`, and `build_specialist(name, brief, tools, checkpointer=None)`, which builds any `agent <-> tools -> END` loop. `SPECIALIST_BRIEFS` and `_TOOLSETS` hold what makes each worker different; `get_specialists` builds the three workers once. |
+| `graph/nodes/supervision.py` | `_run_specialist`, which invokes a worker and maps its result back as its dossier leg, and the one-line dispatch nodes for Recordability, Reportability and Hazard Control. |
+| `graph/nodes/review.py` | `postgres_checkpointer`, `get_reviewer` (the factory with the Reviewer's brief, tools and checkpointer), `reviewer_node` and `route_after_review`. |
+| `types/dossier.py` | `DossierLeg` (task, proposal, decisions, cited) and `Dossier`, keyed by worker. |
+| `schemas/rule_proposal.py` | The `Proposal` base, `ClassificationProposal`, `ReportingProposal`, `HazardControlProposal`, and the `Exclusion` and `ControlType` vocabularies. |
+| `schemas/review.py` | `Rejection` (worker, quoted claim, problem, narrowed goal) and `ReviewVerdict`. |
+| `tools/tools.py` | The `@tool` functions and each participant's tool list. |
+| `rules/proposal_review.py` | `review_classification`, `review_reporting` and `review_hazard_control`, and `CONTROL_PARAGRAPHS`. |
+| `prompts.py` | Each worker's brief and default goal, and the Reviewer's brief. |
+| `config.py` | `max_review_iterations` (3) and `graph_recursion_limit` (25). |
 
-Paths are relative to `src/fieldsight/`. The pydantic models (`ClassificationProposal`, `ReportingProposal`, `Exclusion`) are in `schemas/rule_proposal.py`, and `RuleDecision.exclusion` is in `schemas/rule_decision.py`.
+Paths are relative to `src/fieldsight/`.
 
-For GF-50: the parent state supplies `incident` (a plain dict) and an optional `tasks[name]` narrowed goal, and receives the proposal key plus `rule_invocations`, which needs a list-append reducer.
+## Decisions
+
+| Decision | Why |
+|---|---|
+| A specialist is data (a brief and a tool list) built by one factory, like the trainer's `specialists.py` | Spec section 5 defines each worker only by its goal, corpus, rules and tools |
+| The model decides when it's done; `MAX_SPECIALIST_TOOL_ROUNDS` (10) caps it; an accepted proposal doesn't force an end | Section 5: a worker loops "until it stops requesting tools" |
+| Tools per worker follow section 9; the `propose_*` tools are the structured output, validated at the tool boundary | Section 9: every propose tool takes a typed proposal and returns it validated or rejected |
+| Tools read the incident from injected state, never from a model argument | Section 9: the model chooses what, never whose |
+| Hazard Control's citation gate is two checks: the schema needs `control_type` and `provision`, and `review_hazard_control` needs the first chunk to be a `CFR-269-` chunk and the provision to sit in the control's paragraph of (l) | Section 5: a proposal with no resolving citation is rejected at the tool boundary |
+| `ControlType` is a `Literal`, one value per paragraph (l)(1) to (l)(12) | A vocabulary defined in code, taken from the corpus text |
+| A dossier leg holds the task, proposal, decisions and cited chunk text, never messages | Section 5: the Reviewer sees only structured outputs; the cited text lets it reject a claim its chunk doesn't state (P4) |
+| The Reviewer is the same factory with its own brief and tools, compiled with a Postgres checkpointer, on thread `{analyst_id}:{incident_id}:reviewer` | Sections 5 and 8: its own checkpointer thread; section 9: it holds `search_knowledge_base` |
+| The agent adds the task whenever a run starts, and the brief only when the history is empty | The Reviewer's thread is reused, so each iteration's dossier has to reach the model |
+| Every loop has two caps: the round budget or `max_review_iterations`, plus `graph_recursion_limit` on each invoke; hitting the recursion limit means no proposal or verdict, not a crash | Section 5: every loop has a structured condition and an independent hard cap |
+| The checkpointer is built in the graph layer (`nodes/review.py`), not in `repository.py` | Trainer template: the checkpointer is passed in at `compile()` |
+
+## Not implemented
+
+- The Coordinator: `supervisor_node`, `route_after_supervisor`, its typed plan, and why each worker was dispatched.
+- The parent graph (`graph/state.py`, `graph/graph.py`): `analyst_id` and `tasks` in state, the reducers (`dossier` with `operator.or_`, `reviews` append, `tasks` merge), a separate edge from each worker into the Reviewer, and `ReviewVerdict` in the checkpoint serializer's allowed modules.
+- The eligibility check and output guardrails.
+- `find_similar_incidents` for Hazard Control (comes with the Gateway ticket).
+- The run record: the full list of rules-engine invocations (the dossier keeps only the latest decision per rule), tool calls, and token totals.
+- Registering the Reviewer's thread in the `sessions` table.
+- Known edge case: if the Reviewer runs out of rounds mid-tool-call, its thread keeps an unanswered tool call, and a later run on that thread would fail on Bedrock.
