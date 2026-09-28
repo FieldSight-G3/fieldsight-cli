@@ -4,6 +4,8 @@ from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from .bounds import BoundsConfig
+
 load_dotenv()
 
 
@@ -48,5 +50,8 @@ settings = Settings(
     retrieval_max_chunks=int(os.environ["FIELDSIGHT_RETRIEVAL_MAX_CHUNKS"]),
     confidence_floor=float(os.environ["FIELDSIGHT_CONFIDENCE_FLOOR"]),
     gateway_api_key=os.environ["FIELDSIGHT_GATEWAY_API_KEY"],
-    allow_dev_identity=os.environ["FIELDSIGHT_ALLOW_DEV_IDENTITY"].lower() == "true",
+    allow_dev_identity=os.environ["FIELDSIGHT_ALLOW_DEV_IDENTITY"].lower() == "true"
 )
+
+# every loop cap and budget: defaults in code, FIELDSIGHT_BOUNDS_* overrides them per environment
+bounds = BoundsConfig.from_environment()

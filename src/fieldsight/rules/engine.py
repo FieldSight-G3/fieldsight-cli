@@ -116,6 +116,7 @@ def r4_inputs(incident: NormalizedIncident, r1: RuleDecision) -> R4Inputs:
 # the rule whose decision another rule uses
 NEEDS = {"R1": "R3", "R4": "R1"}
 
+
 def evaluate_rule(rule_id: str, incident: dict, decisions: dict[str, dict]) -> dict:
     """ one rule over a plain incident dict, given the latest decision per rule so far; for the specialists' tools """
 

@@ -19,3 +19,7 @@ class RetrievalError(FieldSightError):
 
 class RuleError(FieldSightError):
     """ a rule couldn't run, e.g. the rule whose decision it uses hasn't run yet """
+
+
+class GuardrailError(FieldSightError):
+    """ Bedrock Guardrails couldn't screen a string, so it can't be let through """

@@ -35,6 +35,7 @@ class BoundsConfig(BaseModel):
     hazard_control_max_tokens_per_call: int = Field(default=6144, gt=0)
     reviewer_max_tokens_per_call: int = Field(default=4096, gt=0)
     max_tool_invocations_per_turn: int = Field(default=12, gt=0)
+    max_specialist_tool_rounds: int = Field(default=10, gt=0)
     max_graph_recursion_depth: int = Field(default=32, gt=0)
     max_reviewer_iterations: int = Field(default=2, gt=0)
     max_retrieved_chunks_per_turn: int = Field(default=16, gt=0)

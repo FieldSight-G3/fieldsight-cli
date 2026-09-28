@@ -44,6 +44,10 @@ def bedrock_agent_runtime() -> Any:
     return client("bedrock-agent-runtime")
 
 
+def bedrock_runtime() -> Any:
+    return client("bedrock-runtime")
+
+
 def textract() -> Any:
     return client("textract")
 
@@ -53,6 +57,8 @@ def s3() -> Any:
 
 
 def chat_model(*, fast: bool = False, temperature: float = 0.0) -> BaseChatModel:
+    """ the reasoning tier for the workers; fast=True is the fast tier, for the readiness gate """
+
     return ChatBedrockConverse(
         model_id=settings.bedrock_fast_model_id if fast else settings.bedrock_model_id,
         region_name=settings.aws_region,

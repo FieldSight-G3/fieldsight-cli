@@ -28,11 +28,12 @@ def test_must_find_the_exclusion_not_just_the_clock(script):
         calls(("propose_reporting_determination", {"proposal": {
             "outcome": "not_reportable", "exclusion": "observation_only", "chunk_ids": ["CFR-1904-a"],
             "rationale": "Observation only is not in-patient hospitalization [1]."}})),
+        AIMessage("Proposed."),
     ])
 
     state = get_specialists()["reportability"].invoke(
-        {"worker": "reportability", "task": "test", "incident": INCIDENT, "messages": [], "rounds": 0,
-         "decisions": [], "retrieved": [], "proposal": None})
+        {"task": "test", "incident": INCIDENT, "messages": [], "rounds": 0, "decisions": {}, "retrieved": {},
+         "proposal": None})
 
     clock_only = next(m for m in state["messages"] if isinstance(m, ToolMessage) and m.name == "propose_reporting_determination")
     assert '"rejected"' in clock_only.text
