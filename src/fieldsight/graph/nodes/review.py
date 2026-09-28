@@ -2,26 +2,14 @@
 
 import json
 
-from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.errors import GraphRecursionError
-from psycopg import Connection
-from psycopg.rows import dict_row
 
-from ...config import bounds, settings
+from ...checkpoint import Participant, postgres_checkpointer, thread_id
+from ...config import bounds
 from ...prompts import PROMPTS
 from ...schemas.review import ReviewVerdict
 from ...tools.tools import TOOLSETS
 from ..specialists import build_specialist
-
-
-def postgres_checkpointer() -> PostgresSaver:
-    """ setup() only creates the checkpoint tables that are missing """
-
-    url = settings.database_url.replace("postgresql+psycopg://", "postgresql://", 1)
-    saver = PostgresSaver(Connection.connect(url, autocommit=True, prepare_threshold=0, row_factory=dict_row))
-    saver.setup()
-    return saver
-
 
 _REVIEWER = None
 
@@ -39,7 +27,7 @@ def reviewer_node(state: dict) -> dict:
 
     config = {
         # one thread per (analyst, incident, participant), so the Reviewer's state never merges with a worker's
-        "configurable": {"thread_id": f"{state['analyst_id']}:{state['incident']['incident_id']}:reviewer"},
+        "configurable": {"thread_id": thread_id(state["analyst_id"], state["incident"]["incident_id"], Participant.REVIEWER)},
         "recursion_limit": bounds.max_graph_recursion_depth,
     }
     try:
