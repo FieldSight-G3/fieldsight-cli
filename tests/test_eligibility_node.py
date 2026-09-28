@@ -7,8 +7,8 @@ import pytest
 from sqlalchemy import MetaData, Table, delete, insert
 
 from fieldsight.graph.nodes.eligibility import eligibility_check_node, review_snapshot
+from fieldsight.harness.escalation.review import CitationReference
 from fieldsight.repository import IncidentRepository, ReviewQueueRepository
-from fieldsight.review_decisions import CitationReference
 from tests.test_analysis import normalized_fields
 
 

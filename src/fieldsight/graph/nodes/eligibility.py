@@ -2,9 +2,9 @@
 
 from uuid import UUID
 
-from ...analysis import ReviewSnapshot, analyze_incident
-from ...escalation import EscalationSignals
-from ...review_decisions import CitationReference
+from ...harness.analysis import ReviewSnapshot, analyze_incident
+from ...harness.escalation.review import CitationReference
+from ...types.escalation import EscalationSignals
 
 
 def review_snapshot(state: dict) -> ReviewSnapshot:

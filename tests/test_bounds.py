@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import ValidationError
 
-from fieldsight.bounds import (
+from fieldsight.harness.bounds import (
     AgentName,
     BoundsConfig,
     LegKind,

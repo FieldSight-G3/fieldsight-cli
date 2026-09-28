@@ -6,8 +6,8 @@ from uuid import UUID
 
 import pytest
 
-from fieldsight.idempotency import canonicalize, idempotency_key
-from fieldsight.tool_service import SimilarIncidentsInput
+from fieldsight.harness.idempotency import canonicalize, idempotency_key
+from fieldsight.interfaces.tool_service import SimilarIncidentsInput
 
 SESSION = "analyst-1:inc-4:hazard_control"
 
@@ -26,8 +26,9 @@ def test_session_tool_and_values_each_change_the_key():
     assert idempotency_key(SESSION, "find_similar_incidents", {"limit": 4}) != base
 
 
-def test_list_order_is_meaningful():
+def test_list_order_is_meaningful_but_set_order_is_not():
     assert canonicalize({"ids": [1, 2]}) != canonicalize({"ids": [2, 1]})
+    assert canonicalize({"ids": {"b", "a"}}) == canonicalize({"ids": {"a", "b"}})
 
 
 def test_equal_values_of_different_types_share_a_key():
@@ -39,13 +40,20 @@ def test_equal_values_of_different_types_share_a_key():
 
 def test_pydantic_arguments_match_their_plain_form():
     assert canonicalize({"args": SimilarIncidentsInput(limit=3)}) == canonicalize({"args": {"limit": 3}})
-
-
-def test_the_key_is_stable_across_runs():
-    assert idempotency_key(SESSION, "find_similar_incidents", {"limit": 3}) == (
+    assert idempotency_key(SESSION, "find_similar_incidents", SimilarIncidentsInput(limit=3)) == (
         idempotency_key(SESSION, "find_similar_incidents", {"limit": 3})
     )
-    assert len(idempotency_key(SESSION, "find_similar_incidents", {"limit": 3})) == 64
+
+
+def test_the_key_is_a_uuid_stable_across_runs():
+    key = idempotency_key(SESSION, "find_similar_incidents", {"limit": 3})
+    assert isinstance(key, UUID)
+    assert key == idempotency_key(SESSION, "find_similar_incidents", {"limit": 3})
+
+
+def test_parts_cannot_run_together():
+    # "a" + "b:c" and "a:b" + "c" must not collide once joined
+    assert idempotency_key("a", "b:c", {}) != idempotency_key("a:b", "c", {})
 
 
 @pytest.mark.parametrize("arguments", [{"x": float("nan")}, {"x": float("inf")}, {1: "non-string key"}, {"x": object()}])

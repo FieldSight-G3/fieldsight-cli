@@ -6,7 +6,7 @@
 {analyst_id, incident, tasks}                                    parent state (not built)
       |
 COORDINATOR (not built) --dispatch--> <worker>_specialist_node   nodes/supervision.py
-                                          |  invoke {task, incident}, recursion_limit from config.bounds
+                                          |  invoke {task, incident}, recursion_limit from settings.bounds
                                           v
                                     agent <-> tools              specialists.py (build_specialist)
                                           |  the model stops asking for tools,
@@ -36,7 +36,7 @@ route_after_review --rejected, n < max_reviewer_iterations--> "coordinator"
 | `tools/tools.py` | The `@tool` functions and each participant's tool list. |
 | `rules/proposal_review.py` | `review_classification`, `review_reporting` and `review_hazard_control`, and `CONTROL_PARAGRAPHS`. |
 | `prompts.py` | `PROMPTS` and `GOALS`, keyed by participant: each worker's brief and default goal, the Reviewer's brief, and the readiness classifier's brief. |
-| `bounds.py` (via `config.bounds`) | `max_specialist_tool_rounds` (10), `max_reviewer_iterations` (2) and `max_graph_recursion_depth` (32), each overridable with `FIELDSIGHT_BOUNDS_*`. |
+| `harness/bounds.py` (via `settings.bounds`) | `max_specialist_tool_rounds` (10), `max_reviewer_iterations` (2) and `max_graph_recursion_depth` (32), each overridable with `FIELDSIGHT_BOUNDS_*`. |
 
 Paths are relative to `src/fieldsight/`.
 
@@ -60,7 +60,7 @@ Paths are relative to `src/fieldsight/`.
 
 - The Coordinator: `supervisor_node`, `route_after_supervisor`, its typed plan, and why each worker was dispatched.
 - The parent graph (`graph/state.py`, `graph/graph.py`): `analyst_id` and `tasks` in state, the reducers (`dossier` with `operator.or_`, `reviews` append, `tasks` merge), a separate edge from each worker into the Reviewer, and `ReviewVerdict` in the checkpoint serializer's allowed modules.
-- The eligibility check, and calling `harness/dossier_guard.py` on the dossier after the Reviewer approves (the guard exists; see `harness/README.md`).
+- The eligibility check, and calling `harness/guardrails/dossier_guard.py` on the dossier after the Reviewer approves (the guard exists; see `harness/README.md`). Pass the guard the harness's own invocations (or none, so it runs the rules itself), never only the workers' tool-path ones. Blocked legs go back to the Coordinator; at the end the graph returns `types/run.py`'s `WorkflowResult` to `harness/run/lifecycle.py`.
 - `find_similar_incidents` for Hazard Control (comes with the Gateway ticket).
 - The run record (GF-53): every rules-engine invocation (a worker's state keeps one decision per rule; each `evaluate_rule` call is in its messages), tool calls, and token totals.
 - Calling `open_thread` for each participant when a turn starts (the parent graph's entry point); `reviewer_node` builds its thread id with `thread_id` but does not register it.

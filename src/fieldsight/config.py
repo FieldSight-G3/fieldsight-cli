@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from .bounds import BoundsConfig
+from .harness.bounds import BoundsConfig
 
 load_dotenv()
 
@@ -28,9 +28,10 @@ class Settings(BaseSettings):
     database_iam_auth: bool
     retrieval_score_threshold: float = Field(ge=0.0, le=1.0)
     retrieval_max_chunks: int = Field(ge=1)
-    confidence_floor: float = Field(ge=0.0, le=1.0)
     gateway_api_key: str = Field(min_length=1)
     allow_dev_identity: bool
+    # every loop cap and budget: defaults in code, FIELDSIGHT_BOUNDS_* overrides them per environment
+    bounds: BoundsConfig = Field(default_factory=BoundsConfig.from_environment)
 
 
 settings = Settings(
@@ -50,10 +51,6 @@ settings = Settings(
     database_iam_auth=os.environ.get("FIELDSIGHT_DATABASE_IAM_AUTH", "false").lower() == "true",
     retrieval_score_threshold=float(os.environ["FIELDSIGHT_RETRIEVAL_SCORE_THRESHOLD"]),
     retrieval_max_chunks=int(os.environ["FIELDSIGHT_RETRIEVAL_MAX_CHUNKS"]),
-    confidence_floor=float(os.environ["FIELDSIGHT_CONFIDENCE_FLOOR"]),
     gateway_api_key=os.environ["FIELDSIGHT_GATEWAY_API_KEY"],
     allow_dev_identity=os.environ["FIELDSIGHT_ALLOW_DEV_IDENTITY"].lower() == "true"
 )
-
-# every loop cap and budget: defaults in code, FIELDSIGHT_BOUNDS_* overrides them per environment
-bounds = BoundsConfig.from_environment()

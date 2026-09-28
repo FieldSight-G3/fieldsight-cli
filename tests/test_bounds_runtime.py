@@ -5,14 +5,14 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from fieldsight.bounds import (
+from fieldsight.harness.bounds import (
     BoundsConfig,
     LegRequest,
     SessionUsage,
     TurnUsage,
     UsageEvent,
 )
-from fieldsight.bounds_runtime import BoundStopped, TurnBudget
+from fieldsight.harness.bounds_runtime import BoundStopped, TurnBudget
 
 
 class TurnBudgetTests(unittest.TestCase):

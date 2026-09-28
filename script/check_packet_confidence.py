@@ -13,11 +13,14 @@ import sys
 from pathlib import Path
 
 from fieldsight.aws.textract import analyze_bytes
-from fieldsight.config import settings
 from fieldsight.ingest.artifacts.fields import extract_form_fields
 from fieldsight.ingest.blocks import index_blocks, related
+from fieldsight.schemas.rule_input import R5Inputs
 
 PACKETS = Path(__file__).resolve().parents[1] / "packets"
+
+# the floor R5 applies, so this flags exactly what the readiness gate would
+FLOOR = R5Inputs.model_fields["floor"].default
 
 # P3: filled in by hand and scanned; the date of injury should read below the floor, its neighbours above
 HANDWRITTEN = PACKETS / "inc-0413"
@@ -43,7 +46,7 @@ QUERIES = {
 
 
 def floor_flag(confidence: float) -> str:
-    return "  BELOW FLOOR" if confidence < settings.confidence_floor else ""
+    return "  BELOW FLOOR" if confidence < FLOOR else ""
 
 
 def answers(blocks: list[dict]) -> list[tuple[str, str, float]]:

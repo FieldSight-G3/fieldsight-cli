@@ -5,6 +5,9 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+from fieldsight.harness.escalation.review import submit_review
+from fieldsight.interfaces.tool_api import CORRELATION_HEADER, create_app
+from fieldsight.interfaces.tool_service import ToolResponse
 from fieldsight.logging_context import (
     CorrelationFilter,
     JsonFormatter,
@@ -12,9 +15,6 @@ from fieldsight.logging_context import (
     correlation_id,
     with_correlation_id,
 )
-from fieldsight.review_flow import submit_review
-from fieldsight.tool_api import CORRELATION_HEADER, create_app
-from fieldsight.tool_service import ToolResponse
 
 
 def _json_line(message: str) -> dict[str, Any]:

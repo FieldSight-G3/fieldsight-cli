@@ -15,10 +15,10 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from fieldsight.aws import clients
-from fieldsight.bounds import BoundsConfig, SessionUsage, TurnUsage, UsageEvent
-from fieldsight.bounds_runtime import BoundStopped, TurnBudget
 from fieldsight.graph.nodes import review
 from fieldsight.graph.nodes.review import reviewer_node
+from fieldsight.harness.bounds import BoundsConfig, SessionUsage, TurnUsage, UsageEvent
+from fieldsight.harness.bounds_runtime import BoundStopped, TurnBudget
 
 
 class ApprovingModel:

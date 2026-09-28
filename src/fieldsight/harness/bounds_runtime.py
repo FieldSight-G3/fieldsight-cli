@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from threading import RLock
 
-from fieldsight.bounds import (
+from fieldsight.errors import FieldSightError
+from fieldsight.harness.bounds import (
     BoundDecision,
     BoundsConfig,
     LegRequest,
@@ -17,7 +18,6 @@ from fieldsight.bounds import (
     preflight,
     record_usage,
 )
-from fieldsight.errors import FieldSightError
 
 
 class BoundStopped(FieldSightError, RuntimeError):

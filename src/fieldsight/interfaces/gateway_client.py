@@ -18,7 +18,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import McpError
 
-from fieldsight.bounds import BoundsConfig
+from fieldsight.harness.bounds import BoundsConfig
 
 logger = logging.getLogger(__name__)
 

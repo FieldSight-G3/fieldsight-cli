@@ -5,8 +5,8 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import MetaData, Table, delete, insert
 
+from fieldsight.errors import ToolDenied
 from fieldsight.repository import GatewayReadRepository, SessionRepository
-from fieldsight.tool_service import ToolDenied
 from fieldsight.tool_store import GatewayReadStore
 
 DIMENSIONS = 1536

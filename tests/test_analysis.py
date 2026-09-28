@@ -5,13 +5,13 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import MetaData, Table, delete, insert
 
-from fieldsight.analysis import ReviewSnapshot, analyze_incident
+from fieldsight.harness.analysis import ReviewSnapshot, analyze_incident
+from fieldsight.harness.escalation.review import CitationReference
 from fieldsight.repository import (
     IncidentRepository,
     ReviewQueueRepository,
     RunRecordRepository,
 )
-from fieldsight.review_decisions import CitationReference
 
 
 def normalized_fields() -> dict[str, Any]:

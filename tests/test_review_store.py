@@ -9,10 +9,13 @@ import pytest
 from sqlalchemy import MetaData, Table, delete, insert, select
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from fieldsight.bounds import BoundsConfig
+from fieldsight.harness.bounds import BoundsConfig
+from fieldsight.harness.escalation.review import (
+    CitationReference,
+    ReviewDecision,
+    ReviewWriteFailed,
+)
 from fieldsight.repository import IncidentRepository, ReviewQueueRepository
-from fieldsight.review_decisions import CitationReference, ReviewDecision
-from fieldsight.review_flow import ReviewWriteFailed
 
 DOSSIER = {"narrative": "Worker slipped on wet stairs.", "outcome": {"recordable": True}}
 CITATIONS = {

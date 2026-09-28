@@ -17,7 +17,6 @@ TEST_ENVIRONMENT = {
     "FIELDSIGHT_DATABASE_URL": "postgresql://fieldsight:fieldsight_dev@localhost:5432/fieldsight",
     "FIELDSIGHT_RETRIEVAL_SCORE_THRESHOLD": "0.5",
     "FIELDSIGHT_RETRIEVAL_MAX_CHUNKS": "8",
-    "FIELDSIGHT_CONFIDENCE_FLOOR": "0.7",
 }
 for key, value in TEST_ENVIRONMENT.items():
     if not os.environ.get(key):

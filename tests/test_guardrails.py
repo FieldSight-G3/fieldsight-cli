@@ -3,11 +3,11 @@ from datetime import UTC, datetime
 import pytest
 
 from fieldsight.aws.guardrails import prompt_attack_detected
-from fieldsight.harness import turn_check
-from fieldsight.harness.answer_guard import guard_answer
-from fieldsight.harness.common import DISCLOSURE
-from fieldsight.harness.dossier_guard import guard_dossier
-from fieldsight.harness.turn_check import check_turn
+from fieldsight.harness.guardrails import turn_check
+from fieldsight.harness.guardrails.answer_guard import guard_answer
+from fieldsight.harness.guardrails.common import DISCLOSURE
+from fieldsight.harness.guardrails.dossier_guard import guard_dossier
+from fieldsight.harness.guardrails.turn_check import check_turn
 from fieldsight.schemas.incidents import NormalizedIncident
 from fieldsight.schemas.retrieval import DraftAnswer
 

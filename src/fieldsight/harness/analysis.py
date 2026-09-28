@@ -5,15 +5,12 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from fieldsight.escalation import (
-    EscalationDecision,
-    EscalationSignals,
-    evaluate_escalation,
-)
+from fieldsight.harness.escalation.review import CitationReference
+from fieldsight.harness.escalation.triggers import evaluate_escalation
 from fieldsight.repository import IncidentRepository
-from fieldsight.review_decisions import CitationReference
 from fieldsight.rules.engine import IncidentRuleResults, evaluate_incident
 from fieldsight.schemas.incidents import NormalizedIncident
+from fieldsight.types.escalation import EscalationDecision, EscalationSignals
 
 
 class ReviewSnapshot(BaseModel):

@@ -14,10 +14,14 @@ from sqlalchemy import MetaData, Table, create_engine, insert, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import OperationalError
 
-from fieldsight.bounds import BoundsConfig
 from fieldsight.config import settings
-from fieldsight.review_decisions import CitationReference, ReviewDecision
-from fieldsight.review_flow import PendingReview, ReviewWriteFailed
+from fieldsight.harness.bounds import BoundsConfig
+from fieldsight.harness.escalation.review import (
+    CitationReference,
+    PendingReview,
+    ReviewDecision,
+    ReviewWriteFailed,
+)
 
 RecordType = TypeVar("RecordType", bound=BaseModel)
 
@@ -80,25 +84,28 @@ class IncidentRepository(_Repository):
     def get(self, incident_id: UUID) -> IncidentRecord | None:
         return self._get("incident_id", incident_id, IncidentRecord)
 
-    def save_analysis(self, incident_id: UUID, correlation_id: UUID, outcome: dict[str, Any], deciding_rule: str, rule_invocations: list[dict[str, Any]], escalation_triggers: dict[str, Any], *, requires_review: bool) -> UUID:
+    def save_analysis(self, incident_id: UUID, correlation_id: UUID, outcome: dict[str, Any] | None, deciding_rule: str | None, rule_invocations: list[dict[str, Any]], escalation_triggers: dict[str, Any] | None, *, requires_review: bool, command: str = "analyze", workers_dispatched: dict[str, Any] | None = None) -> UUID:
+        """One turn's writes in one transaction; outcome is None for a turn that must not overwrite it, like ask."""
         metadata = MetaData()
         run_records = Table("run_records", metadata, autoload_with=self.engine)
         review_queue = Table("review_queue", metadata, autoload_with=self.engine) if requires_review else None
         with self.engine.begin() as connection:
-            updated = connection.execute(
-                update(self.table)
-                .where(self.table.c.incident_id == incident_id)
-                .values(outcome=outcome, deciding_rule=deciding_rule)
-                .returning(self.table.c.incident_id)
-            ).scalar_one_or_none()
-            if updated is None:
-                raise LookupError(f"Incident {incident_id} does not exist")
+            if outcome is not None:
+                updated = connection.execute(
+                    update(self.table)
+                    .where(self.table.c.incident_id == incident_id)
+                    .values(outcome=outcome, deciding_rule=deciding_rule)
+                    .returning(self.table.c.incident_id)
+                ).scalar_one_or_none()
+                if updated is None:
+                    raise LookupError(f"Incident {incident_id} does not exist")
             run_id = connection.execute(
                 insert(run_records)
                 .values(
                     correlation_id=correlation_id,
                     incident_id=incident_id,
-                    command="analyze",
+                    command=command,
+                    workers_dispatched=workers_dispatched,
                     rule_invocations={"items": rule_invocations},
                     escalation_triggers=escalation_triggers
                 )

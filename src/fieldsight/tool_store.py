@@ -5,8 +5,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from fieldsight.errors import ToolDenied
 from fieldsight.repository import GatewayReadRepository
-from fieldsight.tool_service import SimilarCandidate, ToolDenied
+from fieldsight.schemas.incidents import SimilarCandidate
 
 logger = logging.getLogger(__name__)
 

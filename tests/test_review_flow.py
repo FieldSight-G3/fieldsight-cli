@@ -6,17 +6,15 @@ from uuid import UUID
 
 from pydantic import ValidationError
 
-from fieldsight.review_decisions import (
+from fieldsight.harness.escalation.review import (
     CitationReference,
     CitationRepoint,
-    ReviewDecision,
-    ReviewEdit,
-    ReviewRequest,
-)
-from fieldsight.review_flow import (
     PendingReview,
     ReviewConflict,
+    ReviewDecision,
+    ReviewEdit,
     ReviewNotEntitled,
+    ReviewRequest,
     document_for_chunk,
     submit_review,
 )

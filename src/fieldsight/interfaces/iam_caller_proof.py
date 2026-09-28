@@ -19,8 +19,8 @@ import boto3
 from botocore.auth import SigV4QueryAuth
 from botocore.awsrequest import AWSRequest
 
-from fieldsight.bounds import BoundsConfig
-from fieldsight.tool_service import ToolDenied
+from fieldsight.errors import ToolDenied
+from fieldsight.harness.bounds import BoundsConfig
 
 PROOF_HEADER = "X-Fieldsight-Caller-Proof"
 THREAD_HEADER = "X-Fieldsight-Thread-Id"

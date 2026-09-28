@@ -6,7 +6,7 @@ import threading
 from langgraph.errors import GraphRecursionError
 
 from ...checkpoint import Participant, postgres_checkpointer, thread_id
-from ...config import bounds
+from ...config import settings
 from ...prompts import PROMPTS
 from ...schemas.review import ReviewVerdict
 from ...tools.tools import TOOLSETS
@@ -33,7 +33,7 @@ def reviewer_node(state: dict) -> dict:
     config = {
         # one thread per (analyst, incident, participant), so the Reviewer's state never merges with a worker's
         "configurable": {"thread_id": thread_id(state["analyst_id"], state["incident"]["incident_id"], Participant.REVIEWER)},
-        "recursion_limit": bounds.max_graph_recursion_depth,
+        "recursion_limit": settings.bounds.max_graph_recursion_depth,
     }
     try:
         result = get_reviewer().invoke(
@@ -62,6 +62,6 @@ def route_after_review(state: dict) -> str:
     verdict = state["reviews"][-1]
     if verdict is None or verdict.approved:
         return "eligibility_check"
-    if state["review_iterations"] >= bounds.max_reviewer_iterations:
+    if state["review_iterations"] >= settings.bounds.max_reviewer_iterations:
         return "eligibility_check"
     return "coordinator"
