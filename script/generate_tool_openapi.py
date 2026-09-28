@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from fieldsight.tool_service import (
+from fieldsight.interfaces.tool_service import (
     GetExtractionInput,
     SimilarIncidentsInput,
     ToolResponse,

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Literal, Protocol
-from uuid import UUID
+from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from fieldsight.errors import FailureCode
+from fieldsight.schemas.incidents import SimilarCandidate
 
 
 class GetExtractionInput(BaseModel):
@@ -22,19 +24,6 @@ class SimilarIncidentsInput(BaseModel):
     limit: int = Field(default=3, ge=1, le=5, description="Maximum number of similar incidents")
 
 
-class SimilarCandidate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    incident_id: UUID
-    outcome: dict[str, Any]
-    deciding_rule: str
-    similarity_score: float = Field(ge=0, le=1)
-    matching_narrative_span: str
-
-
-FailureCode = Literal["unauthenticated", "not_entitled", "not_found", "insufficient_data", "unavailable", "invalid_input"]
-
-
 class ToolFailure(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -48,12 +37,6 @@ class ToolResponse(BaseModel):
     ok: bool
     result: dict[str, Any] | None = None
     error: ToolFailure | None = None
-
-
-class ToolDenied(Exception):
-    def __init__(self, code: FailureCode, message: str) -> None:
-        self.code = code
-        super().__init__(message)
 
 
 class ReadStore(Protocol):

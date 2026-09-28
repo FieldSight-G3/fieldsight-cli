@@ -1,6 +1,6 @@
 # FieldSight ECS read tools and IAM Gateway
 
-The Flask API still serves the two read tools through ECS, an internal ALB, an AWS IAM protected REST API stage, and AgentCore Gateway. The Gateway's inbound authentication is AWS IAM with SigV4. The agent connects using `src/fieldsight/gateway_client.py`. See `GATEWAY-IAM.md` for the current identity handoff limitation.
+The Flask API still serves the two read tools through ECS, an internal ALB, an AWS IAM protected REST API stage, and AgentCore Gateway. The Gateway's inbound authentication is AWS IAM with SigV4. The agent connects using `src/fieldsight/interfaces/gateway_client.py`. See `GATEWAY-IAM.md` for the current identity handoff limitation.
 
 ## Deploy the existing tool API
 
