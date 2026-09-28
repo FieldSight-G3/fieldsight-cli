@@ -11,6 +11,8 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import MetaData, Table, create_engine, insert, select, update
 
 from fieldsight.config import settings
+from fieldsight.review_decisions import CitationReference, ReviewDecision
+from fieldsight.review_flow import PendingReview
 
 RecordType = TypeVar("RecordType", bound=BaseModel)
 
@@ -89,6 +91,42 @@ class IncidentRepository(_Repository):
                 )
         return run_id
 
+    def save_analysis_for_review(self, incident_id: UUID, correlation_id: UUID, outcome: dict[str, Any], deciding_rule: str, rule_invocations: list[dict[str, Any]], escalation_triggers: dict[str, Any], *, submitting_analyst_id: UUID, dossier_snapshot: dict[str, Any], citations: dict[str, CitationReference]) -> UUID:
+        """Like save_analysis with requires_review, but queues an immutable dossier snapshot for get_pending."""
+        metadata = MetaData()
+        run_records = Table("run_records", metadata, autoload_with=self.engine)
+        review_queue = Table("review_queue", metadata, autoload_with=self.engine)
+        with self.engine.begin() as connection:
+            updated = connection.execute(
+                update(self.table)
+                .where(self.table.c.incident_id == incident_id)
+                .values(outcome=outcome, deciding_rule=deciding_rule)
+                .returning(self.table.c.incident_id)
+            ).scalar_one_or_none()
+            if updated is None:
+                raise LookupError(f"Incident {incident_id} does not exist")
+            run_id = connection.execute(
+                insert(run_records)
+                .values(
+                    correlation_id=correlation_id,
+                    incident_id=incident_id,
+                    command="analyze",
+                    rule_invocations={"items": rule_invocations},
+                    escalation_triggers=escalation_triggers
+                )
+                .returning(run_records.c.run_id)
+            ).scalar_one()
+            connection.execute(
+                insert(review_queue).values(
+                    incident_id=incident_id,
+                    triggers=escalation_triggers,
+                    submitting_analyst_id=submitting_analyst_id,
+                    dossier_snapshot=dossier_snapshot,
+                    citations={key: value.model_dump(mode="json") for key, value in citations.items()}
+                )
+            )
+        return run_id
+
 class RunRecordRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
     run_id: UUID
@@ -163,6 +201,26 @@ class ReviewQueueRepository(_Repository):
         with self.engine.connect() as connection:
             rows = connection.execute(statement).mappings().all()
         return [ReviewQueueRecord.model_validate(dict(row)) for row in rows]
+
+    def get_pending(self, queue_id: UUID) -> PendingReview | None:
+        columns = [self.table.c[name] for name in ("queue_id", "incident_id", "submitting_analyst_id", "dossier_snapshot", "citations")]
+        statement = select(*columns).where(self.table.c.queue_id == queue_id, self.table.c.status == "pending")
+        with self.engine.connect() as connection:
+            row = connection.execute(statement).mappings().one_or_none()
+        if row is None or row["submitting_analyst_id"] is None or row["dossier_snapshot"] is None or row["citations"] is None:
+            return None
+        citations = {key: CitationReference.model_validate(value) for key, value in row["citations"].items()}
+        return PendingReview(queue_id=row["queue_id"], incident_id=row["incident_id"], submitting_analyst_id=row["submitting_analyst_id"], original_payload=row["dossier_snapshot"], original_citations=citations)
+
+    def record_if_pending(self, decision: ReviewDecision) -> bool:
+        statement = (
+            update(self.table)
+            .where(self.table.c.queue_id == decision.queue_id, self.table.c.incident_id == decision.incident_id, self.table.c.status == "pending")
+            .values(status=decision.status, decision=decision.model_dump(mode="json"), reviewer_id=decision.reviewer_id, decided_at=decision.decided_at)
+            .returning(self.table.c.queue_id)
+        )
+        with self.engine.begin() as connection:
+            return connection.execute(statement).scalar_one_or_none() is not None
 
 class SessionRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")

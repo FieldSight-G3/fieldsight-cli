@@ -5,7 +5,6 @@ verified by the session layer; the store supplies the original, immutable
 dossier and the submitting analyst. Persistence must be atomic.
 """
 
-from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Any, Protocol
