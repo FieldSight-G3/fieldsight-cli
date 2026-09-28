@@ -1,6 +1,7 @@
 """ the Dossier Reviewer: a harness stage that judges the dossier on its own checkpointer thread, then routes the cycle """
 
 import json
+import threading
 
 from langgraph.errors import GraphRecursionError
 
@@ -12,13 +13,17 @@ from ...tools.tools import TOOLSETS
 from ..specialists import build_specialist
 
 _REVIEWER = None
+_REVIEWER_LOCK = threading.Lock()
+
 
 def get_reviewer():
     """ the compiled Reviewer, built once: the specialist factory with its brief, its tools and a checkpointer """
 
     global _REVIEWER
-    if _REVIEWER is None:
-        _REVIEWER = build_specialist("reviewer", PROMPTS["reviewer"], TOOLSETS["reviewer"], postgres_checkpointer())
+    # the Reviewer can be reached from concurrent legs; only one of them may build it
+    with _REVIEWER_LOCK:
+        if _REVIEWER is None:
+            _REVIEWER = build_specialist("reviewer", PROMPTS["reviewer"], TOOLSETS["reviewer"], postgres_checkpointer())
     return _REVIEWER
 
 

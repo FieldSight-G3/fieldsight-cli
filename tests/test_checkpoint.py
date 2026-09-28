@@ -1,6 +1,11 @@
-from uuid import UUID
+import operator
+from concurrent.futures import ThreadPoolExecutor
+from typing import Annotated, TypedDict
+from uuid import UUID, uuid4
 
 import pytest
+from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.graph import END, START, StateGraph
 
 from fieldsight import checkpoint
 from fieldsight.checkpoint import (
@@ -110,3 +115,46 @@ def test_postgres_checkpointer_is_shared_and_ready():
 
     assert checkpoint.postgres_checkpointer() is saver
     assert saver.get_tuple({"configurable": {"thread_id": "no-such-thread"}}) is None
+
+class Notes(TypedDict):
+    notes: Annotated[list[str], operator.add]
+
+
+def note_graph(saver):
+    """ a one-node graph whose whole state is a list of notes: each run appends its input to the thread's history """
+
+    graph = StateGraph(Notes)
+    graph.add_node("write", lambda state: {})
+    graph.add_edge(START, "write")
+    graph.add_edge("write", END)
+    return graph.compile(checkpointer=saver)
+
+
+def test_participants_on_one_incident_keep_separate_memory_in_postgres():
+    incident_id = IncidentRepository().create("Substation 7", {"date_of_injury": "2026-02-01"})
+    analyst_id = uuid4()
+    graph = note_graph(checkpoint.postgres_checkpointer())
+
+    worker = open_thread(analyst_id, incident_id, Participant.REPORTABILITY)
+    reviewer = open_thread(analyst_id, incident_id, Participant.REVIEWER)
+
+    graph.invoke({"notes": ["worker tool-call transcript"]}, worker)
+    graph.invoke({"notes": ["dossier v1"]}, reviewer)
+    graph.invoke({"notes": ["dossier v2"]}, reviewer)
+
+    # the Reviewer's thread resumed across runs and never saw the worker's transcript
+    assert graph.get_state(reviewer).values["notes"] == ["dossier v1", "dossier v2"]
+    assert graph.get_state(worker).values["notes"] == ["worker tool-call transcript"]
+
+    # a fresh saver on its own connection reads the same state back: it lives in Postgres, as a later CLI command needs
+    with PostgresSaver.from_conn_string(checkpoint.conninfo()) as fresh:
+        assert note_graph(fresh).get_state(reviewer).values["notes"] == ["dossier v1", "dossier v2"]
+
+def test_concurrent_callers_share_one_checkpointer(monkeypatch):
+    # start from "not built yet", so all eight threads race to build it
+    monkeypatch.setattr(checkpoint, "_SAVER", None)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        savers = list(pool.map(lambda _: checkpoint.postgres_checkpointer(), range(8)))
+
+    assert len({id(saver) for saver in savers}) == 1

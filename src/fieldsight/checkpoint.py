@@ -1,8 +1,8 @@
 """ the LangGraph checkpointer: one thread per (analyst, incident, participant), so no participant's state merges with another's """
 
 import atexit
+import threading
 from enum import StrEnum
-from functools import cache
 from typing import Any
 from uuid import UUID
 
@@ -80,12 +80,35 @@ def connection_kwargs() -> dict[str, Any]:
     return kwargs
 
 
-@cache
-def postgres_checkpointer() -> PostgresSaver:
-    """ the one checkpointer every participant shares, built once per process; setup() only creates missing tables """
+# any fixed 64-bit number; it only has to be the same in every process that runs setup()
+SETUP_LOCK_KEY = 4804804804
 
-    pool = ConnectionPool(conninfo(), kwargs=connection_kwargs, min_size=1, max_size=POOL_MAX_SIZE, open=True)
-    atexit.register(pool.close)
-    saver = PostgresSaver(pool)
-    saver.setup()
-    return saver
+_SAVER: PostgresSaver | None = None
+_SAVER_LOCK = threading.Lock()
+
+
+def postgres_checkpointer() -> PostgresSaver:
+    """ the one checkpointer every participant shares, built once per process """
+
+    global _SAVER
+    # two threads asking at once must not build two pools or run setup() twice
+    with _SAVER_LOCK:
+        if _SAVER is None:
+            pool = ConnectionPool(conninfo(), kwargs=connection_kwargs, min_size=1, max_size=POOL_MAX_SIZE, open=True)
+            atexit.register(pool.close)
+            saver = PostgresSaver(pool)
+            _setup(saver, pool)
+            _SAVER = saver
+    return _SAVER
+
+
+def _setup(saver: PostgresSaver, pool: ConnectionPool) -> None:
+    """ setup() reads the migration version, then inserts it: two processes doing that at once insert the same
+    version and one fails, so a Postgres advisory lock makes them take turns """
+
+    with pool.connection() as conn:
+        conn.execute("SELECT pg_advisory_lock(%s)", (SETUP_LOCK_KEY,))
+        try:
+            saver.setup()
+        finally:
+            conn.execute("SELECT pg_advisory_unlock(%s)", (SETUP_LOCK_KEY,))
