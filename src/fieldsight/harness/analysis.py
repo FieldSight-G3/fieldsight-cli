@@ -5,8 +5,10 @@ from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from fieldsight.escalation import (
+from fieldsight.config import settings
+from fieldsight.harness.escalation import (
     EscalationDecision,
+    EscalationPolicy,
     EscalationSignals,
     evaluate_escalation,
 )
@@ -35,7 +37,9 @@ def analyze_incident(incident_id: UUID, *, signals: EscalationSignals | None = N
         "incident_id": str(stored.incident_id),
     })
     results = evaluate_incident(facts)
-    decision = evaluate_escalation(facts, results, signals=signals)
+    # the same threshold retrieval filters at, so escalation never disagrees with the retrieval gate
+    policy = EscalationPolicy(retrieval_score_threshold=settings.retrieval_score_threshold)
+    decision = evaluate_escalation(facts, results, signals=signals, policy=policy)
     fired = {name: decision.checks[name].model_dump(mode="json") for name in decision.fired}
     deciding_rule = "R1" if results.recordability is not None else "R5"
 

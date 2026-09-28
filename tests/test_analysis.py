@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from typing import Any
 
-from fieldsight.analysis import analyze_incident
+from fieldsight.harness.analysis import analyze_incident
 from fieldsight.repository import (
     IncidentRepository,
     ReviewQueueRepository,

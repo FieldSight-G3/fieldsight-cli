@@ -11,11 +11,11 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 from ..aws import clients
-from ..config import bounds
+from ..config import settings
 from ..prompts import PROMPTS
 from ..tools.tools import TOOLSETS
 
-MAX_SPECIALIST_TOOL_ROUNDS = bounds.max_specialist_tool_rounds
+MAX_SPECIALIST_TOOL_ROUNDS = settings.bounds.max_specialist_tool_rounds
 
 # the workers get_specialists builds; each one's brief is PROMPTS[name] and its tools TOOLSETS[name]
 WORKERS = ("recordability", "reportability", "hazard_control")

@@ -41,6 +41,11 @@ every failure --> emit(): a structured log line with the correlation id, and an 
 | `answer_guard.py` | `guard_answer` (stage 4 on a generated answer), `THRESHOLDS` and `MAX_REGENERATIONS`. |
 | `dossier_guard.py` | `guard_dossier` (stage 4 on the dossier) and `LEG_REVIEWS`. |
 | `common.py` | `emit`, `refuse`, `citation_problems`, `latest`, `DISCLOSURE` and the `DETERMINATION` patterns. |
+| `escalation.py` | `evaluate_escalation` (the OR-ed review triggers), `EscalationPolicy` (near-boundary margins) and `EscalationSignals`. |
+| `bounds.py` | `BoundsConfig`, `preflight` (check-and-stop before each leg), `record_usage` and `start_turn`. |
+| `analysis.py` | `analyze_incident`: runs the rules and escalation on a stored incident and saves the run. |
+| `review_decisions.py` | `decide_review`, the side-effect-free check of a human approve, edit then approve, or reject. |
+| `review_flow.py` | `submit_review` and the `ReviewStore` protocol that records one decision on a pending queue item. |
 
 Paths are relative to `src/fieldsight/harness/`. The shapes (`TurnRequest`, `GuardrailEvent`, `Refusal`) are in `types/guardrails.py`, and the classifier's `ReadinessClassification` is in `schemas/readiness.py`.
 

@@ -6,7 +6,7 @@
 {analyst_id, incident, tasks}                                    parent state (not built)
       |
 COORDINATOR (not built) --dispatch--> <worker>_specialist_node   nodes/supervision.py
-                                          |  invoke {task, incident}, recursion_limit from config.bounds
+                                          |  invoke {task, incident}, recursion_limit from settings.bounds
                                           v
                                     agent <-> tools              specialists.py (build_specialist)
                                           |  the model stops asking for tools,
@@ -35,7 +35,7 @@ route_after_review --rejected, n < max_reviewer_iterations--> "coordinator"
 | `tools/tools.py` | The `@tool` functions and each participant's tool list. |
 | `rules/proposal_review.py` | `review_classification`, `review_reporting` and `review_hazard_control`, and `CONTROL_PARAGRAPHS`. |
 | `prompts.py` | `PROMPTS` and `GOALS`, keyed by participant: each worker's brief and default goal, the Reviewer's brief, and the readiness classifier's brief. |
-| `bounds.py` (via `config.bounds`) | `max_specialist_tool_rounds` (10), `max_reviewer_iterations` (2) and `max_graph_recursion_depth` (32), each overridable with `FIELDSIGHT_BOUNDS_*`. |
+| `harness/bounds.py` (via `settings.bounds`) | `max_specialist_tool_rounds` (10), `max_reviewer_iterations` (2) and `max_graph_recursion_depth` (32), each overridable with `FIELDSIGHT_BOUNDS_*`. |
 
 Paths are relative to `src/fieldsight/`.
 
