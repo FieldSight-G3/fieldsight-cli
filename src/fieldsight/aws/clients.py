@@ -51,6 +51,8 @@ def bedrock_runtime() -> Any:
 def textract() -> Any:
     return client("textract")
 
+def rds() -> Any:
+    return client("rds")
 
 def s3() -> Any:
     return client("s3")

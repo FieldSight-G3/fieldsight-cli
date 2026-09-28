@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     bedrock_guardrail_version: str = Field(min_length=1)
     packet_bucket: str = Field(min_length=1)
     database_url: str = Field(min_length=1)
+    database_iam_auth: bool
     retrieval_score_threshold: float = Field(ge=0.0, le=1.0)
     retrieval_max_chunks: int = Field(ge=1)
     confidence_floor: float = Field(ge=0.0, le=1.0)
@@ -46,6 +47,7 @@ settings = Settings(
     bedrock_guardrail_version=os.environ["FIELDSIGHT_BEDROCK_GUARDRAIL_VERSION"],
     packet_bucket=os.environ["FIELDSIGHT_PACKET_BUCKET"],
     database_url=os.environ["FIELDSIGHT_DATABASE_URL"],
+    database_iam_auth=os.environ.get("FIELDSIGHT_DATABASE_IAM_AUTH", "false").lower() == "true",
     retrieval_score_threshold=float(os.environ["FIELDSIGHT_RETRIEVAL_SCORE_THRESHOLD"]),
     retrieval_max_chunks=int(os.environ["FIELDSIGHT_RETRIEVAL_MAX_CHUNKS"]),
     confidence_floor=float(os.environ["FIELDSIGHT_CONFIDENCE_FLOOR"]),

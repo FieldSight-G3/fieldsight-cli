@@ -2,11 +2,13 @@ from uuid import UUID
 
 import pytest
 
+from fieldsight import checkpoint
 from fieldsight.checkpoint import (
     Participant,
     open_thread,
     thread_id,
 )
+from fieldsight.config import settings
 from fieldsight.graph.specialists import WORKERS
 from fieldsight.repository import IncidentRepository, SessionRepository
 
@@ -67,3 +69,44 @@ def test_open_thread_gives_each_participant_its_own_row():
 
     sessions = SessionRepository()
     assert [sessions.get(thread).participant for thread in threads] == [participant.value for participant in Participant]
+
+def test_conninfo_is_libpq_form_and_keeps_the_local_password(monkeypatch):
+    monkeypatch.setattr(settings, "database_url", "postgresql+psycopg://fieldsight:secret@localhost:5434/fieldsight")
+    monkeypatch.setattr(settings, "database_iam_auth", False)
+
+    assert checkpoint.conninfo() == "postgresql://fieldsight:secret@localhost:5434/fieldsight"
+    kwargs = checkpoint.connection_kwargs()
+    assert "password" not in kwargs and "sslmode" not in kwargs
+
+
+class FakeRds:
+    """ stands in for the RDS client: a new token on every call """
+
+    def __init__(self):
+        self.calls = []
+
+    def generate_db_auth_token(self, **kwargs):
+        self.calls.append(kwargs)
+        return f"token-{len(self.calls)}"
+
+
+def test_iam_auth_drops_the_password_and_mints_a_fresh_token_per_connection(monkeypatch):
+    rds = FakeRds()
+    monkeypatch.setattr(settings, "database_url", "postgresql+psycopg://fieldsight:unused@db.example.rds.amazonaws.com/fieldsight")
+    monkeypatch.setattr(settings, "database_iam_auth", True)
+    monkeypatch.setattr(checkpoint.clients, "rds", lambda: rds)
+
+    assert checkpoint.conninfo() == "postgresql://fieldsight@db.example.rds.amazonaws.com/fieldsight"
+    first, second = checkpoint.connection_kwargs(), checkpoint.connection_kwargs()
+    assert (first["password"], second["password"]) == ("token-1", "token-2")
+    assert first["sslmode"] == "require"
+    assert rds.calls[0] == {
+        "DBHostname": "db.example.rds.amazonaws.com", "Port": 5432, "DBUsername": "fieldsight", "Region": settings.aws_region,
+    }
+
+
+def test_postgres_checkpointer_is_shared_and_ready():
+    saver = checkpoint.postgres_checkpointer()
+
+    assert checkpoint.postgres_checkpointer() is saver
+    assert saver.get_tuple({"configurable": {"thread_id": "no-such-thread"}}) is None
