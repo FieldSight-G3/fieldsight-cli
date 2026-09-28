@@ -1,0 +1,29 @@
+id: escalation-05a
+category: escalation_pair
+pair_id: escalation-05
+trigger: reportable_outcome
+trigger_fires: true
+why: >
+  Rule-outcome trigger from §10: any outcome reportable under 1904.39 always escalates.
+  P2 as submitted: formal in-patient admission for care or treatment within 24 hours, so
+  R2 returns reportable. The trigger must fire from R2's recorded outcome, and the dossier
+  must land in the review queue regardless of anything else in the run.
+incident_id: INC-2026-0412
+setup:
+  base_packet: packets/inc-0412/
+turns:
+  - command: analyze
+    expected:
+      rule_outcomes:
+        - rule_id: R2
+          outcome: reportable
+          inputs_include:
+            event_type: inpatient_hospitalization
+            admission_reason: care_or_treatment
+      escalated_to_review_queue: true
+      escalation_triggers_fired:
+        - reportable_outcome
+      trigger_detail:
+        source_rule_id: R2
+        source_outcome: reportable
+ci_tier: true

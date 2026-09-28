@@ -1,0 +1,40 @@
+id: threshold-02b
+category: threshold
+pair_id: threshold-02
+why: >
+  Same timing as threshold-02a, but the injury is a chipped tooth, which 1904.39(b)(11)
+  explicitly excludes from the amputation definition along with broken teeth, avulsions,
+  enucleations, deglovings, scalpings and severed ears. The pair must come out differently.
+incident_id: null
+turns:
+  - command: ask
+    query: "A lineworker was struck in the mouth by a swinging pulley at 2:00 PM on April 6, 2026, and chipped a front tooth. We learned about it at 2:15 PM. Does a chipped tooth count as a reportable amputation?"
+threshold:
+  rule_id: R2
+  boundary: "membership in the 1904.39(b)(11) amputation definition versus its exclusion list"
+  boundary_source: "29 CFR 1904.39(b)(11)"
+  value: chipped_tooth
+  side: excluded
+  rule_inputs:
+    work_related: true
+    event_type: amputation
+    incident_at: "2026-04-06T14:00:00-04:00"
+    event_at: "2026-04-06T14:00:00-04:00"
+    learned_at: "2026-04-06T14:15:00-04:00"
+    amputation_detail: chipped_tooth
+  expected_rule_outcome: not_reportable
+  expected_deadline: null
+expected:
+  outcome: answer
+  rules_engine_invocation_required: true
+  answer_must_include:
+    - "not reportable as an amputation"
+    - "amputations do not include broken or chipped teeth"
+  must_not_include:
+    - "report within 24 hours"
+    - "a chipped tooth is an amputation"
+  sources:
+    - doc_id: CFR-1904
+      section_path: "1904.39"
+      paragraph: "(b)(11)"
+distractor: amputation

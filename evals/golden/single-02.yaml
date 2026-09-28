@@ -1,0 +1,24 @@
+id: single-02
+category: single_document
+why: >
+  Tests that the CFR-269 minimum-approach-distance tables survived extraction with their
+  columns intact, and that retrieval lands on the right row despite the many unrelated
+  voltage and kV mentions in 1910.269 (manifest distractor 4). 12.47 kV is packet 2's
+  breaker voltage.
+incident_id: null
+turns:
+  - command: ask
+    query: "What is the minimum approach distance for a worker near exposed energized parts on a 12.47 kV ac system, phase-to-ground and phase-to-phase?"
+expected:
+  outcome: answer
+  answer_must_include:
+    - "0.65 m (2.14 ft) phase-to-ground"
+    - "0.68 m (2.24 ft) phase-to-phase"
+    - "applies at elevations of 900 m (3,000 ft) or less"
+  must_not_include:
+    - "0.63 m"
+    - "0.77 m"
+  sources:
+    - doc_id: CFR-269
+      section_path: "1910.269"
+      paragraph: "(l)(3)(i), Table R-3, Table R-6 row 5.1 to 15.0 kV"
