@@ -47,11 +47,11 @@ def test_analyze_incident_records_rule_invocations():
     assert stored is not None
     assert stored.outcome is not None
 
-def test_low_confidence_records_gate_and_review():
+def test_low_confidence_records_gate_and_review(snapshot):
     fields = normalized_fields()
     fields["confidences"]["incident_at"] = 0.59
     incident_id = IncidentRepository().create("Substation 7", fields)
-    analysis = analyze_incident(incident_id)
+    analysis = analyze_incident(incident_id, review_snapshot=snapshot)
     saved = RunRecordRepository().get(analysis.run_id)
     assert saved is not None
     assert saved.rule_invocations is not None
@@ -100,4 +100,15 @@ def test_snapshot_is_not_queued_without_escalation(snapshot):
     incident_id = IncidentRepository().create("Substation 7", normalized_fields())
     analysis = analyze_incident(incident_id, review_snapshot=snapshot)
     assert analysis.escalation_decision.requires_review is False
+    assert not any(item.incident_id == incident_id for item in ReviewQueueRepository().list_pending())
+
+def test_escalation_without_a_snapshot_writes_nothing():
+    fields = normalized_fields()
+    fields["confidences"]["incident_at"] = 0.59
+    incidents = IncidentRepository()
+    incident_id = incidents.create("Substation 7", fields)
+    with pytest.raises(ValueError, match="no review snapshot"):
+        analyze_incident(incident_id)
+    stored = incidents.get(incident_id)
+    assert stored is not None and stored.outcome is None
     assert not any(item.incident_id == incident_id for item in ReviewQueueRepository().list_pending())

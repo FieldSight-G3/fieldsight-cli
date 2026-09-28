@@ -18,6 +18,8 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import McpError
 
+from fieldsight.bounds import BoundsConfig
+
 logger = logging.getLogger(__name__)
 
 # the read tools the Gateway routes to the ECS API
@@ -75,7 +77,7 @@ async def gateway_tools(thread_id: str, *, caller_proof: str, region: str | None
         raise RuntimeError("Set AWS_REGION for SigV4 signing")
     async with (
         httpx.AsyncClient(
-            timeout=60.0,
+            timeout=BoundsConfig.from_environment().http_timeout_seconds,
             follow_redirects=False,
             auth=SigV4HttpxAuth(aws_region),
             headers={"x-fieldsight-thread-id": thread_id, "x-fieldsight-caller-proof": caller_proof},

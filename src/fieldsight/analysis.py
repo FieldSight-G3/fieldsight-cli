@@ -58,7 +58,10 @@ def analyze_incident(incident_id: UUID, *, signals: EscalationSignals | None = N
         "rule_invocations": [item.model_dump(mode="json") for item in results.invocations],
         "escalation_triggers": decision.model_dump(mode="json"),
     }
-    if decision.requires_review and review_snapshot is not None:
+    if decision.requires_review:
+        if review_snapshot is None:
+            # a queue row without a snapshot can never be reviewed; even a no-dossier case needs its submitter
+            raise ValueError(f"Incident {incident_id} escalates ({', '.join(decision.fired)}) but no review snapshot was given")
         run_id = repository.save_analysis_for_review(
             **analysis,
             submitting_analyst_id=review_snapshot.submitting_analyst_id,
@@ -66,7 +69,7 @@ def analyze_incident(incident_id: UUID, *, signals: EscalationSignals | None = N
             citations=review_snapshot.citations,
         )
     else:
-        run_id = repository.save_analysis(**analysis, requires_review=decision.requires_review)
+        run_id = repository.save_analysis(**analysis, requires_review=False)
     return AnalysisRun(
         run_id=run_id,
         results=results,

@@ -51,3 +51,12 @@ A reference document, not an essay. Fill every section.
 - Accepted risks — name them, incl. the two-person approver split and the Gateway identity posture.
 - Intended use / out-of-scope use.
 - Cost to the analyst of each failure mode.
+
+### Gateway identity posture (accepted risk)
+- **Boundary:** agent → AgentCore Gateway → API Gateway (IAM) → internal ALB → ECS tool API.
+- **Mitigation:** the Gateway uses AWS IAM (SigV4) inbound auth, so an unsigned or unauthorized principal is rejected at the Gateway. The analyst is identified separately by a 60-second, thread-bound STS `GetCallerIdentity` proof that the dispatcher signs with the analyst's own assumed role. The ECS API verifies it against regional STS, requires an enrolled analyst role, maps it to the analyst, and rechecks the bound session and establishment grant on every call (structured `not_entitled` denial, never empty results).
+- **Accepted risk:** the Gateway authenticates the AWS principal, not the analyst. Analyst identity is verified at the ECS API, not rejected at the Gateway, and the target reaches ECS as the Gateway's service role. A leaked proof is replayable for its 60-second life on its bound thread, so proofs are kept out of logs, checkpoints and Postgres. We chose IAM over a JWT authorizer because no long-lived secrets are allowed and every analyst already holds a distinct IAM role.
+
+### Two-person approver split (accepted risk)
+- **Mitigation:** the reviewer must differ from the submitting analyst, enforced in `submit_review` and by the `ck_review_queue_separate_reviewer` database check. The reviewer's establishment grant is checked on every decision, the reviewer's identity comes from the verified session (never an argument), and a decision is recorded once (conditional update).
+- **Accepted risk:** the split is between analyst records. One person who can assume two enrolled analyst roles could approve their own dossier, so each analyst role's trust policy must admit only that analyst.

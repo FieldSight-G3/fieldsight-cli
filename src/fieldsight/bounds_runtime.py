@@ -17,9 +17,12 @@ from fieldsight.bounds import (
     preflight,
     record_usage,
 )
+from fieldsight.errors import FieldSightError
 
 
-class BoundStopped(RuntimeError):
+class BoundStopped(FieldSightError, RuntimeError):
+    """A budget is spent; still a RuntimeError for existing handlers."""
+
     def __init__(self, decision: BoundDecision) -> None:
         self.decision = decision
         super().__init__(f"Budget stopped: {decision.reason_code} ({decision.current}/{decision.limit})")

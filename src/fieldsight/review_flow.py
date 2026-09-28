@@ -14,6 +14,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 from fieldsight.errors import FieldSightError
+from fieldsight.logging_context import with_correlation_id
 from fieldsight.review_decisions import (
     ChunkSource,
     CitationReference,
@@ -36,7 +37,7 @@ class PendingReview(BaseModel):
     original_citations: dict[str, CitationReference]
 
 
-class ReviewConflict(Exception):
+class ReviewConflict(FieldSightError):
     """The queue item is missing or has already received a decision."""
 
 
@@ -70,6 +71,7 @@ class ReviewStore(Protocol):
         ...
 
 
+@with_correlation_id
 def submit_review(request: ReviewRequest, *, queue_id: UUID, verified_reviewer_id: UUID, store: ReviewStore, source_for_chunk: ChunkSource | None = None, decided_at: datetime | None = None) -> ReviewDecision:
     """Validate, then save one human decision using the trusted review context."""
     pending = store.get_pending(queue_id)

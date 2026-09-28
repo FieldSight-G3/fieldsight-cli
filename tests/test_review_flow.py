@@ -113,5 +113,36 @@ class ReviewFlowTests(unittest.TestCase):
             self.assertIsNone(document_for_chunk(chunk_id), chunk_id)
 
 
+    def _dossier_store(self) -> FakeReviewStore:
+        store = FakeReviewStore()
+        assert store.pending is not None
+        store.pending = store.pending.model_copy(update={"original_payload": {
+            "recordability": {"proposal": {"outcome": "recordable", "log_column": "column_H", "rationale": "2 days away [1]"}},
+            "reportability": {"proposal": {"rationale": "Not reportable: admitted for observation only; 24-hour clock does not apply"}},
+        }})
+        return store
+
+    def test_narrative_edit_may_reword_around_the_determinations(self) -> None:
+        store = self._dossier_store()
+        request = ReviewRequest(action="edit_then_approve", edit=ReviewEdit(
+            narrative="Recordable, Column H, with 2 days away. Not reportable: the stay was observation only (24 h clock n/a)."))
+        decision = submit_review(request, queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store, decided_at=DECIDED_AT)
+        self.assertEqual(decision.action, "edit_then_approve")
+
+    def test_narrative_edit_cannot_change_an_outcome_period_or_date(self) -> None:
+        for narrative in ("Not recordable.", "Recordable in column I.", "Reportable within 24 hours.", "Recordable with 3 days away.", "Injured on 2026-02-01."):
+            with self.subTest(narrative=narrative):
+                store = self._dossier_store()
+                request = ReviewRequest(action="edit_then_approve", edit=ReviewEdit(narrative=narrative))
+                with self.assertRaisesRegex(ValueError, "not change a determination"):
+                    submit_review(request, queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store)
+                self.assertIsNone(store.saved)
+
+    def test_a_note_is_not_held_to_the_determination_check(self) -> None:
+        store = self._dossier_store()
+        request = ReviewRequest(action="edit_then_approve", edit=ReviewEdit(note="Site lead thinks 3 days; left the rule outcome as computed."))
+        self.assertEqual(submit_review(request, queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store).status, "approved")
+
+
 if __name__ == "__main__":
     unittest.main()

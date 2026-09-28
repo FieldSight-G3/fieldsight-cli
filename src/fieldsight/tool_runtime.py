@@ -6,11 +6,13 @@ from flask import Flask
 
 from fieldsight.config import settings
 from fieldsight.iam_caller_proof import caller_resolver
+from fieldsight.logging_context import configure_logging
 from fieldsight.repository import AnalystRepository
 from fieldsight.tool_api import create_app
 
 
 def create_production_app() -> Flask:
+    configure_logging()
     role_arns = {arn.strip() for arn in settings.analyst_role_arns.split(",") if arn.strip()}
     role_pattern = re.compile(r"arn:aws:iam::(\d{12}):role/[\w+=,.@-]{1,64}", re.ASCII)
     matches = [role_pattern.fullmatch(arn) for arn in role_arns]
