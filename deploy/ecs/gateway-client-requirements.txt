@@ -1,0 +1,4 @@
+# Install in the AgentCore Runtime image (not in the Flask ECS image).
+httpx>=0.27,<1
+mcp>=1.24,<2
+langchain-mcp-adapters>=0.3.2,<1
