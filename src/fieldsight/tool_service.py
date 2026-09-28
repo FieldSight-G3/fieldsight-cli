@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from fieldsight.errors import FieldSightError
+
 
 class GetExtractionInput(BaseModel):
     """Read the extraction for the authenticated caller's bound session."""
@@ -50,7 +52,7 @@ class ToolResponse(BaseModel):
     error: ToolFailure | None = None
 
 
-class ToolDenied(Exception):
+class ToolDenied(FieldSightError):
     def __init__(self, code: FailureCode, message: str) -> None:
         self.code = code
         super().__init__(message)

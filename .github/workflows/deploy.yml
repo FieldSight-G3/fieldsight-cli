@@ -50,7 +50,14 @@ jobs:
             -t "$REGISTRY/$ECR_REPOSITORY:$TAG" .
 
           docker push "$REGISTRY/$ECR_REPOSITORY:$TAG"
-          echo "uri=$REGISTRY/$ECR_REPOSITORY:$TAG" >> "$GITHUB_OUTPUT"
+
+          # deploy by digest, not tag: the task definition names the exact image that was pushed
+          DIGEST_URI=$(docker inspect --format '{{index .RepoDigests 0}}' "$REGISTRY/$ECR_REPOSITORY:$TAG")
+          case "$DIGEST_URI" in
+            "$REGISTRY/$ECR_REPOSITORY@sha256:"*) ;;
+            *) echo "Pushed image has no ECR digest: $DIGEST_URI" >&2; exit 1 ;;
+          esac
+          echo "uri=$DIGEST_URI" >> "$GITHUB_OUTPUT"
 
       - name: Put the image in the Task Definition
         id: task-def
