@@ -1,4 +1,6 @@
 from datetime import datetime
+from typing import Any
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -68,3 +70,15 @@ class NormalizedIncident(BaseModel):
     confidences: dict[str, ConfidenceScore] = Field(
         description="Confidence score for each extracted incident field"
     )
+
+
+class SimilarCandidate(BaseModel):
+    """A past incident the caller may read, ranked by narrative similarity."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    incident_id: UUID
+    outcome: dict[str, Any]
+    deciding_rule: str
+    similarity_score: float = Field(ge=0, le=1)
+    matching_narrative_span: str

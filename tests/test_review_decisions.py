@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import ValidationError
 
-from fieldsight.review_decisions import (
+from fieldsight.harness.review_decisions import (
     CitationReference,
     CitationRepoint,
     ReviewAction,

@@ -2,7 +2,7 @@
 
 from langgraph.errors import GraphRecursionError
 
-from ...config import bounds
+from ...config import settings
 from ...prompts import GOALS
 from ...types.dossier import DossierLeg
 from ..specialists import get_specialists
@@ -17,7 +17,7 @@ def _run_specialist(name: str, state: dict) -> dict:
         result = get_specialists()[name].invoke(
             {"task": task, "incident": state["incident"], "messages": [], "rounds": 0,
              "decisions": {}, "retrieved": {}, "proposal": None},
-            {"recursion_limit": bounds.max_graph_recursion_depth},
+            {"recursion_limit": settings.bounds.max_graph_recursion_depth},
         )
     except GraphRecursionError:
         # the independent hard cap: a worker that hits it ends with no proposal, not a crash

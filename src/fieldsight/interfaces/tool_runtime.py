@@ -5,9 +5,9 @@ import re
 from flask import Flask
 
 from fieldsight.config import settings
-from fieldsight.iam_caller_proof import caller_resolver
+from fieldsight.interfaces.iam_caller_proof import caller_resolver
+from fieldsight.interfaces.tool_api import create_app
 from fieldsight.repository import AnalystRepository
-from fieldsight.tool_api import create_app
 
 
 def create_production_app() -> Flask:

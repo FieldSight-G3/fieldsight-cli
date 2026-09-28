@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from pydantic import ValidationError
 
-from fieldsight.escalation import (
+from fieldsight.harness.escalation import (
     EscalationDecision,
     EscalationPolicy,
     EscalationSignals,

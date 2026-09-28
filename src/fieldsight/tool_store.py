@@ -7,8 +7,9 @@ from typing import Any
 
 from sqlalchemy import MetaData, Table, and_, select
 
+from fieldsight.errors import ToolDenied
 from fieldsight.repository import IncidentRepository
-from fieldsight.tool_service import SimilarCandidate, ToolDenied
+from fieldsight.schemas.incidents import SimilarCandidate
 
 logger = logging.getLogger(__name__)
 

@@ -7,8 +7,10 @@ from typing import Any
 
 from flask import request
 
-from fieldsight.tool_api import create_app
-from fieldsight.tool_service import SimilarCandidate, ToolDenied, ToolService
+from fieldsight.errors import ToolDenied
+from fieldsight.interfaces.tool_api import create_app
+from fieldsight.interfaces.tool_service import ToolService
+from fieldsight.schemas.incidents import SimilarCandidate
 
 
 class FakeStore:

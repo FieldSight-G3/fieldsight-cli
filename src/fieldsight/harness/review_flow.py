@@ -13,7 +13,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
-from fieldsight.review_decisions import (
+from fieldsight.harness.review_decisions import (
     ChunkSource,
     CitationReference,
     ReviewContext,
