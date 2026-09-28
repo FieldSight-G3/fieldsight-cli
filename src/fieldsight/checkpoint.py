@@ -3,6 +3,8 @@
 from enum import StrEnum
 from uuid import UUID
 
+from fieldsight.repository import SessionRepository
+
 
 class Participant(StrEnum):
     """ every graph participant that keeps its own checkpointer thread (sections 5 and 10) """
@@ -26,4 +28,13 @@ def thread_id(analyst_id: UUID | str, incident_id: UUID | str, participant: Part
             raise ValueError(f"invalid thread id component: {part!r}")
     return f"{parts[0]}:{parts[1]}:{role}"
 
+def open_thread(
+    analyst_id: UUID, incident_id: UUID, participant: Participant | str, sessions: SessionRepository | None = None
+) -> dict:
+    """ the run config for one participant's thread, registered in sessions the first time and reused after """
+
+    role = Participant(participant)
+    thread = thread_id(analyst_id, incident_id, role)
+    (sessions or SessionRepository()).get_or_create(thread, analyst_id, incident_id, role.value)
+    return {"configurable": {"thread_id": thread}}
 

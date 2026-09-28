@@ -9,6 +9,7 @@ from pgvector.sqlalchemy import (
 )
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import MetaData, Table, create_engine, insert, select, update
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from fieldsight.config import settings
 
@@ -28,6 +29,23 @@ class _Repository:
         with self.engine.connect() as connection:
             row = connection.execute(statement).mappings().one_or_none()
         return model.model_validate(dict(row)) if row is not None else None
+
+    def get_or_create(self, thread_id: str, analyst_id: UUID, incident_id: UUID, participant: str) -> SessionRecord:
+        """ one row per thread, created on first use and reused after; a thread already bound elsewhere is refused """
+
+        statement = pg_insert(self.table).values(
+            thread_id=thread_id,
+            analyst_id=analyst_id,
+            incident_id=incident_id,
+            participant=participant,
+        ).on_conflict_do_nothing(index_elements=["thread_id"])
+        with self.engine.begin() as connection:
+            connection.execute(statement)
+
+        record = self.get(thread_id)
+        if record is None or (record.analyst_id, record.incident_id, record.participant) != (analyst_id, incident_id, participant):
+            raise ValueError(f"thread {thread_id!r} is already bound to a different session")
+        return record
 
 class IncidentRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")

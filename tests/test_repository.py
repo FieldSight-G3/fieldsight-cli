@@ -1,5 +1,7 @@
 from uuid import uuid4
 
+import pytest
+
 from fieldsight.repository import (
     IncidentRepository,
     ReviewQueueRepository,
@@ -90,3 +92,23 @@ def test_session_create_and_get_round_trip():
     assert record.analyst_id == analyst_id
     assert record.incident_id == incident_id
     assert record.participant == "coordinator"
+
+def test_session_get_or_create_reuses_the_row():
+    incident_id = IncidentRepository().create("Substation 7", {"date_of_injury": "2026-02-01"})
+    sessions = SessionRepository()
+    analyst_id = uuid4()
+
+    first = sessions.get_or_create("reuse-thread", analyst_id, incident_id, "reviewer")
+    second = sessions.get_or_create("reuse-thread", analyst_id, incident_id, "reviewer")
+
+    assert first == second
+    assert second.participant == "reviewer"
+
+
+def test_session_get_or_create_refuses_a_thread_bound_elsewhere():
+    incident_id = IncidentRepository().create("Substation 7", {"date_of_injury": "2026-02-01"})
+    sessions = SessionRepository()
+    sessions.get_or_create("bound-thread", uuid4(), incident_id, "reviewer")
+
+    with pytest.raises(ValueError):
+        sessions.get_or_create("bound-thread", uuid4(), incident_id, "reviewer")

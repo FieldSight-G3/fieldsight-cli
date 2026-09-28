@@ -2,8 +2,13 @@ from uuid import UUID
 
 import pytest
 
-from fieldsight.checkpoint import Participant, thread_id
+from fieldsight.checkpoint import (
+    Participant,
+    open_thread,
+    thread_id,
+)
 from fieldsight.graph.specialists import WORKERS
+from fieldsight.repository import IncidentRepository, SessionRepository
 
 ANALYST = UUID("11111111-1111-1111-1111-111111111111")
 OTHER_ANALYST = UUID("22222222-2222-2222-2222-222222222222")
@@ -43,3 +48,22 @@ def test_unknown_participant_is_rejected():
 def test_bad_component_is_rejected(bad):
     with pytest.raises(ValueError):
         thread_id(bad, INCIDENT, Participant.COORDINATOR)
+
+def test_open_thread_registers_once_and_returns_the_run_config():
+    incident_id = IncidentRepository().create("Substation 7", {"date_of_injury": "2026-02-01"})
+
+    first = open_thread(ANALYST, incident_id, Participant.REVIEWER)
+    second = open_thread(ANALYST, incident_id, "reviewer")
+
+    assert first == second == {"configurable": {"thread_id": f"{ANALYST}:{incident_id}:reviewer"}}
+    record = SessionRepository().get(first["configurable"]["thread_id"])
+    assert (record.analyst_id, record.incident_id, record.participant) == (ANALYST, incident_id, "reviewer")
+
+
+def test_open_thread_gives_each_participant_its_own_row():
+    incident_id = IncidentRepository().create("Substation 7", {"date_of_injury": "2026-02-01"})
+
+    threads = [open_thread(ANALYST, incident_id, participant)["configurable"]["thread_id"] for participant in Participant]
+
+    sessions = SessionRepository()
+    assert [sessions.get(thread).participant for thread in threads] == [participant.value for participant in Participant]
