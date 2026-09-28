@@ -8,11 +8,13 @@ from .bounds import BoundsConfig
 
 load_dotenv()
 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="forbid")
 
     environment: str = Field(min_length=1)
     aws_region: str = Field(min_length=1)
+    analyst_role_arns: str = Field(min_length=1)
     bedrock_model_id: str = Field(min_length=1)
     bedrock_fast_model_id: str = Field(min_length=1)
     bedrock_judge_model_id: str = Field(min_length=1)
@@ -29,9 +31,11 @@ class Settings(BaseSettings):
     gateway_api_key: str = Field(min_length=1)
     allow_dev_identity: bool
 
+
 settings = Settings(
     environment=os.environ["FIELDSIGHT_ENVIRONMENT"],
     aws_region=os.environ["FIELDSIGHT_AWS_REGION"],
+    analyst_role_arns=os.environ["FIELDSIGHT_ANALYST_ROLE_ARNS"],
     bedrock_model_id=os.environ["FIELDSIGHT_BEDROCK_MODEL_ID"],
     bedrock_fast_model_id=os.environ["FIELDSIGHT_BEDROCK_FAST_MODEL_ID"],
     bedrock_judge_model_id=os.environ["FIELDSIGHT_BEDROCK_JUDGE_MODEL_ID"],

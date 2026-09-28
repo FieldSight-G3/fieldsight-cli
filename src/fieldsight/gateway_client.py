@@ -56,10 +56,12 @@ def gateway_url(region: str) -> str:
 
 
 @asynccontextmanager
-async def gateway_tools(thread_id: str, *, region: str | None = None) -> AsyncIterator[list[Any]]:
-    """Expose Gateway tools to a graph, with session context supplied by its dispatcher."""
+async def gateway_tools(thread_id: str, *, caller_proof: str, region: str | None = None) -> AsyncIterator[list[Any]]:
+    """Expose Gateway tools with a caller proof supplied by the trusted dispatcher."""
     if not thread_id.strip():
         raise ValueError("A dispatcher-bound thread ID is required")
+    if not caller_proof:
+        raise ValueError("A signed analyst IAM role proof is required")
     aws_region = region or os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION")
     if not aws_region:
         raise RuntimeError("Set AWS_REGION for SigV4 signing")
@@ -68,7 +70,7 @@ async def gateway_tools(thread_id: str, *, region: str | None = None) -> AsyncIt
             timeout=60.0,
             follow_redirects=False,
             auth=SigV4HttpxAuth(aws_region),
-            headers={"x-fieldsight-thread-id": thread_id},
+            headers={"x-fieldsight-thread-id": thread_id, "x-fieldsight-caller-proof": caller_proof},
         ) as client,
         streamable_http_client(gateway_url(aws_region), http_client=client) as (read, write, _),
         ClientSession(read, write) as session,

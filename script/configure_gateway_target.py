@@ -1,6 +1,6 @@
 """Preview or create the two-tool AgentCore API Gateway stage target.
 
-Run after the REST API stage, Gateway, and REQUEST interceptor exist. The
+Run after the REST API stage and Gateway exist. The
 default is a read-only preview. --apply creates the target using AWS IAM.
 """
 
@@ -44,7 +44,7 @@ def target_request(gateway_id: str, rest_api_id: str, stage: str, name: str = "F
             }
         },
         "credentialProviderConfigurations": [{"credentialProviderType": "GATEWAY_IAM_ROLE"}],
-        "metadataConfiguration": {"allowedRequestHeaders": ["x-fieldsight-thread-id"]},
+        "metadataConfiguration": {"allowedRequestHeaders": ["x-fieldsight-thread-id", "x-fieldsight-caller-proof"]},
     }
 
 

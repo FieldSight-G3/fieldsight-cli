@@ -46,7 +46,7 @@ class GatewayReadStore:
         ).scalar_one_or_none()
         if grant is None:
             raise ToolDenied("not_entitled", "Caller has no grant for this establishment")
-        logger.info("gateway read authorized analyst_id=%s verified_email=%s thread_id=%s", session["analyst_id"], email, thread_id)
+        logger.info("gateway read authorized")
         return incident, session["analyst_id"]
 
     def extraction(self, verified_email: str, thread_id: str) -> dict[str, Any]:

@@ -32,10 +32,7 @@ class GatewayTargetTests(unittest.TestCase):
             ("/tools/get_incident_extraction", ("POST",)),
             ("/tools/find_similar_incidents", ("POST",)),
         })
-        self.assertEqual(
-            request["metadataConfiguration"]["allowedRequestHeaders"],
-            ["x-fieldsight-thread-id", "x-fieldsight-caller-proof"],
-)
+        self.assertEqual(request["metadataConfiguration"]["allowedRequestHeaders"], ["x-fieldsight-thread-id", "x-fieldsight-caller-proof"])
         self.assertEqual(request["credentialProviderConfigurations"], [{"credentialProviderType": "GATEWAY_IAM_ROLE"}])
 
     def test_pydantic_schema_never_exposes_subject_or_caller(self) -> None:

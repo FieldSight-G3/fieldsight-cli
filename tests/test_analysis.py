@@ -52,6 +52,6 @@ def test_low_confidence_records_gate_and_review():
     assert saved.rule_invocations is not None
     assert len(saved.rule_invocations["items"]) == 1
     assert saved.escalation_triggers is not None
-    assert "confidence_gate" in saved.escalation_triggers
+    assert saved.escalation_triggers["checks"]["confidence_gate"]["fired"] is True
     pending = ReviewQueueRepository().list_pending()
     assert any(item.incident_id == incident_id for item in pending)
