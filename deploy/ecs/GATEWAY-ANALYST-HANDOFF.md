@@ -1,7 +1,23 @@
-# Gateway analyst identity handoff
+# IAM analyst identity handoff
 
-`fieldsight.iam_caller_proof.issue_proof(thread_id, region)` creates a 60-second STS GetCallerIdentity proof using the analyst's Identity Center credentials in the CLI. Pass it from trusted dispatcher code to `gateway_tools(thread_id, caller_proof=proof)`; the model never handles the proof or the thread ID. The Gateway target forwards both headers to ECS. ECS checks that the proof was signed with temporary credentials for that thread, calls STS, and receives the authenticated Identity Center principal ARN. The Gateway's own IAM role authenticates the outbound request to API Gateway but cannot identify the analyst. A second MCP client signs a separate proof using its own Identity Center credentials.
+FieldSight uses IAM roles, not IAM Identity Center. The requirements prohibit long-lived access keys: locally, use an assumed role backed by short-lived console credentials (`aws login`); deployed compute uses its execution role. Give each analyst a distinct IAM role such as `FieldSightAnalystLogan` with no IAM path. Restrict its trust policy to that analyst's authorized principal. Never share one analyst role between analysts: anyone who can assume a shared role can choose its session name.
 
-**For Jenya:** expose `email_for_iam_principal(principal_arn: str) -> str | None` in the repository module, using an exact, uniquely enrolled Identity Center assumed-role principal ARN in Postgres. A missing mapping returns `None`. Wire `fieldsight.iam_caller_proof.caller_resolver(repository.email_for_iam_principal, region, account_id)` into `create_app(caller_resolver=...)`. The store must then check that email's session and establishment grant on each call. Move the SQL currently in `tool_store.py` into Jenya's repository module to comply with the single-repository requirement. Identity Center session names can change; re-enroll a verified ARN if one changes rather than guessing an analyst from a role name or client email.
+The trusted dispatcher uses the analyst's temporary assumed-role credentials and calls `issue_proof(thread_id, region)` to make a 60-second, session-bound STS `GetCallerIdentity` proof. Pass it to `gateway_tools(thread_id, caller_proof=proof)`; the model cannot supply the proof or thread ID. The target allowlists `x-fieldsight-thread-id` and `x-fieldsight-caller-proof` and forwards both to ECS. ECS validates the URL, calls regional STS, requires an exact role from `allowed_role_arns`, and passes the verified **analyst role ARN** to the resolver. The Gateway's execution role signs the target request but is never an analyst role.
 
-The proof is a short-lived bearer secret. Keep it out of application, ALB, API Gateway and Gateway request logs, and out of graph checkpoints or Postgres. Refresh it for each turn. ECS needs outbound HTTPS to the regional STS endpoint. Before enabling tools, verify the complete CLI or external-client → Gateway → API Gateway → ECS → STS path with live Identity Center credentials, and verify that another analyst is denied access to a session and to an establishment without a grant. The default ECS resolver remains fail-closed until that wiring is complete.
+**For Jenya:** expose `email_for_iam_principal(role_arn: str) -> str | None` in the repository module, using an exact, uniquely enrolled analyst IAM role ARN in Postgres. Return `None` if there is no match. Wire `caller_resolver(repository.email_for_iam_principal, region, account_id, allowed_role_arns)` into `create_app(caller_resolver=...)`. Only include enrolled analyst roles in `allowed_role_arns`; never include the Gateway or Runtime roles. The store must check that analyst's session and establishment grant on every call. Move the SQL in `tool_store.py` to the repository module to honor the single-repository requirement. This handoff does not edit Jenya's files.
+
+Local smoke test (AWS CLI 2.32 or newer, with an assigned analyst role):
+
+```powershell
+aws login --profile fieldsight-signin
+aws configure set role_arn "arn:aws:iam::ACCOUNT_ID:role/FieldSightAnalystLogan" --profile fieldsight-analyst
+aws configure set source_profile fieldsight-signin --profile fieldsight-analyst
+aws configure set region us-east-1 --profile fieldsight-analyst
+$env:AWS_PROFILE = "fieldsight-analyst"
+aws sts get-caller-identity --profile fieldsight-analyst --query Arn --output text
+python script/check_iam_caller_proof.py --role-arn "arn:aws:iam::ACCOUNT_ID:role/FieldSightAnalystLogan"
+```
+
+Replace the role ARN and region with your assigned values. STS should report `arn:aws:sts::ACCOUNT_ID:assumed-role/FieldSightAnalystLogan/...`. If AssumeRole is denied, both the IAM user policy and the role trust policy must allow it. Signing as an IAM user, even with temporary `aws login` credentials, is rejected.
+
+Treat the proof URL as a short-lived bearer secret: keep it out of application, ALB, API Gateway and Gateway request logs, graph checkpoints, and Postgres. Refresh it for each turn. ECS needs outbound HTTPS to regional STS. For a deployed Runtime, the proof must arrive from an authenticated analyst-facing dispatcher (configure a Runtime header allowlist if applicable); signing with the Runtime execution role fails. A second external client needs its own analyst role and proof. Before enabling tools, test the full client → Gateway → API Gateway → ECS → STS path, including cross-analyst denials. ECS denies tool requests by default until the production resolver is wired.

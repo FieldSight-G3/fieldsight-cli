@@ -1,6 +1,6 @@
-"""Short-lived, session-bound AWS IAM identity proof for Gateway read tools.
+"""Short-lived, session-bound assumed IAM role proof for Gateway read tools.
 
-The analyst's Identity Center credentials sign an STS GetCallerIdentity request.
+The analyst's temporary role credentials sign an STS GetCallerIdentity request.
 ECS sends that request to STS to authenticate its signer. The proof is a bearer
 secret until it expires; pass it only through TLS and never write it to logs.
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 import urllib.request
 import xml.etree.ElementTree as ET
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
@@ -25,6 +25,7 @@ PROOF_HEADER = "X-Fieldsight-Caller-Proof"
 THREAD_HEADER = "X-Fieldsight-Thread-Id"
 _REGION = re.compile(r"[a-z]{2}-(?:[a-z]+-)*[a-z]+-\d+\Z")
 _ACCOUNT = re.compile(r"\d{12}\Z")
+_ROLE_NAME = re.compile(r"[\w+=,.@-]{1,64}\Z", re.ASCII)
 _QUERY_KEYS = frozenset({
     "Action", "Version", "X-Amz-Algorithm", "X-Amz-Credential", "X-Amz-Date",
     "X-Amz-Expires", "X-Amz-Security-Token", "X-Amz-Signature", "X-Amz-SignedHeaders",
@@ -32,15 +33,15 @@ _QUERY_KEYS = frozenset({
 
 
 def issue_proof(thread_id: str, region: str, credentials: Any = None) -> str:
-    """Sign a proof with the *analyst's* current Identity Center credentials."""
+    """Sign a proof with the analyst's temporary assumed-role credentials."""
     _check_thread(thread_id)
     host = _sts_host(region)
     credentials = credentials or boto3.Session().get_credentials()
     if credentials is None:
-        raise RuntimeError("Sign in with AWS IAM Identity Center before calling the Gateway")
+        raise RuntimeError("Assume an analyst IAM role before calling the Gateway")
     frozen = credentials.get_frozen_credentials()
     if not frozen.token:
-        raise RuntimeError("Temporary Identity Center credentials are required")
+        raise RuntimeError("Temporary IAM role credentials are required")
     request = AWSRequest(
         method="GET",
         url=f"https://{host}/?Action=GetCallerIdentity&Version=2011-06-15",
@@ -65,12 +66,12 @@ def _fetch_sts(request: urllib.request.Request) -> bytes:
     return payload
 
 
-def verify_proof(proof: str, thread_id: str, region: str, account_id: str, *, fetch: Callable[[urllib.request.Request], bytes] = _fetch_sts, now: datetime | None = None) -> str:
-    """Return the STS-verified Identity Center principal ARN, or deny the call."""
+def verify_proof(proof: str, thread_id: str, region: str, account_id: str, allowed_role_arns: Collection[str], *, fetch: Callable[[urllib.request.Request], bytes] = _fetch_sts, now: datetime | None = None) -> str:
+    """Return the exact enrolled analyst role ARN, or deny the call."""
     try:
         _check_thread(thread_id)
         host = _sts_host(region)
-        if not _ACCOUNT.fullmatch(account_id) or not isinstance(proof, str) or len(proof) > 4096:
+        if not _ACCOUNT.fullmatch(account_id) or not isinstance(proof, str) or len(proof) > 4096 or not allowed_role_arns:
             raise ValueError("Invalid caller proof configuration")
         parsed = urlsplit(proof)
         if parsed.scheme != "https" or parsed.netloc != host or parsed.path != "/" or parsed.fragment:
@@ -99,20 +100,27 @@ def verify_proof(proof: str, thread_id: str, region: str, account_id: str, *, fe
         arn = root.findtext(".//{*}Arn")
         account = root.findtext(".//{*}Account")
         user_id = root.findtext(".//{*}UserId")
-        if account != account_id or not user_id or not arn or not arn.startswith(f"arn:aws:sts::{account_id}:assumed-role/AWSReservedSSO_"):
-            raise ValueError("Caller is not an enrolled Identity Center principal")
-        return arn
+        prefix = f"arn:aws:sts::{account_id}:assumed-role/"
+        if account != account_id or not user_id or not arn or not arn.startswith(prefix):
+            raise ValueError("Caller is not an assumed role in this account")
+        role_name, separator, session_name = arn[len(prefix):].partition("/")
+        if not separator or not session_name or not _ROLE_NAME.fullmatch(role_name) or user_id.rpartition(":")[2] != session_name:
+            raise ValueError("Invalid assumed role identity")
+        role_arn = f"arn:aws:iam::{account_id}:role/{role_name}"
+        if role_arn not in allowed_role_arns:
+            raise ValueError("Role is not enrolled as an analyst")
+        return role_arn
     except (ValueError, TypeError, OverflowError, OSError, ET.ParseError) as exc:
-        raise ToolDenied("unauthenticated", "Valid Identity Center caller proof is required") from exc
+        raise ToolDenied("unauthenticated", "Valid enrolled IAM role proof is required") from exc
 
 
-def caller_resolver(lookup_email: Callable[[str], str | None], region: str, account_id: str) -> Callable[[], str]:
-    """Build the Flask resolver; Jenya's repository supplies the exact ARN lookup."""
+def caller_resolver(lookup_email: Callable[[str], str | None], region: str, account_id: str, allowed_role_arns: Collection[str]) -> Callable[[], str]:
+    """Build the Flask resolver; the repository maps a unique analyst role to an email."""
     from flask import request
 
     def resolve() -> str:
-        principal_arn = verify_proof(request.headers.get(PROOF_HEADER, ""), request.headers.get(THREAD_HEADER, ""), region, account_id)
-        email = lookup_email(principal_arn)
+        role_arn = verify_proof(request.headers.get(PROOF_HEADER, ""), request.headers.get(THREAD_HEADER, ""), region, account_id, allowed_role_arns)
+        email = lookup_email(role_arn)
         if not email:
             raise ToolDenied("not_entitled", "Caller has no enrolled analyst record")
         return email

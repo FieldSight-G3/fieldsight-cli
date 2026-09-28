@@ -199,3 +199,22 @@ class SessionRepository(_Repository):
 
     def get(self, thread_id: str) -> SessionRecord | None:
         return self._get("thread_id", thread_id, SessionRecord)
+
+class AnalystRepository(_Repository):
+    def __init__(self, dsn: str | None = None) -> None:
+        super().__init__("analysts", dsn)
+
+    def email_for_iam_principal(self, role_arn: str) -> str | None:
+        statement = select(self.table.c.email).where(self.table.c.iam_role_arn == role_arn)
+        with self.engine.connect() as connection:
+            return connection.execute(statement).scalar_one_or_none()
+
+    def assign_iam_role(self, analyst_id: UUID, role_arn: str) -> bool:
+        statement = (
+            update(self.table)
+            .where(self.table.c.analyst_id == analyst_id)
+            .values(iam_role_arn=role_arn)
+            .returning(self.table.c.analyst_id)
+        )
+        with self.engine.begin() as connection:
+            return connection.execute(statement).scalar_one_or_none() is not None
