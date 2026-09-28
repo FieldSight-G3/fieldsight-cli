@@ -1,0 +1,93 @@
+"""The review path uses a trusted identity and saves a queue decision once."""
+
+import unittest
+from datetime import UTC, datetime
+from uuid import UUID
+
+from pydantic import ValidationError
+
+from fieldsight.review_decisions import (
+    CitationReference,
+    CitationRepoint,
+    ReviewDecision,
+    ReviewEdit,
+    ReviewRequest,
+)
+from fieldsight.review_flow import PendingReview, ReviewConflict, submit_review
+
+QUEUE = UUID("00000000-0000-0000-0000-000000000004")
+CASE = UUID("00000000-0000-0000-0000-000000000003")
+SUBMITTER = UUID("00000000-0000-0000-0000-000000000001")
+REVIEWER = UUID("00000000-0000-0000-0000-000000000002")
+DECIDED_AT = datetime(2026, 9, 27, 12, tzinfo=UTC)
+
+
+class FakeReviewStore:
+    def __init__(self) -> None:
+        self.pending: PendingReview | None = PendingReview(
+            queue_id=QUEUE,
+            incident_id=CASE,
+            submitting_analyst_id=SUBMITTER,
+            original_payload={"narrative": "Original", "outcome": {"rule": "R1"}},
+            original_citations={"ref-1": CitationReference(document_id="CFR-1904", chunk_id="old")},
+        )
+        self.saved: ReviewDecision | None = None
+        self.can_save = True
+
+    def get_pending(self, queue_id: UUID) -> PendingReview | None:
+        return self.pending if self.pending is not None and self.pending.queue_id == queue_id else None
+
+    def record_if_pending(self, decision: ReviewDecision) -> bool:
+        if (not self.can_save or self.pending is None or decision.queue_id != self.pending.queue_id or decision.incident_id != self.pending.incident_id):
+            return False
+        self.saved = decision
+        self.pending = None
+        return True
+
+
+class ReviewFlowTests(unittest.TestCase):
+    def test_approve_uses_verified_reviewer_and_original_snapshot(self) -> None:
+        store = FakeReviewStore()
+        decision = submit_review(ReviewRequest(action="approve"), queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store, decided_at=DECIDED_AT)
+        self.assertEqual(decision.status, "approved")
+        self.assertEqual(decision.reviewer_id, REVIEWER)
+        self.assertEqual(decision.decided_at, DECIDED_AT)
+        self.assertEqual(decision.original_payload["outcome"], {"rule": "R1"})
+        self.assertIs(store.saved, decision)
+        with self.assertRaises(ReviewConflict):
+            submit_review(ReviewRequest(action="reject", reason="wrong"), queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store)
+
+    def test_rejection_is_recorded_and_self_review_cannot_write(self) -> None:
+        store = FakeReviewStore()
+        with self.assertRaises(ValidationError):
+            submit_review(ReviewRequest(action="approve"), queue_id=QUEUE, verified_reviewer_id=SUBMITTER, store=store, decided_at=DECIDED_AT)
+        self.assertIsNone(store.saved)
+        decision = submit_review(ReviewRequest(action="reject", reason="Unsupported claim"), queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store, decided_at=DECIDED_AT)
+        self.assertEqual(decision.status, "rejected")
+        self.assertEqual(decision.reason, "Unsupported claim")
+
+    def test_edit_only_allows_same_document_citation(self) -> None:
+        store = FakeReviewStore()
+        repoint = CitationRepoint(citation_id="ref-1", replacement_chunk_id="other")
+        request = ReviewRequest(action="edit_then_approve", edit=ReviewEdit(narrative="Clearer", citation_repoints=[repoint]))
+        with self.assertRaises(ValueError):
+            submit_review(request, queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store, source_for_chunk=lambda _: "CFR-269")
+        self.assertIsNone(store.saved)
+        decision = submit_review(request, queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store, source_for_chunk=lambda _: "CFR-1904")
+        self.assertEqual(decision.action, "edit_then_approve")
+        self.assertEqual(decision.original_payload["narrative"], "Original")
+        assert decision.edit is not None
+        self.assertEqual(decision.edit.narrative, "Clearer")
+
+    def test_missing_item_and_concurrent_decision_fail_closed(self) -> None:
+        store = FakeReviewStore()
+        with self.assertRaises(ReviewConflict):
+            submit_review(ReviewRequest(action="approve"), queue_id=CASE, verified_reviewer_id=REVIEWER, store=store)
+        store.can_save = False
+        with self.assertRaises(ReviewConflict):
+            submit_review(ReviewRequest(action="approve"), queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store)
+        self.assertIsNone(store.saved)
+
+
+if __name__ == "__main__":
+    unittest.main()

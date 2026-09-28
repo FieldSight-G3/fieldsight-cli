@@ -56,21 +56,10 @@ class IncidentRepository(_Repository):
     def get(self, incident_id: UUID) -> IncidentRecord | None:
         return self._get("incident_id", incident_id, IncidentRecord)
 
-    def save_analysis(
-        self,
-        incident_id: UUID,
-        correlation_id: UUID,
-        outcome: dict[str, Any],
-        deciding_rule: str,
-        rule_invocations: list[dict[str, Any]],
-        escalation_triggers: dict[str, Any]
-    ) -> UUID:
+    def save_analysis(self, incident_id: UUID, correlation_id: UUID, outcome: dict[str, Any], deciding_rule: str, rule_invocations: list[dict[str, Any]], escalation_triggers: dict[str, Any], *, requires_review: bool) -> UUID:
         metadata = MetaData()
         run_records = Table("run_records", metadata, autoload_with=self.engine)
-        review_queue = (
-            Table("review_queue", metadata, autoload_with=self.engine)
-            if escalation_triggers else None
-        )
+        review_queue = Table("review_queue", metadata, autoload_with=self.engine) if requires_review else None
         with self.engine.begin() as connection:
             updated = connection.execute(
                 update(self.table)
