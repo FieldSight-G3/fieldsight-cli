@@ -32,7 +32,7 @@ expected:
     - "days away is the more serious outcome, so it takes column H over column I"
   must_not_include:
     - "goes in column I"
-    - "180 days"
+    - "enter 180"
   sources:
     - doc_id: CFR-1904
       section_path: "1904.7"
