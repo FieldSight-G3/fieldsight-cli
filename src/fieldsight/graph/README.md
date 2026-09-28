@@ -60,7 +60,7 @@ Paths are relative to `src/fieldsight/`.
 
 - The Coordinator: `supervisor_node`, `route_after_supervisor`, its typed plan, and why each worker was dispatched.
 - The parent graph (`graph/state.py`, `graph/graph.py`): `analyst_id` and `tasks` in state, the reducers (`dossier` with `operator.or_`, `reviews` append, `tasks` merge), a separate edge from each worker into the Reviewer, and `ReviewVerdict` in the checkpoint serializer's allowed modules.
-- The eligibility check, and calling `harness/dossier_guard.py` on the dossier after the Reviewer approves (the guard exists; see `harness/README.md`).
+- The eligibility check, and calling `harness/guardrails/dossier_guard.py` on the dossier after the Reviewer approves (the guard exists; see `harness/README.md`). Pass the guard the harness's own invocations (or none, so it runs the rules itself), never only the workers' tool-path ones. Blocked legs go back to the Coordinator; at the end the graph returns `types/run.py`'s `WorkflowResult` to `harness/run/lifecycle.py`.
 - `find_similar_incidents` for Hazard Control (comes with the Gateway ticket).
 - The run record (GF-53): every rules-engine invocation (a worker's state keeps one decision per rule; each `evaluate_rule` call is in its messages), tool calls, and token totals.
 - Registering the Reviewer's thread in the `sessions` table.

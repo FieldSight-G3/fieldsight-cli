@@ -5,14 +5,14 @@ from datetime import UTC, datetime, timedelta
 
 from pydantic import ValidationError
 
-from fieldsight.harness.escalation import (
+from fieldsight.harness.escalation.triggers import evaluate_escalation
+from fieldsight.rules.engine import evaluate_incident
+from fieldsight.schemas.incidents import NormalizedIncident
+from fieldsight.types.escalation import (
     EscalationDecision,
     EscalationPolicy,
     EscalationSignals,
-    evaluate_escalation,
 )
-from fieldsight.rules.engine import evaluate_incident
-from fieldsight.schemas.incidents import NormalizedIncident
 
 ORIGIN = datetime(2026, 1, 1, 9, tzinfo=UTC)
 ALL_CLEAR = EscalationSignals(

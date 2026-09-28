@@ -6,14 +6,16 @@ from uuid import UUID
 
 from pydantic import ValidationError
 
-from fieldsight.harness.review_decisions import (
+from fieldsight.harness.escalation.review import (
     CitationReference,
     CitationRepoint,
+    PendingReview,
+    ReviewConflict,
     ReviewDecision,
     ReviewEdit,
     ReviewRequest,
+    submit_review,
 )
-from fieldsight.harness.review_flow import PendingReview, ReviewConflict, submit_review
 
 QUEUE = UUID("00000000-0000-0000-0000-000000000004")
 CASE = UUID("00000000-0000-0000-0000-000000000003")

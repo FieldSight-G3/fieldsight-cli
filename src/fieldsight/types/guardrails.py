@@ -44,7 +44,7 @@ class GuardrailEvent(TypedDict):
 
 
 # distinct from retrieval's RefusalReason, which covers why a corpus search couldn't ground an answer
-GuardrailRefusal = Literal["invalid_input", "prompt_attack", "action_requested", "out_of_scope", "output_blocked"]
+GuardrailRefusal = Literal["invalid_input", "prompt_attack", "action_requested", "out_of_scope", "output_blocked", "bound_reached"]
 
 
 class Refusal(TypedDict):

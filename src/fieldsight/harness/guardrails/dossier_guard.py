@@ -1,12 +1,12 @@
 """ stage 4 on the dossier: every threshold outcome must match a rule invocation recorded this turn """
 
-from ..rules.engine import evaluate_incident
-from ..rules.proposal_review import review_classification, review_reporting
-from ..schemas.incidents import NormalizedIncident
-from ..schemas.rule_proposal import ClassificationProposal, ReportingProposal
-from ..schemas.run_records import RuleInvocation
-from ..types.dossier import Dossier
-from ..types.guardrails import GuardrailEvent
+from ...rules.engine import evaluate_incident
+from ...rules.proposal_review import review_classification, review_reporting
+from ...schemas.incidents import NormalizedIncident
+from ...schemas.rule_proposal import ClassificationProposal, ReportingProposal
+from ...schemas.run_records import RuleInvocation
+from ...types.dossier import Dossier
+from ...types.guardrails import GuardrailEvent
 from .common import DETERMINATION, citation_problems, emit, latest
 
 # the propose tools' schemas and reviews, reused to check each leg against this turn's rule invocations

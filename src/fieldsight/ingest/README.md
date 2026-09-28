@@ -80,6 +80,6 @@ Paths are relative to `src/fieldsight/ingest/`. The shapes (`StoredArtifact`, `E
 - The `submit` command that runs store, crack, redact, normalize and report, then writes the incident row.
 - Normalize: the one structured-output call that produces `NormalizedIncident` with each field's source artifact and confidence (section 7 step 5).
 - Photograph corroboration with Bedrock's multimodal model (section 7 step 3).
-- Passing the cracked strings through the Prompt Attacks filter: `harness/turn_check.check_turn(..., cracked=...)` does it, but nothing calls it from `submit` yet.
+- Passing the cracked strings through the Prompt Attacks filter: `harness/guardrails/turn_check.check_turn(..., cracked=...)` does it, but nothing calls it from `submit` yet.
 - `redact` and `ingestion_report` have no caller yet.
 - `script/ingest_corpus_local.py` is broken: it imports `CorpusChunkRepository`, which `repository.py` doesn't have, and nothing reads the local pgvector table.

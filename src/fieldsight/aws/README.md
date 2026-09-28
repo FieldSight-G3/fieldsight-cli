@@ -8,9 +8,9 @@ config.settings
 clients.py   session() --> client(service)    adaptive retries, 4 attempts, 5 s connect / 30 s read
       |
       +-- chat_model()        ChatBedrockConverse + Guardrails      --> specialists, Reviewer, RAG chain
-      |   chat_model(fast=True)  the fast tier                      --> harness/turn_check.py (readiness)
+      |   chat_model(fast=True)  the fast tier                      --> harness/guardrails/turn_check.py (readiness)
       +-- bedrock_runtime() --> guardrails.py    screen (ApplyGuardrail), prompt_attack_detected
-      |                                          --> harness/turn_check.py
+      |                                          --> harness/guardrails/turn_check.py
       +-- embeddings()        Titan v2, 1024 dims, unit length      --> script/ingest_corpus_local.py
       +-- corpus_retriever()  Bedrock KB retriever, score-gated     --> retrieval/corpus.py
       +-- textract() -------> textract.py        start_analysis, get_analysis_status, get_blocks,
