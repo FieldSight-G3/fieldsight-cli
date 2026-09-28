@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from ...errors import ExtractionError
-from ...types.artifacts import ARTIFACT_FAILURE, ExtractedField, PacketExtraction
+from ...types.artifacts import ArtifactFailure, ExtractedField, PacketExtraction
 from ..crack import crack
 from .fields import extract_form_fields
 from .storage import upload_artifact
@@ -28,5 +28,5 @@ def crack_packet(paths: list[Path]) -> PacketExtraction:
             fields += crack_artifact(path)
         except ExtractionError as error:
             log.warning("skipped artifact %s: %s", path.name, error)
-            failures.append(ARTIFACT_FAILURE.validate_python({"artifact": path.name, "reason": str(error)}))
+            failures.append(ArtifactFailure(artifact=path.name, reason=str(error)))
     return {"artifacts": [path.name for path in paths], "fields": fields, "failures": failures}

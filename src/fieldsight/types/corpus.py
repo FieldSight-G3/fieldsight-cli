@@ -37,12 +37,5 @@ class ChunkMetadata(TypedDict):
     chunk_id: str
 
 
-class Source(ChunkMetadata):
-    """ one entry of a grounded answer's sources array: a chunk and how well it matched """
-
-    score: float
-
-
 CORPUS_DOC = TypeAdapter(CorpusDoc)
 CHUNK_METADATA = TypeAdapter(ChunkMetadata)
-SOURCE = TypeAdapter(Source)

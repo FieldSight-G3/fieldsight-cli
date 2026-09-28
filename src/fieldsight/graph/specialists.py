@@ -11,10 +11,11 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 from ..aws import clients
+from ..config import bounds
 from ..prompts import PROMPTS
 from ..tools.tools import TOOLSETS
 
-MAX_SPECIALIST_TOOL_ROUNDS = 10
+MAX_SPECIALIST_TOOL_ROUNDS = bounds.max_specialist_tool_rounds
 
 # the workers get_specialists builds; each one's brief is PROMPTS[name] and its tools TOOLSETS[name]
 WORKERS = ("recordability", "reportability", "hazard_control")
@@ -30,7 +31,7 @@ class SpecialistState(TypedDict):
     rounds: int
 
     # what the tools found, written by the tools themselves
-    decisions: Annotated[list[dict], operator.add]
+    decisions: Annotated[dict[str, dict], operator.or_]     # keyed by rule id; the rules are deterministic, so a re-run just repeats
     retrieved: Annotated[dict[str, dict], operator.or_]
 
     # output: set by the propose tool once it accepts a proposal

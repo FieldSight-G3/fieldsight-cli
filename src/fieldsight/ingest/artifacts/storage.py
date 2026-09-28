@@ -4,7 +4,7 @@ import hashlib
 from pathlib import Path
 
 from ...aws.s3 import upload
-from ...types.artifacts import STORED_ARTIFACT, StoredArtifact
+from ...types.artifacts import StoredArtifact
 
 
 def artifact_key(path: Path, digest: str) -> str:
@@ -18,6 +18,6 @@ def upload_artifact(file_path) -> StoredArtifact:
 
     path = Path(file_path)
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
-    artifact = STORED_ARTIFACT.validate_python({"name": path.name, "digest": digest, "key": artifact_key(path, digest)})
+    artifact = StoredArtifact(name=path.name, digest=digest, key=artifact_key(path, digest))
     upload(path, artifact["key"])
     return artifact
