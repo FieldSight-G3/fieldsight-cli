@@ -11,10 +11,13 @@ from langgraph.graph.message import add_messages
 from langgraph.prebuilt import ToolNode
 
 from ..aws import clients
-from ..prompts import HAZARD_CONTROL_PROMPT, RECORDABILITY_PROMPT, REPORTABILITY_PROMPT
-from ..tools.tools import HAZARD_CONTROL_TOOLS, RECORDABILITY_TOOLS, REPORTABILITY_TOOLS
+from ..prompts import PROMPTS
+from ..tools.tools import TOOLSETS
 
 MAX_SPECIALIST_TOOL_ROUNDS = 10
+
+# the workers get_specialists builds; each one's brief is PROMPTS[name] and its tools TOOLSETS[name]
+WORKERS = ("recordability", "reportability", "hazard_control")
 
 
 class SpecialistState(TypedDict):
@@ -76,19 +79,6 @@ def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer:
     return g.compile(name=name, checkpointer=checkpointer)
 
 
-# each specialist's brief carries its goal, corpus and rules (spec section 5); its tools follow spec section 9
-SPECIALIST_BRIEFS = {
-    "recordability": RECORDABILITY_PROMPT,
-    "reportability": REPORTABILITY_PROMPT,
-    "hazard_control": HAZARD_CONTROL_PROMPT,
-}
-
-_TOOLSETS = {
-    "recordability": RECORDABILITY_TOOLS,
-    "reportability": REPORTABILITY_TOOLS,
-    "hazard_control": HAZARD_CONTROL_TOOLS,
-}
-
 # lazily loading the specialists so that just importing this module doesn't create them
 _SPECIALISTS: dict | None = None
 
@@ -98,5 +88,5 @@ def get_specialists() -> dict:
 
     global _SPECIALISTS
     if _SPECIALISTS is None:
-        _SPECIALISTS = {name: build_specialist(name, brief, _TOOLSETS[name]) for name, brief in SPECIALIST_BRIEFS.items()}
+        _SPECIALISTS = {name: build_specialist(name, PROMPTS[name], TOOLSETS[name]) for name in WORKERS}
     return _SPECIALISTS

@@ -26,7 +26,7 @@ route_after_review --rejected, n < max_review_iterations--> "coordinator"
 
 | File | Contains |
 |---|---|
-| `graph/specialists.py` | `SpecialistState`, `MAX_SPECIALIST_TOOL_ROUNDS`, and `build_specialist(name, brief, tools, checkpointer=None)`, which builds any `agent <-> tools -> END` loop. `SPECIALIST_BRIEFS` and `_TOOLSETS` hold what makes each worker different; `get_specialists` builds the three workers once. |
+| `graph/specialists.py` | `SpecialistState`, `MAX_SPECIALIST_TOOL_ROUNDS`, and `build_specialist(name, brief, tools, checkpointer=None)`, which builds any `agent <-> tools -> END` loop. `PROMPTS` (in `prompts.py`) and `TOOLSETS` (in `tools/tools.py`) hold what makes each participant different; `get_specialists` builds the three `WORKERS` once. |
 | `graph/nodes/supervision.py` | `_run_specialist`, which invokes a worker and maps its result back as its dossier leg, and the one-line dispatch nodes for Recordability, Reportability and Hazard Control. |
 | `graph/nodes/review.py` | `postgres_checkpointer`, `get_reviewer` (the factory with the Reviewer's brief, tools and checkpointer), `reviewer_node` and `route_after_review`. |
 | `types/dossier.py` | `DossierLeg` (task, proposal, decisions, cited) and `Dossier`, keyed by worker. |

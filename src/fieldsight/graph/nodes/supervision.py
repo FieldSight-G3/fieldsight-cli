@@ -3,17 +3,17 @@
 from langgraph.errors import GraphRecursionError
 
 from ...config import settings
-from ...prompts import HAZARD_CONTROL_GOAL, RECORDABILITY_GOAL, REPORTABILITY_GOAL
+from ...prompts import GOALS
 from ...tools.tools import latest_decisions
 from ...types.dossier import DossierLeg
 from ..specialists import get_specialists
 
 
-def _run_specialist(name: str, goal: str, state: dict) -> dict:
+def _run_specialist(name: str, state: dict) -> dict:
     """ invoke one worker sub-graph and map its result back as its leg of the dossier; its transcript stays behind """
 
     # the Coordinator narrows the goal when it re-dispatches
-    task = state.get("tasks", {}).get(name) or goal
+    task = state.get("tasks", {}).get(name) or GOALS[name]
     try:
         result = get_specialists()[name].invoke(
             {"task": task, "incident": state["incident"], "messages": [], "rounds": 0,
@@ -35,12 +35,12 @@ def _run_specialist(name: str, goal: str, state: dict) -> dict:
 
 
 def recordability_specialist_node(state: dict) -> dict:
-    return _run_specialist("recordability", RECORDABILITY_GOAL, state)
+    return _run_specialist("recordability", state)
 
 
 def reportability_specialist_node(state: dict) -> dict:
-    return _run_specialist("reportability", REPORTABILITY_GOAL, state)
+    return _run_specialist("reportability", state)
 
 
 def hazard_control_specialist_node(state: dict) -> dict:
-    return _run_specialist("hazard_control", HAZARD_CONTROL_GOAL, state)
+    return _run_specialist("hazard_control", state)

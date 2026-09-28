@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from langchain_core.messages import AIMessage
 
 from fieldsight.graph.nodes.supervision import recordability_specialist_node
-from fieldsight.prompts import RECORDABILITY_GOAL
+from fieldsight.prompts import GOALS
 from fieldsight.schemas.incidents import NormalizedIncident
 
 AT = datetime(2026, 3, 2, 9, 0, tzinfo=UTC)
@@ -32,7 +32,7 @@ def test_leg_carries_the_proposal_and_only_what_it_rests_on(script):
 
     leg = recordability_specialist_node({"incident": INCIDENT})["dossier"]["recordability"]
 
-    assert leg["task"] == RECORDABILITY_GOAL
+    assert leg["task"] == GOALS["recordability"]
     assert leg["proposal"]["log_column"] == "H"
     assert set(leg["decisions"]) == {"R1", "R3", "R4"}
     assert leg["cited"]["CFR-1904-a"]["text"] == "text of 1904.39"

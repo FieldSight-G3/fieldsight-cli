@@ -20,6 +20,8 @@ from ..schemas.rule_proposal import (
     ReportingProposal,
 )
 
+TOOLSETS: dict[str, list]
+
 
 def respond(result: dict, tool_call_id: str, **state_update) -> Command:
     """ answer the model with the result and record what the tool found in the specialist's state """
@@ -181,8 +183,10 @@ def submit_review(
     return propose(verdict, [], tool_call_id)
 
 
-# creating lists of the tools to BIND to each specialist's model
-RECORDABILITY_TOOLS = [get_incident_extraction, search_knowledge_base, evaluate_rule, propose_classification]
-REPORTABILITY_TOOLS = [get_incident_extraction, search_knowledge_base, evaluate_rule, propose_reporting_determination]
-HAZARD_CONTROL_TOOLS = [search_knowledge_base, propose_hazard_control]
-REVIEWER_TOOLS = [search_knowledge_base, submit_review]
+# the tools to BIND to each participant's model (spec section 9)
+TOOLSETS = {
+    "recordability": [get_incident_extraction, search_knowledge_base, evaluate_rule, propose_classification],
+    "reportability": [get_incident_extraction, search_knowledge_base, evaluate_rule, propose_reporting_determination],
+    "hazard_control": [search_knowledge_base, propose_hazard_control],
+    "reviewer": [search_knowledge_base, submit_review],
+}

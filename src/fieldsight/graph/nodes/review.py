@@ -8,9 +8,9 @@ from psycopg import Connection
 from psycopg.rows import dict_row
 
 from ...config import settings
-from ...prompts import REVIEWER_PROMPT
+from ...prompts import PROMPTS
 from ...schemas.review import ReviewVerdict
-from ...tools.tools import REVIEWER_TOOLS
+from ...tools.tools import TOOLSETS
 from ..specialists import build_specialist
 
 
@@ -30,7 +30,7 @@ def get_reviewer():
 
     global _REVIEWER
     if _REVIEWER is None:
-        _REVIEWER = build_specialist("reviewer", REVIEWER_PROMPT, REVIEWER_TOOLS, postgres_checkpointer())
+        _REVIEWER = build_specialist("reviewer", PROMPTS["reviewer"], TOOLSETS["reviewer"],postgres_checkpointer())
     return _REVIEWER
 
 
