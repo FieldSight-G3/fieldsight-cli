@@ -2,7 +2,7 @@
 
 import re
 
-from ...types.artifacts import REDACTED_SPAN, ExtractedField, Redacted, RedactedSpan
+from ...types.artifacts import ExtractedField, Redacted, RedactedSpan
 
 # Form 301 labels whose whole value is PII
 PII_LABEL = re.compile(r"\b(name|street|address|city|zip|phone|date of birth|ssn|social security|e-?mail|completed by)\b")
@@ -40,7 +40,7 @@ def scrub_text(text: str, names: set[str], where: str) -> tuple[str, list[Redact
         if start < cursor:      # overlaps a match already masked
             continue
         parts += [text[cursor:start], f"[REDACTED_{kind.upper()}]"]
-        spans.append(REDACTED_SPAN.validate_python({"kind": kind, "where": where, "start": start, "end": end}))
+        spans.append(RedactedSpan(kind=kind, where=where, start=start, end=end))
         cursor = end
     return "".join(parts) + text[cursor:], spans
 
@@ -49,7 +49,7 @@ def redact(fields: list[ExtractedField], narrative: str | None) -> Redacted:
     """ drop PII fields and scrub the rest, including the employee's name in the narrative; reports every removed span """
 
     dropped = [field for field in fields if is_pii_label(field["label"])]
-    spans = [REDACTED_SPAN.validate_python({"kind": "field", "where": f["label"], "start": 0, "end": len(f["value"])}) for f in dropped]
+    spans = [RedactedSpan(kind="field", where=f["label"], start=0, end=len(f["value"])) for f in dropped]
 
     names = {
         word

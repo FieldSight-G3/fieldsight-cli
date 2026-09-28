@@ -1,6 +1,6 @@
 """ labelled form fields from a packet artifact's Textract blocks """
 
-from ...types.artifacts import EXTRACTED_FIELD, ExtractedField
+from ...types.artifacts import ExtractedField
 from ..blocks import index_blocks, related, text_of
 
 
@@ -31,8 +31,8 @@ def extract_form_fields(blocks: list[dict], artifact: str) -> list[ExtractedFiel
         # a misread label is as bad as a misread value, so take the lower confidence
         confidence = min(key.get("Confidence", 0.0), value.get("Confidence", 0.0)) / 100
 
-        fields.append(EXTRACTED_FIELD.validate_python({
-            "label": label, "value": text_of(value, by_id), "confidence": confidence, "artifact": artifact, "page": value.get("Page", 1),
-        }))
+        fields.append(ExtractedField(
+            label=label, value=text_of(value, by_id), confidence=confidence, artifact=artifact, page=value.get("Page", 1),
+        ))
 
     return fields

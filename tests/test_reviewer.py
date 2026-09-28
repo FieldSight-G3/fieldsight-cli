@@ -4,7 +4,7 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.checkpoint.memory import InMemorySaver
 
-from fieldsight.config import settings
+from fieldsight.config import bounds
 from fieldsight.graph.nodes import review
 from fieldsight.graph.nodes.review import reviewer_node, route_after_review
 from fieldsight.schemas.review import Rejection, ReviewVerdict
@@ -69,7 +69,7 @@ REJECTED = ReviewVerdict(approved=False, rejections=[
 @pytest.mark.parametrize(("verdict", "iterations", "route"), [
     (APPROVED, 1, "eligibility_check"),
     (REJECTED, 1, "coordinator"),
-    (REJECTED, settings.max_review_iterations, "eligibility_check"),
+    (REJECTED, bounds.max_reviewer_iterations, "eligibility_check"),
     (None, 1, "eligibility_check"),
 ])
 def test_route_after_review(verdict, iterations, route):

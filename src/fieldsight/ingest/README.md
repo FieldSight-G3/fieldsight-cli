@@ -54,9 +54,8 @@ ingestion_report --> processed, extracted, below floor, failures           artif
 | `corpus/loader.py` | `TextractLoader`, a LangChain document loader over the saved Textract output. |
 | `corpus/chain.py` | `chunk_chain`: one doc in, its chunks out; `.batch()` runs the corpus. |
 | `corpus/indexing.py` | `stage_chunks` and `sync_knowledge_base`. |
-| `chunking.py` | Stale; see below. |
 
-Paths are relative to `src/fieldsight/ingest/`. The shapes (`StoredArtifact`, `ExtractedField`, `CorpusDoc`, `ChunkMetadata` and others) are in `types/`.
+Paths are relative to `src/fieldsight/ingest/`. The shapes (`StoredArtifact`, `ExtractedField`, `CorpusDoc`, `ChunkMetadata` and others) are TypedDicts in `types/`.
 
 ## Decisions
 
@@ -74,12 +73,13 @@ Paths are relative to `src/fieldsight/ingest/`. The shapes (`StoredArtifact`, `E
 | A field's confidence is the lower of its key's and value's | A misread label is as bad as a misread value |
 | Redaction by field label, plus a pattern scrub of names, SSNs, emails and phones; spans are returned, never the removed text | Section 7: deterministic PII redaction by field name that returns the removed spans |
 | Malformed artifacts are logged and skipped, not fatal | Section 7: skip and log; the dossier states what failed |
+| Only data from outside is validated: `sources.json` (`CORPUS_DOC`) and the metadata sent to the KB (`CHUNK_METADATA`); shapes this code builds itself are plain TypedDicts | Validating a dict we just built from known values can't catch anything |
 
 ## Not implemented
 
 - The `submit` command that runs store, crack, redact, normalize and report, then writes the incident row.
 - Normalize: the one structured-output call that produces `NormalizedIncident` with each field's source artifact and confidence (section 7 step 5).
 - Photograph corroboration with Bedrock's multimodal model (section 7 step 3).
-- The Prompt Attacks filter on every string cracked out of an artifact (section 10).
+- Passing the cracked strings through the Prompt Attacks filter: `harness/turn_check.check_turn(..., cracked=...)` does it, but nothing calls it from `submit` yet.
 - `redact` and `ingestion_report` have no caller yet.
-- `ingest/chunking.py` is stale and broken: it imports `pdf_key` from `aws.s3` and `CORPUS_SOURCES` from `config`, which both moved to `corpus/sources.py`, and nothing imports it. It should be deleted.
+- `script/ingest_corpus_local.py` is broken: it imports `CorpusChunkRepository`, which `repository.py` doesn't have, and nothing reads the local pgvector table.

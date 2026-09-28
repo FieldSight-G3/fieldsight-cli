@@ -1,11 +1,8 @@
-""" shapes of packet artifact data in the ingestion pipeline: plain dicts, validated at the boundary """
+""" shapes of packet artifact data in the ingestion pipeline: plain dicts built by our own code """
 
 from typing import Literal, TypedDict
 
-from pydantic import ConfigDict, TypeAdapter, with_config
 
-
-@with_config(ConfigDict(extra="forbid"))
 class StoredArtifact(TypedDict):
     """ a packet artifact once it is in S3, keyed by its content hash """
 
@@ -14,7 +11,6 @@ class StoredArtifact(TypedDict):
     key: str
 
 
-@with_config(ConfigDict(extra="forbid"))
 class ExtractedField(TypedDict):
     """ one filled-in form field, traced to the artifact and page it came from """
 
@@ -28,7 +24,6 @@ class ExtractedField(TypedDict):
 RedactionKind = Literal["field", "name", "ssn", "email", "phone"]
 
 
-@with_config(ConfigDict(extra="forbid"))
 class RedactedSpan(TypedDict):
     """ where something was removed; never the removed text itself, since that is the PII """
 
@@ -46,7 +41,6 @@ class Redacted(TypedDict):
     spans: list[RedactedSpan]
 
 
-@with_config(ConfigDict(extra="forbid"))
 class ArtifactFailure(TypedDict):
     """ an artifact that was skipped, and why """
 
@@ -62,7 +56,6 @@ class PacketExtraction(TypedDict):
     failures: list[ArtifactFailure]
 
 
-@with_config(ConfigDict(extra="forbid"))
 class IngestionReport(TypedDict):
     """ the ingestion report: artifacts processed, fields extracted, fields below the floor, failures """
 
@@ -70,10 +63,3 @@ class IngestionReport(TypedDict):
     fields_extracted: int
     fields_below_floor: list[str]
     failures: list[ArtifactFailure]
-
-
-STORED_ARTIFACT = TypeAdapter(StoredArtifact)
-EXTRACTED_FIELD = TypeAdapter(ExtractedField)
-REDACTED_SPAN = TypeAdapter(RedactedSpan)
-ARTIFACT_FAILURE = TypeAdapter(ArtifactFailure)
-INGESTION_REPORT = TypeAdapter(IngestionReport)

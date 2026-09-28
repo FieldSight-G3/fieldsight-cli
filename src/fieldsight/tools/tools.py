@@ -29,12 +29,6 @@ def respond(result: dict, tool_call_id: str, **state_update) -> Command:
     return Command(update={**state_update, "messages": [ToolMessage(json.dumps(result), tool_call_id=tool_call_id)]})
 
 
-def latest_decisions(state: dict) -> dict[str, dict]:
-    """ the latest decision per rule this run """
-
-    return {decision["rule_id"]: decision for decision in state["decisions"]}
-
-
 @tool
 def get_incident_extraction(state: Annotated[dict, InjectedState]) -> dict:
     """ The normalized facts extracted from this incident's packet, and each field's extraction confidence.
@@ -92,10 +86,10 @@ def evaluate_rule(
     """
 
     try:
-        decision = run_rule(rule_id, state["incident"], latest_decisions(state))
+        decision = run_rule(rule_id, state["incident"], state["decisions"])
     except RuleError as error:
         return {"error": str(error)}
-    return respond({"decision": decision}, tool_call_id, decisions=[decision])
+    return respond({"decision": decision}, tool_call_id, decisions={decision["rule_id"]: decision})
 
 
 def propose(proposal: BaseModel, problems: list[str], tool_call_id: str) -> Command:
@@ -122,7 +116,7 @@ def propose_classification(
         proposal: The outcome, column and day count exactly as the rules returned them, a rationale, and its chunk ids.
     """
 
-    problems = proposal_review.review_classification(proposal, latest_decisions(state), set(state["retrieved"]))
+    problems = proposal_review.review_classification(proposal, state["decisions"],set(state["retrieved"]))
     return propose(proposal, problems, tool_call_id)
 
 
@@ -141,7 +135,7 @@ def propose_reporting_determination(
         proposal: The outcome, clock, deadline and exclusion exactly as R2 returned them, a rationale, and its chunk ids.
     """
 
-    problems = proposal_review.review_reporting(proposal, latest_decisions(state), set(state["retrieved"]))
+    problems = proposal_review.review_reporting(proposal, state["decisions"],set(state["retrieved"]))
     return propose(proposal, problems, tool_call_id)
 
 

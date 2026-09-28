@@ -32,7 +32,7 @@ def test_must_find_the_exclusion_not_just_the_clock(script):
     ])
 
     state = get_specialists()["reportability"].invoke(
-        {"task": "test", "incident": INCIDENT, "messages": [], "rounds": 0, "decisions": [], "retrieved": {},
+        {"task": "test", "incident": INCIDENT, "messages": [], "rounds": 0, "decisions": {}, "retrieved": {},
          "proposal": None})
 
     clock_only = next(m for m in state["messages"] if isinstance(m, ToolMessage) and m.name == "propose_reporting_determination")

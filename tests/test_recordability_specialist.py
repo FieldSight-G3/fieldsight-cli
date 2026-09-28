@@ -22,7 +22,7 @@ def calls(*requests) -> AIMessage:
 def run(replies: list, script) -> dict:
     script(replies)
     return get_specialists()["recordability"].invoke(
-        {"task": "test", "incident": INCIDENT, "messages": [], "rounds": 0, "decisions": [], "retrieved": {},
+        {"task": "test", "incident": INCIDENT, "messages": [], "rounds": 0, "decisions": {}, "retrieved": {},
          "proposal": None})
 
 
@@ -37,7 +37,7 @@ def test_loops_on_its_tools_until_it_decides_it_is_done_and_applies_r3_r1_r4(scr
     ], script)
 
     assert state["proposal"]["log_column"] == "H"
-    assert [decision["rule_id"] for decision in state["decisions"]] == ["R3", "R1", "R4"]
+    assert list(state["decisions"]) == ["R3", "R1", "R4"]
 
 
 def test_stops_at_the_round_budget(script):
