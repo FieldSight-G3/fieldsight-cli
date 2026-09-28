@@ -13,7 +13,13 @@ from fieldsight.review_decisions import (
     ReviewEdit,
     ReviewRequest,
 )
-from fieldsight.review_flow import PendingReview, ReviewConflict, submit_review
+from fieldsight.review_flow import (
+    PendingReview,
+    ReviewConflict,
+    ReviewNotEntitled,
+    document_for_chunk,
+    submit_review,
+)
 
 QUEUE = UUID("00000000-0000-0000-0000-000000000004")
 CASE = UUID("00000000-0000-0000-0000-000000000003")
@@ -33,9 +39,13 @@ class FakeReviewStore:
         )
         self.saved: ReviewDecision | None = None
         self.can_save = True
+        self.entitled = {REVIEWER, SUBMITTER}
 
     def get_pending(self, queue_id: UUID) -> PendingReview | None:
         return self.pending if self.pending is not None and self.pending.queue_id == queue_id else None
+
+    def reviewer_entitled(self, reviewer_id: UUID, incident_id: UUID) -> bool:
+        return reviewer_id in self.entitled and incident_id == CASE
 
     def record_if_pending(self, decision: ReviewDecision) -> bool:
         if (not self.can_save or self.pending is None or decision.queue_id != self.pending.queue_id or decision.incident_id != self.pending.incident_id):
@@ -87,6 +97,20 @@ class ReviewFlowTests(unittest.TestCase):
         with self.assertRaises(ReviewConflict):
             submit_review(ReviewRequest(action="approve"), queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store)
         self.assertIsNone(store.saved)
+
+    def test_reviewer_without_a_grant_is_denied_before_any_write(self) -> None:
+        store = FakeReviewStore()
+        store.entitled = {SUBMITTER}
+        with self.assertRaises(ReviewNotEntitled):
+            submit_review(ReviewRequest(action="approve"), queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store)
+        self.assertIsNone(store.saved)
+        self.assertIsNotNone(store.pending)
+
+    def test_document_for_chunk_reads_the_corpus_chunk_id_format(self) -> None:
+        self.assertEqual(document_for_chunk("CFR-1904-0123456789ab"), "CFR-1904")
+        self.assertEqual(document_for_chunk("LOI-PACK-ffffffffffff"), "LOI-PACK")
+        for chunk_id in ("CFR-1904", "CFR-1904-0123456789AB", "CFR-1904-0123456789a", "-0123456789ab", "old"):
+            self.assertIsNone(document_for_chunk(chunk_id), chunk_id)
 
 
 if __name__ == "__main__":

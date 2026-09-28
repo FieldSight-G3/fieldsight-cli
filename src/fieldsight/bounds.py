@@ -43,6 +43,8 @@ class BoundsConfig(BaseModel):
     max_turn_wall_clock_seconds: float = Field(default=120.0, gt=0)
     http_timeout_seconds: float = Field(default=20.0, gt=0)
     session_cost_ceiling_usd: Decimal = Field(default=Decimal("5.00"), gt=0)
+    db_write_max_attempts: int = Field(default=3, gt=0)
+    db_write_backoff_seconds: float = Field(default=0.2, ge=0)
 
     @classmethod
     def from_environment(cls, values: Mapping[str, str] | None = None) -> BoundsConfig:

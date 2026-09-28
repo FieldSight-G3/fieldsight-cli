@@ -1,78 +1,42 @@
-"""Parameterized, read-only SQLAlchemy queries used by both Gateway tools."""
+"""Entitlement policy for both Gateway read tools; every query is in the repository module."""
 
 from __future__ import annotations
 
 import logging
 from typing import Any
 
-from sqlalchemy import MetaData, Table, and_, select
-
-from fieldsight.repository import IncidentRepository
+from fieldsight.repository import GatewayReadRepository
 from fieldsight.tool_service import SimilarCandidate, ToolDenied
 
 logger = logging.getLogger(__name__)
 
 
 class GatewayReadStore:
-    def __init__(self, repository: IncidentRepository | None = None) -> None:
-        repository = repository or IncidentRepository()
-        self.engine = repository.engine
-        metadata = MetaData()
-        self.incidents = repository.table
-        self.sessions = Table("sessions", metadata, autoload_with=self.engine)
-        self.analysts = Table("analysts", metadata, autoload_with=self.engine)
-        self.grants = Table("grants", metadata, autoload_with=self.engine)
+    def __init__(self, repository: GatewayReadRepository | None = None) -> None:
+        self.repository = repository or GatewayReadRepository()
+        self.engine = self.repository.engine
 
-    def _bound_incident(self, connection: Any, email: str, thread_id: str) -> Any:
-        session = connection.execute(
-            select(self.sessions.c.analyst_id, self.sessions.c.incident_id)
-            .join(self.analysts, self.analysts.c.analyst_id == self.sessions.c.analyst_id)
-            .where(and_(self.sessions.c.thread_id == thread_id, self.analysts.c.email == email))
-        ).mappings().one_or_none()
+    def _bound_incident(self, email: str, thread_id: str) -> tuple[dict[str, Any], Any]:
+        session = self.repository.bound_session(email, thread_id)
         if session is None:
             raise ToolDenied("not_entitled", "No session is bound to this caller")
-        incident = connection.execute(
-            select(self.incidents.c.incident_id, self.incidents.c.establishment, self.incidents.c.normalized_fields,
-                   self.incidents.c.embedding, self.incidents.c.narrative)
-            .where(self.incidents.c.incident_id == session["incident_id"])
-        ).mappings().one_or_none()
+        incident = self.repository.tool_incident(session["incident_id"])
         if incident is None:
             raise ToolDenied("not_found", "The bound incident is unavailable")
-        grant = connection.execute(
-            select(self.grants.c.grant_id)
-            .where(and_(self.grants.c.analyst_id == session["analyst_id"],
-                        self.grants.c.establishment == incident["establishment"]))
-            .limit(1)
-        ).scalar_one_or_none()
-        if grant is None:
+        if not self.repository.has_grant(session["analyst_id"], incident["establishment"]):
             raise ToolDenied("not_entitled", "Caller has no grant for this establishment")
         logger.info("gateway read authorized")
         return incident, session["analyst_id"]
 
     def extraction(self, verified_email: str, thread_id: str) -> dict[str, Any]:
-        with self.engine.connect() as connection:
-            incident, _ = self._bound_incident(connection, verified_email, thread_id)
-            return {"incident_id": str(incident["incident_id"]), "normalized_fields": incident["normalized_fields"]}
+        incident, _ = self._bound_incident(verified_email, thread_id)
+        return {"incident_id": str(incident["incident_id"]), "normalized_fields": incident["normalized_fields"]}
 
     def similar(self, verified_email: str, thread_id: str, limit: int) -> list[SimilarCandidate]:
-        with self.engine.connect() as connection:
-            incident, analyst_id = self._bound_incident(connection, verified_email, thread_id)
-            if incident["embedding"] is None:
-                raise ToolDenied("insufficient_data", "The bound incident has no narrative embedding")
-            distance = self.incidents.c.embedding.cosine_distance(incident["embedding"])
-            rows = connection.execute(
-                select(self.incidents.c.incident_id, self.incidents.c.outcome,
-                       self.incidents.c.deciding_rule, self.incidents.c.narrative,
-                       distance.label("distance"))
-                .join(self.grants, and_(self.grants.c.establishment == self.incidents.c.establishment,
-                                        self.grants.c.analyst_id == analyst_id))
-                .where(and_(self.incidents.c.incident_id != incident["incident_id"],
-                            self.incidents.c.embedding.is_not(None),
-                            self.incidents.c.outcome.is_not(None),
-                            self.incidents.c.deciding_rule.is_not(None)))
-                .order_by(distance)
-                .limit(limit)
-            ).mappings().all()
+        incident, analyst_id = self._bound_incident(verified_email, thread_id)
+        if incident["embedding"] is None:
+            raise ToolDenied("insufficient_data", "The bound incident has no narrative embedding")
+        rows = self.repository.similar_incidents(incident["incident_id"], incident["embedding"], analyst_id, limit)
         return [
             SimilarCandidate(
                 incident_id=row["incident_id"], outcome=row["outcome"],

@@ -11,8 +11,19 @@ from fieldsight.escalation import (
     evaluate_escalation,
 )
 from fieldsight.repository import IncidentRepository
+from fieldsight.review_decisions import CitationReference
 from fieldsight.rules.engine import IncidentRuleResults, evaluate_incident
 from fieldsight.schemas.incidents import NormalizedIncident
+
+
+class ReviewSnapshot(BaseModel):
+    """The dossier as submitted, frozen onto the review queue row if the case escalates."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    submitting_analyst_id: UUID
+    dossier: dict[str, Any]
+    citations: dict[str, CitationReference]
 
 
 class AnalysisRun(BaseModel):
@@ -24,7 +35,7 @@ class AnalysisRun(BaseModel):
     escalation_triggers: dict[str, Any] = Field(default_factory=dict)
 
 
-def analyze_incident(incident_id: UUID, *, signals: EscalationSignals | None = None) -> AnalysisRun:
+def analyze_incident(incident_id: UUID, *, signals: EscalationSignals | None = None, review_snapshot: ReviewSnapshot | None = None) -> AnalysisRun:
     repository = IncidentRepository()
     stored = repository.get(incident_id)
     if stored is None:
@@ -39,15 +50,23 @@ def analyze_incident(incident_id: UUID, *, signals: EscalationSignals | None = N
     fired = {name: decision.checks[name].model_dump(mode="json") for name in decision.fired}
     deciding_rule = "R1" if results.recordability is not None else "R5"
 
-    run_id = repository.save_analysis(
-        incident_id=incident_id,
-        correlation_id=uuid4(),
-        outcome=results.model_dump(mode="json"),
-        deciding_rule=deciding_rule,
-        rule_invocations=[item.model_dump(mode="json") for item in results.invocations],
-        escalation_triggers=decision.model_dump(mode="json"),
-        requires_review=decision.requires_review,
-    )
+    analysis = {
+        "incident_id": incident_id,
+        "correlation_id": uuid4(),
+        "outcome": results.model_dump(mode="json"),
+        "deciding_rule": deciding_rule,
+        "rule_invocations": [item.model_dump(mode="json") for item in results.invocations],
+        "escalation_triggers": decision.model_dump(mode="json"),
+    }
+    if decision.requires_review and review_snapshot is not None:
+        run_id = repository.save_analysis_for_review(
+            **analysis,
+            submitting_analyst_id=review_snapshot.submitting_analyst_id,
+            dossier_snapshot=review_snapshot.dossier,
+            citations=review_snapshot.citations,
+        )
+    else:
+        run_id = repository.save_analysis(**analysis, requires_review=decision.requires_review)
     return AnalysisRun(
         run_id=run_id,
         results=results,

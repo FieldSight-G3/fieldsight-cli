@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import AsyncIterator, Generator
-from contextlib import asynccontextmanager
-from typing import Any
+from contextlib import AsyncExitStack, asynccontextmanager
+from typing import Any, NamedTuple
 from urllib.parse import urlsplit
 
 import boto3
@@ -15,6 +16,13 @@ from botocore.awsrequest import AWSRequest
 from langchain_mcp_adapters.tools import load_mcp_tools
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
+from mcp.shared.exceptions import McpError
+
+logger = logging.getLogger(__name__)
+
+# the read tools the Gateway routes to the ECS API
+GATEWAY_TOOL_NAMES = ("get_incident_extraction", "find_similar_incidents")
+UNREACHABLE = "The AgentCore Gateway or the ECS tool API could not be reached"
 
 
 class SigV4HttpxAuth(httpx.Auth):
@@ -77,3 +85,42 @@ async def gateway_tools(thread_id: str, *, caller_proof: str, region: str | None
     ):
         await session.initialize()
         yield await load_mcp_tools(session)
+
+
+class GatewayToolset(NamedTuple):
+    tools: list[Any]
+    unavailable: dict[str, str]  # tool name -> why it is gone, for the analyst
+
+
+def _offers(tools: list[Any], name: str) -> bool:
+    # Gateway names tools "<target>___<tool>"
+    return any(tool.name == name or tool.name.endswith(f"___{name}") for tool in tools)
+
+
+@asynccontextmanager
+async def available_gateway_tools(thread_id: str, *, caller_proof: str, region: str | None = None) -> AsyncIterator[GatewayToolset]:
+    """Gateway tools for one turn that degrade instead of failing it.
+
+    If the Gateway or the ECS API is unreachable or unconfigured, the turn continues with its
+    native tools and `unavailable` names each Gateway tool that is gone. A missing thread ID or
+    proof is a caller bug and still raises.
+    """
+    if not thread_id.strip():
+        raise ValueError("A dispatcher-bound thread ID is required")
+    if not caller_proof:
+        raise ValueError("A signed analyst IAM role proof is required")
+    stack = AsyncExitStack()
+    try:
+        tools = await stack.enter_async_context(gateway_tools(thread_id, caller_proof=caller_proof, region=region))
+    except (RuntimeError, OSError, httpx.HTTPError, McpError, ExceptionGroup) as error:
+        await stack.aclose()
+        logger.warning("gateway tools disabled for this turn: %s", type(error).__name__)
+        tools = None
+    if tools is None:
+        yield GatewayToolset([], dict.fromkeys(GATEWAY_TOOL_NAMES, UNREACHABLE))
+        return
+    async with stack:
+        missing = {name: "The Gateway did not offer this tool" for name in GATEWAY_TOOL_NAMES if not _offers(tools, name)}
+        if missing:
+            logger.warning("gateway omitted tools: %s", ", ".join(missing))
+        yield GatewayToolset(tools, missing)
