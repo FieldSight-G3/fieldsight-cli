@@ -23,8 +23,13 @@ SIZE = RecursiveCharacterTextSplitter(chunk_size=CHUNK_CHARS, chunk_overlap=OVER
 def chunk_metadata(doc: CorpusDoc, page: int, header: str | None) -> dict:
     """ metadata the KB filters and cites on; chunk_id is added later """
 
-    return {"doc_id": doc["doc_id"], "title": doc["title"], "doc_type": doc["doc_type"],
-            "section_path": section_path(doc, page, header), "page": page}
+    return {
+        "doc_id": doc["doc_id"], 
+        "title": doc["title"], 
+        "doc_type": doc["doc_type"],
+        "section_path": section_path(doc, page, header), 
+        "page": page
+        }
 
 
 def split_pages(doc: CorpusDoc, layout: dict[int, list[tuple[str, str]]]) -> list[Document]:

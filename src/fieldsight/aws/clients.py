@@ -52,9 +52,9 @@ def s3() -> Any:
     return client("s3")
 
 
-def chat_model(*, fast: bool = False, temperature: float = 0.0) -> BaseChatModel:
+def chat_model(*, temperature: float = 0.0) -> BaseChatModel:
     return ChatBedrockConverse(
-        model_id=settings.bedrock_fast_model_id if fast else settings.bedrock_model_id,
+        model_id=settings.bedrock_model_id,
         region_name=settings.aws_region,
         temperature=temperature,
         guardrail_config={
