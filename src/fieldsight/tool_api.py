@@ -5,11 +5,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from typing import Any
+from uuid import uuid4
 
-from flask import Flask, jsonify, request
+from flask import Flask, g, jsonify, request
 from pydantic import ValidationError
 from sqlalchemy import text as sql_text
 
+from fieldsight.logging_context import correlation_id, valid_correlation_id
 from fieldsight.tool_service import (
     FailureCode,
     ToolDenied,
@@ -19,6 +21,7 @@ from fieldsight.tool_service import (
 )
 
 logger = logging.getLogger(__name__)
+CORRELATION_HEADER = "X-Correlation-Id"
 
 
 def create_app(service: ToolService | None = None, engine: Any = None, caller_resolver: Callable[[], str] | None = None) -> Flask:
@@ -31,6 +34,22 @@ def create_app(service: ToolService | None = None, engine: Any = None, caller_re
         engine = store.engine
     if caller_resolver is None:
         caller_resolver = _unconfigured_caller
+
+    @app.before_request
+    def bind_correlation_id() -> None:
+        # keep the caller's id if it is well formed so one turn can be traced across services
+        g.correlation_token = correlation_id.set(valid_correlation_id(request.headers.get(CORRELATION_HEADER)) or str(uuid4()))
+
+    @app.after_request
+    def echo_correlation_id(response: Any) -> Any:
+        response.headers[CORRELATION_HEADER] = correlation_id.get() or ""
+        return response
+
+    @app.teardown_request
+    def unbind_correlation_id(_: BaseException | None) -> None:
+        token = g.pop("correlation_token", None)
+        if token is not None:
+            correlation_id.reset(token)
 
     @app.get("/health/live")
     def live() -> Any:

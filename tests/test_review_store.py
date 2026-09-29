@@ -1,15 +1,18 @@
 """Postgres integration tests for the ReviewStore adapter on ReviewQueueRepository."""
 
+from contextlib import contextmanager
 from datetime import UTC, datetime
 from threading import Barrier, Thread
 from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import MetaData, Table, delete, insert, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 
+from fieldsight.bounds import BoundsConfig
 from fieldsight.repository import IncidentRepository, ReviewQueueRepository
 from fieldsight.review_decisions import CitationReference, ReviewDecision
+from fieldsight.review_flow import ReviewWriteFailed
 
 DOSSIER = {"narrative": "Worker slipped on wet stairs.", "outcome": {"recordable": True}}
 CITATIONS = {
@@ -202,3 +205,85 @@ def test_save_analysis_for_review_rolls_back_for_missing_incident(analysts):
     queue = ReviewQueueRepository()
     with queue.engine.connect() as connection:
         assert connection.execute(select(queue.table).where(queue.table.c.incident_id == missing)).first() is None
+
+
+def test_reviewer_entitled_needs_a_grant_on_the_incident_establishment(analysts):
+    submitter, reviewer = analysts
+    establishment = f"Entitlement test {uuid4()}"
+    incident_id = IncidentRepository().create(establishment, {"date_of_injury": "2026-02-01"})
+    queue = ReviewQueueRepository()
+    grants = Table("grants", MetaData(), autoload_with=queue.engine)
+    with queue.engine.begin() as connection:
+        connection.execute(insert(grants).values(analyst_id=reviewer, establishment=establishment))
+    try:
+        assert queue.reviewer_entitled(reviewer, incident_id) is True
+        assert queue.reviewer_entitled(submitter, incident_id) is False
+        assert queue.reviewer_entitled(reviewer, uuid4()) is False
+    finally:
+        with queue.engine.begin() as connection:
+            connection.execute(delete(grants).where(grants.c.analyst_id == reviewer))
+
+
+class FlakyEngine:
+    """Wraps a real engine; each begin() can fail before the transaction or drop after it commits."""
+
+    def __init__(self, engine, failures: list[str]) -> None:
+        self.engine = engine
+        self.failures = list(failures)
+
+    @contextmanager
+    def begin(self):
+        failure = self.failures.pop(0) if self.failures else None
+        if failure == "before":
+            raise OperationalError("BEGIN", {}, Exception("connection refused"))
+        with self.engine.begin() as connection:
+            yield connection
+        if failure == "after_commit":
+            raise OperationalError("COMMIT", {}, Exception("connection dropped"))
+
+
+NO_WAIT = BoundsConfig(db_write_max_attempts=3, db_write_backoff_seconds=0)
+
+
+def test_record_if_pending_retries_a_transient_failure(analysts):
+    submitter, reviewer = analysts
+    queue_id, incident_id = _queue_review(submitter)
+    queue = ReviewQueueRepository()
+    queue.engine = FlakyEngine(queue.engine, ["before"])
+
+    assert queue.record_if_pending(_decision(queue_id, incident_id, reviewer), limits=NO_WAIT) is True
+    assert _row(queue_id)["status"] == "approved"
+
+
+def test_commit_hidden_by_a_dropped_connection_is_not_a_conflict(analysts):
+    submitter, reviewer = analysts
+    queue_id, incident_id = _queue_review(submitter)
+    queue = ReviewQueueRepository()
+    queue.engine = FlakyEngine(queue.engine, ["after_commit"])
+    decision = _decision(queue_id, incident_id, reviewer)
+
+    assert queue.record_if_pending(decision, limits=NO_WAIT) is True
+    assert _row(queue_id)["decision"] == decision.model_dump(mode="json")
+
+
+def test_retry_after_another_decision_landed_is_a_conflict(analysts):
+    submitter, reviewer = analysts
+    queue_id, incident_id = _queue_review(submitter)
+    first = _decision(queue_id, incident_id, reviewer)
+    ReviewQueueRepository().record_if_pending(first)
+    queue = ReviewQueueRepository()
+    queue.engine = FlakyEngine(queue.engine, ["before"])
+
+    assert queue.record_if_pending(_decision(queue_id, incident_id, reviewer, action="reject", reason="Late"), limits=NO_WAIT) is False
+    assert _row(queue_id)["decision"] == first.model_dump(mode="json")
+
+
+def test_exhausted_retries_fail_clearly_and_leave_the_row_pending(analysts):
+    submitter, reviewer = analysts
+    queue_id, incident_id = _queue_review(submitter)
+    queue = ReviewQueueRepository()
+    queue.engine = FlakyEngine(queue.engine, ["before"] * 3)
+
+    with pytest.raises(ReviewWriteFailed):
+        queue.record_if_pending(_decision(queue_id, incident_id, reviewer), limits=NO_WAIT)
+    assert _row(queue_id)["status"] == "pending"

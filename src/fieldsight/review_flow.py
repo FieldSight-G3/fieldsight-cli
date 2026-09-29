@@ -6,12 +6,15 @@ dossier and the submitting analyst. Persistence must be atomic.
 """
 
 
+import re
 from datetime import UTC, datetime
 from typing import Any, Protocol
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from fieldsight.errors import FieldSightError
+from fieldsight.logging_context import with_correlation_id
 from fieldsight.review_decisions import (
     ChunkSource,
     CitationReference,
@@ -34,23 +37,49 @@ class PendingReview(BaseModel):
     original_citations: dict[str, CitationReference]
 
 
-class ReviewConflict(Exception):
+class ReviewConflict(FieldSightError):
     """The queue item is missing or has already received a decision."""
+
+
+class ReviewNotEntitled(FieldSightError):
+    """The reviewer holds no grant over the incident's establishment."""
+
+
+class ReviewWriteFailed(FieldSightError):
+    """The decision could not be saved after every bounded retry."""
+
+
+# corpus chunk ids are "{doc_id}-{12 hex digits}" (ingest/corpus/chunking.py chunk_id)
+_CHUNK_ID = re.compile(r"(?P<document_id>.+)-[0-9a-f]{12}\Z")
+
+
+def document_for_chunk(chunk_id: str) -> str | None:
+    """The source document a corpus chunk id belongs to, or None if it isn't a corpus chunk id."""
+    match = _CHUNK_ID.fullmatch(chunk_id)
+    return match["document_id"] if match else None
 
 
 class ReviewStore(Protocol):
     def get_pending(self, queue_id: UUID) -> PendingReview | None: ...
+
+    def reviewer_entitled(self, reviewer_id: UUID, incident_id: UUID) -> bool:
+        """True only if the reviewer holds a grant over the incident's establishment."""
+        ...
 
     def record_if_pending(self, decision: ReviewDecision) -> bool:
         """Atomically save the decision and status only while status is pending."""
         ...
 
 
+@with_correlation_id
 def submit_review(request: ReviewRequest, *, queue_id: UUID, verified_reviewer_id: UUID, store: ReviewStore, source_for_chunk: ChunkSource | None = None, decided_at: datetime | None = None) -> ReviewDecision:
     """Validate, then save one human decision using the trusted review context."""
     pending = store.get_pending(queue_id)
     if pending is None:
         raise ReviewConflict("Queue item is missing or no longer pending")
+    # entitlement runs on every call, not once per session
+    if not store.reviewer_entitled(verified_reviewer_id, pending.incident_id):
+        raise ReviewNotEntitled("Reviewer has no grant for this incident's establishment")
 
     context = ReviewContext(
         queue_id=pending.queue_id,

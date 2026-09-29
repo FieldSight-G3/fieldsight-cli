@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from copy import deepcopy
 from datetime import datetime
@@ -9,6 +10,45 @@ from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+# determination-shaped phrases a narrative edit may reword around but never introduce or change
+_DETERMINATION = re.compile(
+    r"\b(?:not[\s_-]+)?(?:recordable|reportable)\b"
+    r"|\bcolumn[\s_-]*[ghij]\b"
+    r"|\b(?P<amount>\d+(?:\.\d+)?)[\s-]*(?P<unit>hours?|hrs?|h|days?|d)\b"
+    r"|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}/\d{2,4}\b",
+    re.IGNORECASE,
+)
+
+
+def _determinations(text: str) -> set[str]:
+    found = set()
+    for match in _DETERMINATION.finditer(text):
+        if match["unit"]:
+            unit = "days" if match["unit"].lower().startswith("d") else "hours"
+            found.add(f"{match['amount']} {unit}")
+        elif match.group()[0].isdigit():
+            found.add(match.group())
+        else:
+            found.add(" ".join(re.split(r"[\s_-]+", match.group().lower())))
+    return found
+
+
+def _strings(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, Mapping):
+        return [text for item in value.values() for text in _strings(item)]
+    if isinstance(value, list):
+        return [text for item in value for text in _strings(item)]
+    return []
+
+
+def introduced_determinations(original_payload: Mapping[str, Any], narrative: str) -> set[str]:
+    """Outcomes, periods and dates the edited narrative states that the original dossier never did."""
+    original = set().union(*(_determinations(text) for text in _strings(dict(original_payload))))
+    return _determinations(narrative) - original
+
 
 ReviewAction = Literal["approve", "edit_then_approve", "reject"]
 ChunkSource = Callable[[str], str | None]
@@ -100,6 +140,10 @@ class ReviewDecision(BaseModel):
 
 def decide_review(request: ReviewRequest, context: ReviewContext, *, original_payload: Mapping[str, Any], original_citations: Mapping[str, CitationReference], source_for_chunk: ChunkSource | None = None) -> ReviewDecision:
     """Check a human action and return a persistable decision without writing."""
+    if request.edit is not None and request.edit.narrative is not None:
+        introduced = introduced_determinations(original_payload, request.edit.narrative)
+        if introduced:
+            raise ValueError(f"An edit may reword but not change a determination ({', '.join(sorted(introduced))}); reject instead")
     if request.edit is not None:
         seen: set[str] = set()
         for repoint in request.edit.citation_repoints:

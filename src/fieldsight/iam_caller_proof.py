@@ -19,6 +19,7 @@ import boto3
 from botocore.auth import SigV4QueryAuth
 from botocore.awsrequest import AWSRequest
 
+from fieldsight.bounds import BoundsConfig
 from fieldsight.tool_service import ToolDenied
 
 PROOF_HEADER = "X-Fieldsight-Caller-Proof"
@@ -57,7 +58,8 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def _fetch_sts(request: urllib.request.Request) -> bytes:
-    with urllib.request.build_opener(_NoRedirect()).open(request, timeout=3) as response:
+    timeout = BoundsConfig.from_environment().sts_timeout_seconds
+    with urllib.request.build_opener(_NoRedirect()).open(request, timeout=timeout) as response:
         if response.status != 200:
             raise ValueError("STS rejected the caller proof")
         payload = response.read(65537)
