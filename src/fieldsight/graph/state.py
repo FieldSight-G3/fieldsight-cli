@@ -6,6 +6,8 @@ from typing import Annotated, TypedDict
 from ..schemas.review import ReviewVerdict
 from ..types.dossier import Dossier
 
+from ..schemas.run_records import ModelCall, ToolInvocation
+
 
 class WorkflowState(TypedDict):
     
@@ -23,3 +25,8 @@ class WorkflowState(TypedDict):
 
     analysis_run_id: str
     requires_review: bool      
+
+    tool_invocations: Annotated[list[ToolInvocation], operator.add]
+    model_calls: Annotated[list[ModelCall], operator.add]
+
+

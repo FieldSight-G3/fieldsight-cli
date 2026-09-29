@@ -11,7 +11,7 @@ from ...prompts import GOALS, PROMPTS
 from ...schemas.plan import DispatchPlan
 from ...types.dossier import DossierLeg
 from ..specialists import get_specialists
-
+from ..trace import record
 
 def _plan(state: dict) -> DispatchPlan:
     """ the fast model's plan; one retry with a schema reminder, then a typed failure (section 13) """
@@ -83,7 +83,9 @@ def _run_specialist(name: str, state: dict) -> dict:
         decisions=result["decisions"],
         cited={chunk_id: result["retrieved"][chunk_id] for chunk_id in proposal["chunk_ids"]} if proposal else {},
     )
-    return {"dossier": {name: leg}}
+    
+    tools, calls = record(name, result["messages"])
+    return {"dossier": {name: leg}, "tool_invocations": tools, "model_calls": calls}
 
 
 def recordability_specialist_node(state: dict) -> dict:

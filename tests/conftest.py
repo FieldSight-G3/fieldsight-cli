@@ -60,8 +60,11 @@ class ScriptedModel:
         return self
 
     def invoke(self, messages):
-        return self.replies.pop(0)
-
+        reply = self.replies.pop(0)
+        # look like a Bedrock reply, so the run record can price it
+        reply.response_metadata.setdefault("model_name", settings.bedrock_model_id)
+        reply.usage_metadata = reply.usage_metadata or {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        return reply
 
 @pytest.fixture
 def script(monkeypatch):
