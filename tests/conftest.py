@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 load_dotenv()
 TEST_ENVIRONMENT = {
     "FIELDSIGHT_AWS_REGION": "us-east-1",
-    "FIELDSIGHT_BEDROCK_MODEL_ID": "test-placeholder",
+    "FIELDSIGHT_BEDROCK_MODEL_ID": "us.amazon.nova-pro-v1:0",
+    "FIELDSIGHT_BEDROCK_FAST_MODEL_ID": "us.amazon.nova-lite-v1:0",
     "FIELDSIGHT_BEDROCK_EMBEDDING_MODEL_ID": "test-placeholder",
     "FIELDSIGHT_ANALYST_ROLE_ARNS": "analyst",
     "FIELDSIGHT_BEDROCK_KB_ID": "test-placeholder",
@@ -18,6 +19,10 @@ TEST_ENVIRONMENT = {
     "FIELDSIGHT_DATABASE_URL": "postgresql://fieldsight:fieldsight_dev@localhost:5432/fieldsight",
     "FIELDSIGHT_RETRIEVAL_SCORE_THRESHOLD": "0.5",
     "FIELDSIGHT_RETRIEVAL_MAX_CHUNKS": "8",
+    "FIELDSIGHT_REASONING_PRICE_IN": "0.80",
+    "FIELDSIGHT_REASONING_PRICE_OUT": "3.20",
+    "FIELDSIGHT_FAST_PRICE_IN": "0.06",
+    "FIELDSIGHT_FAST_PRICE_OUT": "0.24",
 }
 for key, value in TEST_ENVIRONMENT.items():
     if not os.environ.get(key):
