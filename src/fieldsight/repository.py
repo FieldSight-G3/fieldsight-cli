@@ -22,6 +22,7 @@ from fieldsight.harness.escalation.review import (
     ReviewDecision,
     ReviewWriteFailed,
 )
+from fieldsight.security.redaction import redact_payload, redact_text
 
 RecordType = TypeVar("RecordType", bound=BaseModel)
 
@@ -103,26 +104,30 @@ class IncidentRepository(_Repository):
                 )
         return run_id
 
-    def save_analysis_for_review(self, incident_id: UUID, correlation_id: UUID, outcome: dict[str, Any], deciding_rule: str, rule_invocations: list[dict[str, Any]], escalation_triggers: dict[str, Any], *, submitting_analyst_id: UUID, dossier_snapshot: dict[str, Any], citations: dict[str, CitationReference]) -> UUID:
-        """Like save_analysis with requires_review, but queues an immutable dossier snapshot for get_pending."""
+    def save_analysis_for_review(self, incident_id: UUID, correlation_id: UUID, outcome: dict[str, Any] | None, deciding_rule: str | None, rule_invocations: list[dict[str, Any]], escalation_triggers: dict[str, Any], *, submitting_analyst_id: UUID, dossier_snapshot: dict[str, Any], citations: dict[str, CitationReference], command: str = "analyze", workers_dispatched: dict[str, Any] | None = None) -> UUID:
+        """Like save_analysis with requires_review, but queues an immutable dossier snapshot for get_pending; outcome is None for a turn that must not overwrite it, like ask."""
         metadata = MetaData()
         run_records = Table("run_records", metadata, autoload_with=self.engine)
         review_queue = Table("review_queue", metadata, autoload_with=self.engine)
         with self.engine.begin() as connection:
-            updated = connection.execute(
-                update(self.table)
-                .where(self.table.c.incident_id == incident_id)
-                .values(outcome=outcome, deciding_rule=deciding_rule)
-                .returning(self.table.c.incident_id)
+            exists = connection.execute(
+                select(self.table.c.incident_id).where(self.table.c.incident_id == incident_id)
             ).scalar_one_or_none()
-            if updated is None:
+            if exists is None:
                 raise LookupError(f"Incident {incident_id} does not exist")
+            if outcome is not None:
+                connection.execute(
+                    update(self.table)
+                    .where(self.table.c.incident_id == incident_id)
+                    .values(outcome=outcome, deciding_rule=deciding_rule)
+                )
             run_id = connection.execute(
                 insert(run_records)
                 .values(
                     correlation_id=correlation_id,
                     incident_id=incident_id,
-                    command="analyze",
+                    command=command,
+                    workers_dispatched=workers_dispatched,
                     rule_invocations={"items": rule_invocations},
                     escalation_triggers=escalation_triggers
                 )
@@ -182,6 +187,52 @@ class RunRecordRepository(_Repository):
 
     def get(self, run_id: UUID) -> RunRecordRecord | None:
         return self._get("run_id", run_id, RunRecordRecord)
+
+    def record_correction(
+        self,
+        original_run_id: UUID,
+        reason: str,
+        correlation_id: UUID,
+        *,
+        workers_dispatched: dict[str, Any] | None = None,
+        tool_invocations: dict[str, Any] | None = None,
+        rule_invocations: dict[str, Any] | None = None,
+        escalation_triggers: dict[str, Any] | None = None,
+        model_calls: dict[str, Any] | None = None
+    ) -> UUID:
+        """A new, PII-redacted record that references the run it corrects; the original row is never edited."""
+        if not reason.strip():
+            raise ValueError("A correction needs a reason")
+        with self.engine.begin() as connection:
+            original = connection.execute(
+                select(self.table.c.incident_id).where(self.table.c.run_id == original_run_id)
+            ).one_or_none()
+            if original is None:
+                raise LookupError(f"Run {original_run_id} does not exist")
+            return connection.execute(
+                insert(self.table).values(
+                    correlation_id=correlation_id,
+                    command="correction",
+                    incident_id=original.incident_id,
+                    corrects_run_id=original_run_id,
+                    correction_reason=redact_text(reason, "correction_reason"),
+                    workers_dispatched=redact_payload(workers_dispatched),
+                    tool_invocations=redact_payload(tool_invocations),
+                    rule_invocations=redact_payload(rule_invocations),
+                    escalation_triggers=redact_payload(escalation_triggers),
+                    model_calls=redact_payload(model_calls)
+                ).returning(self.table.c.run_id)
+            ).scalar_one()
+
+    def corrections_of(self, run_id: UUID) -> list[dict[str, Any]]:
+        """Every correction recorded against a run, oldest first."""
+        statement = (
+            select(self.table.c.run_id, self.table.c.correction_reason, self.table.c.created_at)
+            .where(self.table.c.corrects_run_id == run_id)
+            .order_by(self.table.c.created_at, self.table.c.run_id)
+        )
+        with self.engine.connect() as connection:
+            return [dict(row) for row in connection.execute(statement).mappings().all()]
 
 class ReviewQueueRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -374,3 +425,43 @@ class GatewayReadRepository(_Repository):
         )
         with self.engine.connect() as connection:
             return [dict(row) for row in connection.execute(statement).mappings().all()]
+
+
+class SeedRepository(_Repository):
+    """Idempotent inserts for the demo analysts, grants and historical incidents; a second run adds nothing."""
+
+    def __init__(self, dsn: str | None = None) -> None:
+        super().__init__("incidents", dsn)
+        metadata = MetaData()
+        self.analysts = Table("analysts", metadata, autoload_with=self.engine)
+        self.grants = Table("grants", metadata, autoload_with=self.engine)
+
+    def seed(self, analysts: list[dict[str, Any]], grants: list[dict[str, Any]], incidents: list[dict[str, Any]]) -> dict[str, int]:
+        added = {"analysts": 0, "grants": 0, "incidents": 0}
+        with self.engine.begin() as connection:
+            for analyst in analysts:
+                statement = pg_insert(self.analysts).values(**analyst).on_conflict_do_nothing(
+                    index_elements=[self.analysts.c.analyst_id]
+                ).returning(self.analysts.c.analyst_id)
+                added["analysts"] += int(connection.execute(statement).scalar_one_or_none() is not None)
+            for grant in grants:
+                statement = pg_insert(self.grants).values(**grant).on_conflict_do_nothing(
+                    index_elements=[self.grants.c.analyst_id, self.grants.c.establishment]
+                ).returning(self.grants.c.grant_id)
+                added["grants"] += int(connection.execute(statement).scalar_one_or_none() is not None)
+            for incident in incidents:
+                statement = pg_insert(self.table).values(**incident).on_conflict_do_nothing(
+                    index_elements=[self.table.c.incident_id]
+                ).returning(self.table.c.incident_id)
+                added["incidents"] += int(connection.execute(statement).scalar_one_or_none() is not None)
+        return added
+
+
+def database_ready(engine: Any) -> bool:
+    """The readiness probe: one round trip to Postgres. Connection failures mean not ready; anything else is a bug and raises."""
+    try:
+        with engine.connect() as connection:
+            connection.exec_driver_sql("SELECT 1")
+    except OperationalError:
+        return False
+    return True

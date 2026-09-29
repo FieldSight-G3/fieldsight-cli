@@ -1,75 +1,52 @@
-"""eligibility_check_node queues an escalated dossier with its snapshot."""
+"""The eligibility node writes nothing; ReviewSnapshot.of builds the queue snapshot the harness saves."""
 
 from types import SimpleNamespace
 from uuid import uuid4
 
-import pytest
-from sqlalchemy import MetaData, Table, delete, insert
-
-from fieldsight.graph.nodes.eligibility import eligibility_check_node, review_snapshot
+from fieldsight.graph.nodes.eligibility import eligibility_check_node
+from fieldsight.harness.analysis import ReviewSnapshot
 from fieldsight.harness.escalation.review import CitationReference
-from fieldsight.repository import IncidentRepository, ReviewQueueRepository
+from fieldsight.repository import (
+    IncidentRepository,
+    ReviewQueueRepository,
+    RunRecordRepository,
+)
 from tests.test_analysis import normalized_fields
 
-
-@pytest.fixture
-def analyst_id():
-    queue = ReviewQueueRepository()
-    table = Table("analysts", MetaData(), autoload_with=queue.engine)
-    with queue.engine.begin() as connection:
-        analyst = connection.execute(
-            insert(table).values(email=f"submitter-{uuid4()}@example.invalid", name="submitter").returning(table.c.analyst_id)
-        ).scalar_one()
-    yield analyst
-    with queue.engine.begin() as connection:
-        connection.execute(delete(queue.table).where(queue.table.c.submitting_analyst_id == analyst))
-        connection.execute(delete(table).where(table.c.analyst_id == analyst))
+HIT = {"doc_id": "CFR-1904", "chunk_id": "CFR-1904-0123456789ab", "text": "1904.39(a)(2)"}
+DOSSIER = {
+    "reportability": {"task": "t", "proposal": {"chunk_ids": [HIT["chunk_id"]]}, "decisions": {}, "cited": {HIT["chunk_id"]: HIT}},
+    "recordability": {"task": "t", "proposal": None, "decisions": {}, "cited": {}},
+}
 
 
-def _state(analyst_id, incident_id, *, approved=True) -> dict:
-    hit = {"doc_id": "osha-1904-7", "chunk_id": "osha-1904-7#3", "text": "..."}
-    return {
-        "analyst_id": str(analyst_id),
-        "incident": {"incident_id": str(incident_id)},
-        "dossier": {
-            "recordability": {"task": "t", "proposal": {"chunk_ids": ["osha-1904-7#3"]}, "decisions": {}, "cited": {"osha-1904-7#3": hit}},
-            "reportability": {"task": "t", "proposal": None, "decisions": {}, "cited": {}},
-        },
-        "reviews": [SimpleNamespace(approved=approved)],
-        "review_iterations": 1,
-    }
-
-
-def test_review_snapshot_maps_cited_chunks_to_documents(analyst_id):
-    snapshot = review_snapshot(_state(analyst_id, uuid4()))
-
-    assert snapshot.submitting_analyst_id == analyst_id
-    assert snapshot.citations == {"osha-1904-7#3": CitationReference(document_id="osha-1904-7", chunk_id="osha-1904-7#3")}
-
-
-def test_escalated_dossier_is_queued_with_snapshot(analyst_id):
+def test_the_node_hands_back_without_writing():
     fields = normalized_fields()
     fields["confidences"]["incident_at"] = 0.59
     incident_id = IncidentRepository().create("Substation 7", fields)
-    state = _state(analyst_id, incident_id)
+    runs = RunRecordRepository()
+    state = {"analyst_id": str(uuid4()), "incident": {"incident_id": str(incident_id)}, "dossier": DOSSIER,
+             "reviews": [SimpleNamespace(approved=True)], "review_iterations": 1}
 
-    result = eligibility_check_node(state)
+    assert eligibility_check_node(state) == {}
 
-    assert result["requires_review"] is True
-    queue = ReviewQueueRepository()
-    [item] = [item for item in queue.list_pending() if item.incident_id == incident_id]
-    pending = queue.get_pending(item.queue_id)
-    assert pending is not None
-    assert pending.submitting_analyst_id == analyst_id
-    assert pending.original_payload == state["dossier"]
-    assert set(pending.original_citations) == {"osha-1904-7#3"}
+    assert not any(item.incident_id == incident_id for item in ReviewQueueRepository().list_pending())
+    with runs.engine.connect() as connection:
+        written = connection.execute(runs.table.select().where(runs.table.c.incident_id == incident_id)).first()
+    assert written is None
 
 
-def test_missing_verdict_counts_as_not_approved(analyst_id):
-    incident_id = IncidentRepository().create("Substation 7", normalized_fields())
-    state = _state(analyst_id, incident_id)
-    state["reviews"] = [None]
+def test_snapshot_maps_every_cited_chunk_to_its_document():
+    analyst = uuid4()
 
-    result = eligibility_check_node(state)
+    snapshot = ReviewSnapshot.of(str(analyst), DOSSIER)
 
-    assert result["requires_review"] is True
+    assert snapshot.submitting_analyst_id == analyst
+    assert snapshot.dossier == DOSSIER
+    assert snapshot.citations == {HIT["chunk_id"]: CitationReference(document_id="CFR-1904", chunk_id=HIT["chunk_id"])}
+
+
+def test_a_case_routed_straight_to_a_human_still_has_a_snapshot():
+    snapshot = ReviewSnapshot.of(uuid4(), None)
+
+    assert snapshot.dossier == {} and snapshot.citations == {}
