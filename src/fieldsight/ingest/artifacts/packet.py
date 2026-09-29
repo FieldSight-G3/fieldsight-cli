@@ -1,10 +1,10 @@
-""" crack a packet's form artifacts; a malformed one is skipped and logged, never fatal """
+""" crack a packet's form artifacts; malformed ones are logged and skipped """
 
 import logging
 from pathlib import Path
 
 from ...errors import ExtractionError
-from ...types.artifacts import ARTIFACT_FAILURE, ExtractedField, PacketExtraction
+from ...types.artifacts import ArtifactFailure, ExtractedField, PacketExtraction
 from ..crack import crack
 from .fields import extract_form_fields
 from .storage import upload_artifact
@@ -20,7 +20,7 @@ def crack_artifact(path: Path) -> list[ExtractedField]:
 
 
 def crack_packet(paths: list[Path]) -> PacketExtraction:
-    """ every artifact's fields; one that fails is recorded and skipped so the incident proceeds """
+    """ every artifact's fields; failures are recorded and skipped so the incident proceeds """
 
     fields, failures = [], []
     for path in paths:
@@ -28,5 +28,5 @@ def crack_packet(paths: list[Path]) -> PacketExtraction:
             fields += crack_artifact(path)
         except ExtractionError as error:
             log.warning("skipped artifact %s: %s", path.name, error)
-            failures.append(ARTIFACT_FAILURE.validate_python({"artifact": path.name, "reason": str(error)}))
+            failures.append(ArtifactFailure(artifact=path.name, reason=str(error)))
     return {"artifacts": [path.name for path in paths], "fields": fields, "failures": failures}

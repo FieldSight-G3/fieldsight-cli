@@ -1,4 +1,4 @@
-""" which documents make up the corpus, and where they sit locally and in S3 """
+""" corpus documents and their local and S3 locations """
 
 import json
 from pathlib import Path
@@ -13,6 +13,15 @@ def corpus_docs() -> list[CorpusDoc]:
 
     sources = json.loads(CORPUS_SOURCES.read_text(encoding="utf-8"))
     return [CORPUS_DOC.validate_python(doc) for doc in sources["documents"]]
+
+
+def letters() -> dict[str, str]:
+    """ corpus letters of interpretation, date (YYYY-MM-DD) to title """
+
+    sources = json.loads(CORPUS_SOURCES.read_text(encoding="utf-8"))
+    return {item["label"]: item["title"]
+            for doc in sources["documents"] if doc["doc_type"] == "interpretation"
+            for item in doc.get("items", [])}
 
 
 def pdf_path(doc: CorpusDoc) -> Path:

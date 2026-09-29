@@ -1,8 +1,8 @@
-""" read a corpus doc's Textract LAYOUT and TABLES blocks: headers, text and tables per page """
+""" per-page headers, text and tables from a corpus doc's Textract LAYOUT and TABLES blocks """
 
 from ..blocks import index_blocks, related, text_of
 
-# Textract layout blocks the corpus keeps; lists, figures, page headers/footers and page numbers are skipped
+# layout blocks kept; lists, figures, page headers/footers and page numbers are skipped
 LAYOUT_KINDS = {
     "LAYOUT_TITLE": "header", 
     "LAYOUT_SECTION_HEADER": "header", 
@@ -26,7 +26,7 @@ def layout_by_page(blocks: list[dict]) -> dict[int, list[tuple[str, str]]]:
 
 
 def render_table(table: dict, by_id: dict[str, dict]) -> str:
-    """ a TABLE block as |-joined rows, so its columns survive into the chunk """
+    """ a TABLE block as |-joined rows, keeping its columns """
 
     rows: dict[int, dict[int, str]] = {}
     for cell in related(table, by_id, "CHILD"):
@@ -47,7 +47,7 @@ def tables_by_page(blocks: list[dict]) -> dict[int, list[str]]:
 
 
 def page_markdown(items: list[tuple[str, str]]) -> str:
-    """ one page's layout as Markdown: headers become ## lines, text becomes paragraphs """
+    """ a page as Markdown: headers as ## lines, text as paragraphs """
 
     return "\n\n".join(f"## {text}" if kind == "header" else text for kind, text in items)
 

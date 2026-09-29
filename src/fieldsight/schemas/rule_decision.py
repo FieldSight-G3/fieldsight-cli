@@ -40,3 +40,7 @@ class RuleDecision(BaseModel):
         ge=0,
         description="Combined and capped day count used for OSHA 300 Log classification"
     )
+    exclusion: str | None = Field(
+        default=None,
+        description="The 1904.39(b)(10) or (b)(11) exclusion that made an event not reportable, when one did"
+    )

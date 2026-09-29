@@ -44,15 +44,23 @@ def bedrock_agent_runtime() -> Any:
     return client("bedrock-agent-runtime")
 
 
+def bedrock_runtime() -> Any:
+    return client("bedrock-runtime")
+
+
 def textract() -> Any:
     return client("textract")
 
+def rds() -> Any:
+    return client("rds")
 
 def s3() -> Any:
     return client("s3")
 
 
 def chat_model(*, fast: bool = False, temperature: float = 0.0) -> BaseChatModel:
+    """ the reasoning tier for the workers; fast=True is the fast tier, for the readiness gate """
+
     return ChatBedrockConverse(
         model_id=settings.bedrock_fast_model_id if fast else settings.bedrock_model_id,
         region_name=settings.aws_region,
@@ -76,13 +84,13 @@ def embeddings() -> Embeddings:
     )
 
 
-def corpus_retriever(search_filter: dict | None = None) -> BaseRetriever:
-    """ the corpus Knowledge Base, optionally narrowed by a KB metadata filter; hits under the score threshold are dropped by Bedrock """
+def corpus_retriever(search_filter: dict | None = None, gated: bool = True) -> BaseRetriever:
+    """ corpus KB retriever with an optional metadata filter; gated=False keeps below-threshold hits, for threshold tuning """
 
     return AmazonKnowledgeBasesRetriever(
         knowledge_base_id=settings.bedrock_kb_id,
         client=bedrock_agent_runtime(),
         retrieval_config={"vectorSearchConfiguration": {
             "numberOfResults": settings.retrieval_max_chunks, **({"filter": search_filter} if search_filter else {})}},
-        min_score_confidence=settings.retrieval_score_threshold,
+        min_score_confidence=settings.retrieval_score_threshold if gated else None,
     )

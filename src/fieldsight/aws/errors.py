@@ -1,4 +1,4 @@
-""" turn boto failures into FieldSight's own errors, as a decorator on the AWS calls """
+""" decorator that re-raises boto failures as FieldSight errors """
 
 from functools import wraps
 
@@ -8,7 +8,7 @@ from ..errors import FieldSightError
 
 
 def raises(error: type[FieldSightError], action: str):
-    """ any boto failure inside the wrapped call is re-raised as `error`, naming what was being done """
+    """ re-raise boto failures in the wrapped call as `error`, prefixed with `action` """
 
     def decorate(call):
         @wraps(call)

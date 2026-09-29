@@ -41,7 +41,13 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import inch
-from reportlab.platypus import PageBreak, Paragraph, Preformatted, SimpleDocTemplate, Spacer
+from reportlab.platypus import (
+    PageBreak,
+    Paragraph,
+    Preformatted,
+    SimpleDocTemplate,
+    Spacer,
+)
 
 ROOT = Path(__file__).parent
 CACHE = ROOT / ".cache"
@@ -340,7 +346,7 @@ def build_pdf_pages(spec: dict, user_agent: str) -> tuple[Path, list[str], int]:
 # --------------------------------------------------------------------------
 
 TAG = re.compile(r"<[^>]+>")
-SCRIPT = re.compile(r"<(script|style|nav|header|footer)\b.*?</\1>", re.S | re.I)
+SCRIPT = re.compile(r"<(script|style|nav|header|footer)\b.*?</\1>", re.DOTALL | re.IGNORECASE)
 # Agencies separate the page name from the site name with either character.
 TITLE_SPLIT = re.compile(r"\s*(?:\||::)\s*")
 
@@ -392,7 +398,7 @@ def page_text(
     others "Agency :: Page name", so guessing produces a document whose every
     heading is the agency's name.
     """
-    title_m = re.search(r"<title>(.*?)</title>", html, re.S | re.I)
+    title_m = re.search(r"<title>(.*?)</title>", html, re.DOTALL | re.IGNORECASE)
     if title_m:
         # Titles carry entities the body-level table below never sees.
         flat = unescape(TAG.sub("", title_m.group(1)))
@@ -404,13 +410,13 @@ def page_text(
     body = SCRIPT.sub(" ", html)
     for sel in selectors:
         m = re.search(
-            rf'<div[^>]*(?:class|id)="[^"]*{re.escape(sel)}[^"]*"[^>]*>(.*)', body, re.S | re.I
+            rf'<div[^>]*(?:class|id)="[^"]*{re.escape(sel)}[^"]*"[^>]*>(.*)', body, re.DOTALL | re.IGNORECASE
         )
         if m:
             body = m.group(1)
             break
-    body = re.sub(r"<br\s*/?>", "\n", body, flags=re.I)
-    body = re.sub(r"</(p|div|li|h\d)>", "\n\n", body, flags=re.I)
+    body = re.sub(r"<br\s*/?>", "\n", body, flags=re.IGNORECASE)
+    body = re.sub(r"</(p|div|li|h\d)>", "\n\n", body, flags=re.IGNORECASE)
     body = TAG.sub(" ", body)
     for entity, char in ENTITIES.items():
         body = body.replace(entity, char)
