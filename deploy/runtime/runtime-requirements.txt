@@ -1,0 +1,6 @@
+# Installed only in the AgentCore Runtime image, on top of the fieldsight package (not in the ECS image).
+# Exact pins, per the requirements' §3; the Gateway client pins match deploy/ecs/gateway-client-requirements.txt ranges.
+bedrock-agentcore==1.23.1
+mcp==1.30.0
+httpx==0.28.1
+langchain-mcp-adapters==0.3.2

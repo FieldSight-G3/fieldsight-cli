@@ -1,3 +1,30 @@
+# Local stand-ins (requirements §15): Postgres, the ECS tool API on :8080 and the AgentCore Runtime on :8081.
+# Every setting has a placeholder default so `docker compose up` works on a fresh clone; values in .env win.
+# `migrate` applies the Alembic migrations first, so a fresh clone gets the tables; both apps wait for it.
+x-fieldsight-build-args: &build-args
+  PYTHON_BASE_IMAGE: ${PYTHON_BASE_IMAGE:-python:3.14-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d}
+
+x-fieldsight-env: &fieldsight-env
+  FIELDSIGHT_ENVIRONMENT: ${FIELDSIGHT_ENVIRONMENT:-local}
+  FIELDSIGHT_AWS_REGION: ${FIELDSIGHT_AWS_REGION:-us-east-1}
+  AWS_REGION: ${FIELDSIGHT_AWS_REGION:-us-east-1}
+  FIELDSIGHT_BEDROCK_MODEL_ID: ${FIELDSIGHT_BEDROCK_MODEL_ID:-local-placeholder}
+  FIELDSIGHT_BEDROCK_FAST_MODEL_ID: ${FIELDSIGHT_BEDROCK_FAST_MODEL_ID:-local-placeholder}
+  FIELDSIGHT_BEDROCK_JUDGE_MODEL_ID: ${FIELDSIGHT_BEDROCK_JUDGE_MODEL_ID:-local-placeholder}
+  FIELDSIGHT_BEDROCK_EMBEDDING_MODEL_ID: ${FIELDSIGHT_BEDROCK_EMBEDDING_MODEL_ID:-local-placeholder}
+  FIELDSIGHT_BEDROCK_KB_ID: ${FIELDSIGHT_BEDROCK_KB_ID:-local-placeholder}
+  FIELDSIGHT_BEDROCK_KB_DATA_SOURCE_ID: ${FIELDSIGHT_BEDROCK_KB_DATA_SOURCE_ID:-local-placeholder}
+  FIELDSIGHT_BEDROCK_GUARDRAIL_ID: ${FIELDSIGHT_BEDROCK_GUARDRAIL_ID:-local-placeholder}
+  FIELDSIGHT_BEDROCK_GUARDRAIL_VERSION: ${FIELDSIGHT_BEDROCK_GUARDRAIL_VERSION:-1}
+  FIELDSIGHT_PACKET_BUCKET: ${FIELDSIGHT_PACKET_BUCKET:-local-placeholder}
+  # always the compose Postgres, by service name, whatever .env says for the host
+  FIELDSIGHT_DATABASE_URL: postgresql://fieldsight:fieldsight_dev@postgres:5432/fieldsight
+  FIELDSIGHT_RETRIEVAL_SCORE_THRESHOLD: ${FIELDSIGHT_RETRIEVAL_SCORE_THRESHOLD:-0.5}
+  FIELDSIGHT_RETRIEVAL_MAX_CHUNKS: ${FIELDSIGHT_RETRIEVAL_MAX_CHUNKS:-8}
+  FIELDSIGHT_GATEWAY_API_KEY: ${FIELDSIGHT_GATEWAY_API_KEY:-local-placeholder}
+  FIELDSIGHT_ALLOW_DEV_IDENTITY: ${FIELDSIGHT_ALLOW_DEV_IDENTITY:-false}
+  FIELDSIGHT_ANALYST_ROLE_ARNS: ${FIELDSIGHT_ANALYST_ROLE_ARNS:-arn:aws:iam::000000000000:role/FieldSightLocalAnalyst}
+
 services:
   postgres:
     image: pgvector/pgvector:pg16
@@ -12,6 +39,50 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U fieldsight"]
       interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: .
+      dockerfile: deploy/migrate/Dockerfile
+      args: *build-args
+    environment: *fieldsight-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  tool-api:
+    build:
+      context: .
+      dockerfile: deploy/ecs/Dockerfile
+      args: *build-args
+    environment: *fieldsight-env
+    ports:
+      - "8080:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  agent-runtime:
+    build:
+      context: .
+      dockerfile: deploy/runtime/Dockerfile
+      args: *build-args
+    environment: *fieldsight-env
+    ports:
+      - "8081:8080"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/ping', timeout=3)"]
+      interval: 10s
       timeout: 5s
       retries: 5
 

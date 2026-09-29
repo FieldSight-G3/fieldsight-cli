@@ -362,6 +362,11 @@ class AnalystRepository(_Repository):
         with self.engine.connect() as connection:
             return connection.execute(statement).scalar_one_or_none()
 
+    def analyst_id_for_iam_principal(self, role_arn: str) -> UUID | None:
+        statement = select(self.table.c.analyst_id).where(self.table.c.iam_role_arn == role_arn)
+        with self.engine.connect() as connection:
+            return connection.execute(statement).scalar_one_or_none()
+
     def assign_iam_role(self, analyst_id: UUID, role_arn: str) -> bool:
         statement = (
             update(self.table)

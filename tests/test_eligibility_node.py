@@ -1,6 +1,8 @@
 """The eligibility node writes nothing; ReviewSnapshot.of builds the queue snapshot the harness saves."""
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
+from typing import Any
 from uuid import uuid4
 
 from fieldsight.graph.nodes.eligibility import eligibility_check_node
@@ -11,7 +13,17 @@ from fieldsight.repository import (
     ReviewQueueRepository,
     RunRecordRepository,
 )
-from tests.test_analysis import normalized_fields
+
+
+def normalized_fields() -> dict[str, Any]:
+    """ a ready incident: every required field present and confident """
+    return {
+        "work_related": True, "new_case": True, "incident_at": datetime(2026, 9, 22, 8, tzinfo=UTC).isoformat(),
+        "event_at": None, "learned_at": None, "event_type": "other", "admission_reason": None, "amputation_detail": None,
+        "treatments": [], "death": False, "days_away": 1, "restricted_days": 0, "job_transfer": False,
+        "loss_of_consciousness": False, "significant_diagnosis": False,
+        "confidences": {"incident_at": 0.99, "days_away": 0.99},
+    }
 
 HIT = {"doc_id": "CFR-1904", "chunk_id": "CFR-1904-0123456789ab", "text": "1904.39(a)(2)"}
 DOSSIER = {

@@ -1,5 +1,7 @@
 """One writer per turn: an escalated turn leaves one run record and one reviewable queue row holding its dossier."""
 
+from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -12,7 +14,21 @@ from fieldsight.repository import (
     RunRecordRepository,
 )
 from fieldsight.types.run import WorkflowResult
-from tests.test_lifecycle import no_answer, normalized_fields
+
+
+def normalized_fields() -> dict[str, Any]:
+    """ a ready incident: every required field present and confident """
+    return {
+        "work_related": True, "new_case": True, "incident_at": datetime(2026, 9, 22, 8, tzinfo=UTC).isoformat(),
+        "event_at": None, "learned_at": None, "event_type": "other", "admission_reason": None, "amputation_detail": None,
+        "treatments": [], "death": False, "days_away": 1, "restricted_days": 0, "job_transfer": False,
+        "loss_of_consciousness": False, "significant_diagnosis": False,
+        "confidences": {"incident_at": 0.99, "days_away": 0.99},
+    }
+
+
+def no_answer(question: str, objections: list[str]):
+    raise AssertionError("analyze never answers from retrieval")
 
 HIT = {"doc_id": "CFR-1904", "chunk_id": "CFR-1904-0123456789ab", "text": "1904.7(b)(3)"}
 DOSSIER = {"recordability": {"task": "t", "decisions": {}, "cited": {HIT["chunk_id"]: HIT},
