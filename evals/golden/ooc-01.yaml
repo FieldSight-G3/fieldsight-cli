@@ -1,0 +1,28 @@
+id: ooc-01
+category: out_of_corpus
+why: >
+  Powered industrial trucks (1910.178) are on the manifest's declared out-of-corpus list.
+  It's a real OSHA standard a utility would plausibly ask about, so a model will be tempted
+  to answer from memory. Tests that the system refuses, names the gap, and does not hedge
+  into an answer.
+incident_id: null
+turns:
+  - command: ask
+    query: "How often do our warehouse forklift operators need to be re-evaluated under OSHA's powered industrial truck standard?"
+expected:
+  outcome: refusal
+  refusal:
+    reason_code: below_similarity_threshold
+    declared_out_of_corpus_topic: "powered industrial trucks and forklifts"
+    must_name_what_was_searched: true
+    must_name_corpus_scope: "29 CFR Part 1904 recordkeeping and 29 CFR 1910.269 electric power"
+    must_offer_escalation_path: true
+  answer_must_include:
+    - "not covered by the documents"
+    - "forklift"
+  must_not_include:
+    - "1910.178"
+    - "every three years"
+    - "once every three years"
+    - "generally, OSHA requires"
+  sources: []

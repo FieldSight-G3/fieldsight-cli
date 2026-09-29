@@ -1,0 +1,27 @@
+id: multi-01
+category: multi_hop
+why: >
+  Cross-reference 4 in the manifest: the rulemaking preamble (FR-2014) explains why
+  observation-only stays are excluded, but only the regulation (1904.39(b)(9)-(b)(10))
+  states the rule. Stopping at either end gives an incomplete or wrong answer. Built on the
+  "hospital" retrieval distractor, where reportable and non-reportable uses look the same.
+incident_id: null
+turns:
+  - command: ask
+    query: "A worker was kept overnight at the hospital for observation after a work incident but was never admitted for treatment. Is that an in-patient hospitalization we have to report to OSHA, and why did OSHA write the rule that way?"
+expected:
+  outcome: answer
+  answer_must_include:
+    - "not reportable: an in-patient hospitalization involving only observation or diagnostic testing does not have to be reported"
+    - "in-patient hospitalization means a formal admission to the in-patient service of a hospital or clinic for care or treatment"
+    - "commenters asked OSHA to exclude observation or diagnostic testing only, and the final rule added the definition and the clarification"
+  must_not_include:
+    - "goes in column I"
+    - "enter 180"
+  sources:
+    - doc_id: CFR-1904
+      section_path: "1904.39"
+      paragraph: "(b)(9), (b)(10)"
+    - doc_id: FR-2014
+      section_path: "1904.39-analysis"
+      paragraph: "79 FR 56144, discussion of in-patient hospitalization definition"

@@ -1,0 +1,40 @@
+id: threshold-01a
+category: threshold
+pair_id: threshold-01
+why: >
+  Tests the 24-hour boundary in 1904.39(b)(6) at exactly 24 hours, which still counts as
+  "within" 24 hours. Built on the "24 hours" retrieval distractor: the regulation writes the
+  clock as "twenty-four (24) hours", so a literal "24 hours" match lands on the preamble or
+  directive instead of the controlling text.
+incident_id: null
+turns:
+  - command: ask
+    query: "An employee was hurt at 8:00 AM on March 10, 2026. He was formally admitted to the hospital for treatment at 8:00 AM on March 11, exactly 24 hours later, and we learned of the admission at 8:30 AM that day. Is this reportable to OSHA, and by when?"
+threshold:
+  rule_id: R2
+  boundary: "24 hours from the work-related incident to the in-patient hospitalization"
+  boundary_source: "29 CFR 1904.39(b)(6)"
+  value: "24h 0m"
+  side: at_boundary_inclusive
+  rule_inputs:
+    work_related: true
+    event_type: inpatient_hospitalization
+    incident_at: "2026-03-10T08:00:00-05:00"
+    event_at: "2026-03-11T08:00:00-05:00"
+    learned_at: "2026-03-11T08:30:00-05:00"
+    admission_reason: care_or_treatment
+  expected_rule_outcome: reportable
+  expected_deadline: "2026-03-12T08:30:00-05:00"
+expected:
+  outcome: answer
+  rules_engine_invocation_required: true
+  answer_must_include:
+    - "reportable"
+    - "within 24 hours of learning of the hospitalization"
+  must_not_include:
+    - "not reportable"
+  sources:
+    - doc_id: CFR-1904
+      section_path: "1904.39"
+      paragraph: "(a)(2), (b)(6), (b)(7)"
+distractor: "24 hours"

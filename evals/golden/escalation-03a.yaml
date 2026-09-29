@@ -1,0 +1,47 @@
+id: escalation-03a
+category: escalation_pair
+pair_id: escalation-03
+trigger: near_boundary_value
+trigger_fires: true
+why: >
+  Named trigger 3 of 4 (§14): a value within the configured near-boundary margin. P2's
+  176 days away is 4 days short of the 180-day cap in 1904.7(b)(3)(vii). The outcome is
+  still correct (column H, 176), but a small change in the return-to-work date would move
+  it onto the cap, so it must be flagged for a human.
+incident_id: INC-2026-0412
+setup:
+  base_packet: packets/inc-0412/
+assumed_config:
+  near_boundary_margins:
+    r4_day_cap: {value: 7, unit: days}
+  holds_for_margin_range: "4 to 29 days"
+turns:
+  - command: analyze
+    expected:
+      rule_outcomes:
+        - rule_id: R4
+          outcome: H
+          day_count: 176
+      escalation_triggers_fired:
+        - near_boundary_value
+      trigger_detail:
+        rule_id: R4
+        boundary: 180
+        value: 176
+        distance: 4
+        unit: days
+threshold:
+  rule_id: R4
+  boundary: "near-boundary margin around the 180-day cap"
+  boundary_source: "29 CFR 1904.7(b)(3)(vii); margin from typed config"
+  value: 176
+  side: inside_margin
+  rule_inputs:
+    recordable: true
+    death: false
+    days_away: 176
+    restricted_days: 0
+    job_transfer: false
+  expected_rule_outcome: H
+  expected_day_count: 176
+ci_tier: true
