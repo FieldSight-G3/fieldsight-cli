@@ -1,13 +1,66 @@
 """ nodes for the Coordinator and the worker sub-graphs it dispatches """
+import json
 
+from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.errors import GraphRecursionError
 
+from ...aws import clients
 from ...config import settings
-from ...prompts import GOALS
+from ...errors import PlanError
+from ...prompts import GOALS, PROMPTS
+from ...schemas.plan import DispatchPlan
 from ...types.dossier import DossierLeg
 from ..specialists import get_specialists
 
 
+def _plan(state: dict) -> DispatchPlan:
+    """ the fast model's plan; one retry with a schema reminder, then a typed failure (section 13) """
+
+    model = clients.chat_model(fast=True).with_structured_output(DispatchPlan)
+    messages = [SystemMessage(PROMPTS["coordinator"]),
+                HumanMessage(json.dumps({"fields": state["incident"], "narrative": state.get("narrative")}))]
+    for _ in range(2):
+        try:
+            plan = model.invoke(messages)
+        except ValueError as error:
+            problem = str(error)
+        else:
+            if plan:
+                return plan
+            problem = "no plan was returned"
+        messages.append(HumanMessage(f"That plan was invalid: {problem}. Return one that matches the DispatchPlan schema."))
+    raise PlanError("the Coordinator returned no valid plan after one retry")
+
+def coordinator_node(state: dict) -> dict:
+    """ first pass: the model plans. After a Reviewer rejection: re-dispatch only the rejected workers, no model call """
+
+    if state.get("review_iterations"):
+        # route_after_review only comes back here on a rejection; one dispatch per rejected worker
+        problems = {r.worker: r.problem for r in state["reviews"][-1].rejections}
+        dispatches = [{"worker": worker, "reason": problem} for worker, problem in problems.items()]
+        quote, trigger = state["plans"][-1]["energized_equipment_quote"], "reviewer_rejected"
+    else:
+        plan = _plan(state)
+        dispatches = [d.model_dump() for d in plan.dispatches]
+        quote, trigger = plan.energized_equipment_quote, "initial"
+
+    # the model chooses hazard_control; this checks its grounds are really in the narrative
+    grounded = bool(quote) and quote in (state.get("narrative") or "")
+    kept = [d for d in dispatches if grounded or d["worker"] != "hazard_control"]
+    update = {"plans": [{"trigger": trigger, "dispatches": kept, "energized_equipment_quote": quote,
+                         "ungrounded": [d for d in dispatches if d not in kept]}]}
+    if trigger == "initial":
+        # a new turn starts from the default goals, not last turn's narrowed ones
+        update["tasks"] = dict(GOALS)
+    return update
+
+
+def route_after_coordinator(state: dict) -> list[str] | str:
+    """ fan out to every dispatched worker at once; with none, straight to the eligibility check """
+
+    workers = [d["worker"] for d in state["plans"][-1]["dispatches"]]
+    return workers or "eligibility_check"
+    
 def _run_specialist(name: str, state: dict) -> dict:
     """ invoke one worker sub-graph and map its result back as its leg of the dossier; its transcript stays behind """
 

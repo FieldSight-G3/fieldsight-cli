@@ -28,6 +28,8 @@ class RuleError(FieldSightError):
 class GuardrailError(FieldSightError):
     """ Bedrock Guardrails couldn't screen a string, so it can't be let through """
 
+class PlanError(FieldSightError):
+    """ the Coordinator returned no valid dispatch plan, even after a retry """
 
 class ToolDenied(FieldSightError):
     """ a Gateway read tool refused the call; code maps to the HTTP status """
