@@ -1,0 +1,31 @@
+id: near-miss-01
+category: near_miss
+why: >
+  Needlesticks and privacy both sit on the manifest's near-miss list: they sound like
+  bloodborne-pathogens or HIPAA territory, which the corpus doesn't cover, but 1904.29(b)(7)
+  answers this directly. Pairs with ooc-02 (HIPAA), which must refuse: both touch employee
+  privacy, so the similarity threshold has to separate them. A refusal here is a failure.
+incident_id: null
+turns:
+  - command: ask
+    query: "A lineworker was stuck by a used syringe with someone else's blood in it that was left in an underground vault. Can we leave his name off the OSHA 300 Log?"
+expected:
+  outcome: answer
+  must_not_refuse: true
+  answer_must_include:
+    - "yes, a needlestick contaminated with another person's blood is a privacy concern case"
+    - "enter \"privacy case\" in the space normally used for the employee's name"
+    - "keep a separate, confidential list of case numbers and employee names"
+  must_not_include:
+    - "not covered by the documents"
+    - "outside the scope"
+    - "HIPAA"
+    - "bloodborne pathogens standard"
+  sources:
+    - doc_id: CFR-1904
+      section_path: "1904.29"
+      paragraph: "(b)(6), (b)(7)(v)"
+paired_with: ooc-02
+declared_near_miss_topics:
+  - "Needlestick and sharps injuries"
+  - "Privacy-concern cases and the privacy case list"

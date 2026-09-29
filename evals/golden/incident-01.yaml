@@ -1,0 +1,72 @@
+id: incident-01
+category: incident_backed
+why: >
+  P4 is the packet the spec builds to trigger a Reviewer rejection: Form 301 Q9 says
+  "hospitalized overnight as an in-patient", but the stay was observation and diagnostic
+  testing only, which 1904.39(b)(10) excludes. Tests that the case comes out recordable but
+  not reportable, that the exclusion is found rather than the 24-hour clock, and that a
+  follow-up turn reuses the same R2 invocation rather than re-deciding. Built on the
+  "hospital" distractor.
+incident_id: INC-2026-0414
+multi_turn: true
+turns:
+  - command: analyze
+    expected:
+      workers_dispatched: [recordability, reportability]
+      workers_not_dispatched: [hazard_control]
+      reviewer:
+        min_iterations: 2
+        first_verdict: rejected
+        rejection_reason: "reportable-hospitalization claim not supported by cited chunk"
+        redispatch_goal_mentions: "observation or diagnostic testing exclusion"
+      rule_outcomes:
+        - rule_id: R1
+          outcome: recordable
+        - rule_id: R2
+          outcome: not_reportable
+          inputs_include:
+            event_type: inpatient_hospitalization
+            admission_reason: observation_only
+        - rule_id: R4
+          outcome: H
+          day_count: 6
+      failed_artifacts: [scan-0002.pdf]
+      escalation_triggers_fired:
+        - photo_contradicts_narrative
+        - reviewer_needed_more_than_one_iteration
+      escalation_triggers_not_fired:
+        - reportable_outcome
+        - field_below_confidence_floor
+      sources:
+        - doc_id: CFR-1904
+          section_path: "1904.39"
+          paragraph: "(b)(9), (b)(10)"
+        - doc_id: CFR-1904
+          section_path: "1904.7"
+          paragraph: "(b)(3), (b)(4)"
+      must_not_include:
+        - "must be reported within 24 hours"
+        - "reportable in-patient hospitalization"
+  - command: ask
+    query: "The Form 301 says he was hospitalized overnight as an in-patient. Why isn't this reportable?"
+    expected:
+      outcome: answer
+      reuses_rule_invocation_from_turn: 1
+      reused_rule_id: R2
+      new_rule_invocations: []
+      workers_dispatched: []
+      answer_must_include:
+        - "the stay was for observation and diagnostic testing only"
+        - "an in-patient hospitalization that involves only observation or diagnostic testing does not have to be reported"
+        - "in-patient hospitalization means a formal admission for care or treatment"
+      must_not_include:
+        - "you do not need to report"
+        - "Meridian is not required"
+      sources:
+        - doc_id: CFR-1904
+          section_path: "1904.39"
+          paragraph: "(b)(9), (b)(10)"
+session:
+  same_session_across_turns: true
+  thread_key: [analyst_id, INC-2026-0414, participant]
+distractor: hospital

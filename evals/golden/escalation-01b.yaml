@@ -1,0 +1,35 @@
+id: escalation-01b
+category: escalation_pair
+pair_id: escalation-01
+trigger: field_below_confidence_floor
+trigger_fires: false
+why: >
+  Same packet and override as escalation-01a, but the confidence is exactly 0.60. The floor
+  is "below 0.60", so 0.60 itself passes. R5 returns ready and the workflow runs normally.
+  The clean half of the §16 escalation-contrast demo.
+incident_id: INC-2026-0411
+setup:
+  base_packet: packets/inc-0411/
+  extraction_overrides:
+    date_of_injury: 0.60
+turns:
+  - command: analyze
+    expected:
+      rule_outcomes:
+        - rule_id: R5
+          outcome: ready
+      workers_dispatched: [recordability]
+      escalation_triggers_not_fired:
+        - field_below_confidence_floor
+threshold:
+  rule_id: R5
+  boundary: "extraction confidence floor"
+  boundary_source: "FieldSight pipeline parameter (not regulatory)"
+  value: 0.60
+  side: at_boundary_inclusive
+  rule_inputs:
+    confidences: {date_of_injury: 0.60, treatment: 0.95, days_away: 0.95}
+    floor: 0.60
+  expected_rule_outcome: ready
+demo_artifact: "escalation contrast (§16.5): trace and dossier of the clean run"
+ci_tier: true

@@ -1,0 +1,42 @@
+id: threshold-03b
+category: threshold
+pair_id: threshold-03
+why: >
+  Same shape as threshold-03a, but 150 days away plus 35 restricted is 185, over the cap.
+  The day count recorded is 180. The pair must differ on day count while both stay in
+  column H.
+incident_id: null
+turns:
+  - command: ask
+    query: "An employee injured on January 5, 2026 was away from work for 150 calendar days, then on restricted duty for 35 more. Which OSHA 300 Log column does this go in, and what day count do we enter?"
+threshold:
+  rule_id: R4
+  boundary: "180 combined calendar days away and restricted"
+  boundary_source: "29 CFR 1904.7(b)(3)(vii); Form 300 instructions"
+  value: 185
+  side: above
+  rule_inputs:
+    recordable: true
+    death: false
+    days_away: 150
+    restricted_days: 35
+    job_transfer: false
+  expected_rule_outcome: H
+  expected_day_count: 180
+expected:
+  outcome: answer
+  rules_engine_invocation_required: true
+  answer_must_include:
+    - "column H (days away from work)"
+    - "180 days, the cap"
+    - "counting may stop once days away and restricted days together reach 180"
+  must_not_include:
+    - "185 days"
+    - "column I"
+  sources:
+    - doc_id: CFR-1904
+      section_path: "1904.7"
+      paragraph: "(b)(3)(vii)"
+    - doc_id: FORM-301
+      section_path: "overview"
+      paragraph: "column definitions; counting days away and restricted days"

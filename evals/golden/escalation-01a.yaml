@@ -1,0 +1,42 @@
+id: escalation-01a
+category: escalation_pair
+pair_id: escalation-01
+trigger: field_below_confidence_floor
+trigger_fires: true
+why: >
+  Named trigger 1 of 4 (§14): any extracted field below the 0.60 confidence floor.
+  P1 is otherwise clean, so this is the degraded half of the §16 escalation-contrast demo.
+  0.59 is one hundredth below the floor; R5 must return human_determination and the
+  readiness gate must stop the turn before any worker is dispatched.
+incident_id: INC-2026-0411
+setup:
+  base_packet: packets/inc-0411/
+  extraction_overrides:
+    date_of_injury: 0.59
+turns:
+  - command: analyze
+    expected:
+      rule_outcomes:
+        - rule_id: R5
+          outcome: human_determination
+          missing_field: date_of_injury
+      workers_dispatched: []
+      escalated_to_review_queue: true
+      escalation_triggers_fired:
+        - field_below_confidence_floor
+      trigger_detail:
+        field: date_of_injury
+        value: 0.59
+        floor: 0.60
+threshold:
+  rule_id: R5
+  boundary: "extraction confidence floor"
+  boundary_source: "FieldSight pipeline parameter (not regulatory)"
+  value: 0.59
+  side: below
+  rule_inputs:
+    confidences: {date_of_injury: 0.59, treatment: 0.95, days_away: 0.95}
+    floor: 0.60
+  expected_rule_outcome: human_determination
+demo_artifact: "escalation contrast (§16.5): trace and dossier of the degraded run"
+ci_tier: true

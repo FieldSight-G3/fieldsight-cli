@@ -1,0 +1,37 @@
+id: escalation-02b
+category: escalation_pair
+pair_id: escalation-02
+trigger: rules_engine_insufficient_data
+trigger_fires: false
+why: >
+  Same packet and timing as escalation-02a with admission_reason present
+  (observation_only, from the Form 301 narrative and supervisor note). R2 decides
+  not_reportable under 1904.39(b)(10), and the insufficient_data trigger stays silent.
+incident_id: INC-2026-0414
+setup:
+  base_packet: packets/inc-0414/
+turns:
+  - command: analyze
+    expected:
+      rule_outcomes:
+        - rule_id: R2
+          outcome: not_reportable
+          inputs_include:
+            admission_reason: observation_only
+      escalation_triggers_not_fired:
+        - rules_engine_insufficient_data
+threshold:
+  rule_id: R2
+  boundary: "required input present vs absent"
+  boundary_source: "29 CFR 1904.39(b)(9)-(b)(10); §6 missing-input rule"
+  value: observation_only
+  side: present
+  rule_inputs:
+    work_related: true
+    event_type: inpatient_hospitalization
+    incident_at: "2026-07-14T13:30:00-04:00"
+    event_at: "2026-07-14T15:00:00-04:00"
+    learned_at: "2026-07-14T13:30:00-04:00"
+    admission_reason: observation_only
+  expected_rule_outcome: not_reportable
+ci_tier: true

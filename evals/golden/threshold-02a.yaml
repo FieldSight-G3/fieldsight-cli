@@ -1,0 +1,42 @@
+id: threshold-02a
+category: threshold
+pair_id: threshold-02
+why: >
+  Tests the inside edge of the amputation definition in 1904.39(b)(11): a fingertip
+  amputation counts even without bone loss. Built on the "amputation" retrieval distractor,
+  where the word appears in both the reportable list and the exclusion list that carves it
+  back.
+incident_id: null
+turns:
+  - command: ask
+    query: "A lineworker's glove caught in a pulley at 2:00 PM on April 6, 2026, and he lost the tip of his index finger, with no bone involved. We learned about it at 2:15 PM. Is this a reportable amputation, and by when?"
+threshold:
+  rule_id: R2
+  boundary: "membership in the 1904.39(b)(11) amputation definition versus its exclusion list"
+  boundary_source: "29 CFR 1904.39(b)(11)"
+  value: fingertip
+  side: inside_definition
+  rule_inputs:
+    work_related: true
+    event_type: amputation
+    incident_at: "2026-04-06T14:00:00-04:00"
+    event_at: "2026-04-06T14:00:00-04:00"
+    learned_at: "2026-04-06T14:15:00-04:00"
+    amputation_detail: fingertip
+  expected_rule_outcome: reportable
+  expected_deadline: "2026-04-07T14:15:00-04:00"
+expected:
+  outcome: answer
+  rules_engine_invocation_required: true
+  answer_must_include:
+    - "reportable"
+    - "fingertip amputations count with or without bone loss"
+    - "within 24 hours"
+  must_not_include:
+    - "not an amputation"
+    - "not reportable"
+  sources:
+    - doc_id: CFR-1904
+      section_path: "1904.39"
+      paragraph: "(a)(2), (b)(11)"
+distractor: amputation
