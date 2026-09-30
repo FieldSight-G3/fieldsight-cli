@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from ...repository import IncidentRepository, RunRecordRepository
+from ...repository import IncidentRepository, RunRepository
 from ...rules.engine import IncidentRuleResults
 from ...schemas.incidents import NormalizedIncident
 from ...schemas.run_records import RuleInvocation
@@ -38,7 +38,7 @@ def save_run(correlation_id: UUID, command: str, incident: NormalizedIncident | 
     if dossier is not None:
         columns["dossier"] = dossier
     if incident is None:
-        return RunRecordRepository().create(correlation_id, command, workers_dispatched=dispatched,
+        return RunRepository().create(correlation_id, command, workers_dispatched=dispatched,
                                             rule_invocations={"items": recorded}, escalation_triggers=triggers)
 
     # only analyze writes the incident's outcome; an ask, even one re-running a rule on a hypothetical, never does

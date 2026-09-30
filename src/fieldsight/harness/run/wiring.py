@@ -18,7 +18,7 @@ from ...repository import (
     IncidentRepository,
     ReviewQueueRecord,
     ReviewQueueRepository,
-    RunRecordRepository,
+    RunRepository,
 )
 from ...schemas.incidents import NormalizedIncident
 from ...security.entitlement import require_grant, submit_establishment
@@ -121,7 +121,7 @@ def latest_run(incident_id: UUID | str, *, analyst_id: UUID | str,
         raises ToolDenied unless the analyst holds a grant """
 
     require_grant(analyst_id, incident_id)
-    return RunRecordRepository().latest(UUID(str(incident_id)), commands)
+    return RunRepository().latest(UUID(str(incident_id)), commands)
 
 
 def review_queue(analyst_id: UUID | str) -> list[ReviewQueueRecord]:
@@ -178,6 +178,6 @@ def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None 
                                               packet["narrative"], owner_analyst_id=analyst,
                                               # no judged photo means the photo trigger is unevaluated, not clear
                                               photo_verdicts={"items": packet["photos"]} if packet["photos"] else None)
-    RunRecordRepository().create(correlation_id, "submit", incident_id=incident_id)
+    RunRepository().create(correlation_id, "submit", incident_id=incident_id)
     return SubmitResult(incident_id=str(incident_id), establishment=establishment, report=packet["report"],
                         withheld=packet["withheld"], photos=packet["photos"], refusal=None)

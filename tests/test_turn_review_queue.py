@@ -11,7 +11,7 @@ from fieldsight.harness.run.lifecycle import run_turn
 from fieldsight.repository import (
     IncidentRepository,
     ReviewQueueRepository,
-    RunRecordRepository,
+    RunRepository,
 )
 from fieldsight.types.run import WorkflowResult
 
@@ -56,7 +56,7 @@ def rejected_workflow(incident, question, correlation_id):
 
 
 def rows_for(incident_id):
-    runs, queue = RunRecordRepository(), ReviewQueueRepository()
+    runs, queue = RunRepository(), ReviewQueueRepository()
     with runs.engine.connect() as connection:
         run_ids = connection.execute(select(runs.table.c.run_id).where(runs.table.c.incident_id == incident_id)).scalars().all()
         queue_ids = connection.execute(select(queue.table.c.queue_id).where(queue.table.c.incident_id == incident_id)).scalars().all()

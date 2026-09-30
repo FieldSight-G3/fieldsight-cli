@@ -6,13 +6,13 @@ import pytest
 from sqlalchemy import delete, insert, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
-from fieldsight.repository import IncidentRepository, RunRecordRepository
+from fieldsight.repository import IncidentRepository, RunRepository
 
 
 @pytest.fixture
 def original():
     incident_id = IncidentRepository().create("Substation 7", {"days_away": 3})
-    runs = RunRecordRepository()
+    runs = RunRepository()
     run_id = runs.create(uuid4(), "analyze", incident_id=incident_id, rule_invocations={"items": [{"rule_id": "R4"}]})
     return runs, run_id, incident_id
 

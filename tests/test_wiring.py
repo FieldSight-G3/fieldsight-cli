@@ -16,7 +16,7 @@ from fieldsight.harness.run.wiring import harness_workflow, rag_answerer, turn
 from fieldsight.repository import (
     GatewayReadRepository,
     IncidentRepository,
-    RunRecordRepository,
+    RunRepository,
 )
 from fieldsight.schemas.incidents import NormalizedIncident
 from fieldsight.types.run import WorkflowResult
@@ -111,7 +111,7 @@ def test_a_turn_runs_end_to_end_as_the_verified_analyst(granted):
 
     run = turn({"command": "analyze", "incident_id": str(incident_id)}, analyst_id=analyst, workflow=approved, answerer=no_answer)
 
-    saved = RunRecordRepository().get(run.run_id)
+    saved = RunRepository().get(run.run_id)
     assert saved is not None and saved.incident_id == incident_id
     assert saved.workers_dispatched == {"items": ["recordability"], "plans": PLANS}
 
@@ -127,6 +127,6 @@ def test_a_turn_without_a_grant_is_denied_before_anything_is_read_or_written(gra
         turn({"command": "analyze", "incident_id": str(incident_id)}, analyst_id=analyst, workflow=never, answerer=no_answer)
 
     assert denied.value.code == "not_entitled"
-    runs = RunRecordRepository()
+    runs = RunRepository()
     with runs.engine.connect() as connection:
         assert connection.execute(runs.table.select().where(runs.table.c.incident_id == incident_id)).first() is None

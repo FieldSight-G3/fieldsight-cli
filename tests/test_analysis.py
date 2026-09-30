@@ -10,7 +10,7 @@ from fieldsight.harness.escalation.review import CitationReference
 from fieldsight.repository import (
     IncidentRepository,
     ReviewQueueRepository,
-    RunRecordRepository,
+    RunRepository,
 )
 
 
@@ -38,7 +38,7 @@ def test_analyze_incident_records_rule_invocations():
     incidents = IncidentRepository()
     incident_id = incidents.create("Substation 7", normalized_fields())
     analysis = analyze_incident(incident_id)
-    saved = RunRecordRepository().get(analysis.run_id)
+    saved = RunRepository().get(analysis.run_id)
     assert saved is not None
     assert saved.incident_id == incident_id
     assert saved.rule_invocations is not None
@@ -52,7 +52,7 @@ def test_low_confidence_records_gate_and_review(snapshot):
     fields["confidences"]["incident_at"] = 0.59
     incident_id = IncidentRepository().create("Substation 7", fields)
     analysis = analyze_incident(incident_id, review_snapshot=snapshot)
-    saved = RunRecordRepository().get(analysis.run_id)
+    saved = RunRepository().get(analysis.run_id)
     assert saved is not None
     assert saved.rule_invocations is not None
     assert len(saved.rule_invocations["items"]) == 1

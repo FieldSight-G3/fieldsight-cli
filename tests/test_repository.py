@@ -5,7 +5,7 @@ import pytest
 from fieldsight.repository import (
     IncidentRepository,
     ReviewQueueRepository,
-    RunRecordRepository,
+    RunRepository,
     SessionRepository,
 )
 
@@ -36,7 +36,7 @@ def test_run_record_create_and_get_round_trip():
     incidents = IncidentRepository()
     incident_id = incidents.create("Substation 7", {"date_of_injury": "2026-02-01"})
 
-    runs = RunRecordRepository()
+    runs = RunRepository()
     correlation_id = uuid4()
     run_id = runs.create(
         correlation_id=correlation_id,

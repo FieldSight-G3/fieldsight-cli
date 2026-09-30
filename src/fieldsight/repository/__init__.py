@@ -8,7 +8,7 @@ from .base import database_ready
 from .gateway import GatewayReadRepository
 from .incidents import IncidentRecord, IncidentRepository
 from .review_queue import ReviewQueueRecord, ReviewQueueRepository
-from .run_records import RunRecordRecord, RunRecordRepository
+from .run_records import RunRecord, RunRepository
 from .seed import SeedRepository
 from .sessions import SessionRecord, SessionRepository
 
@@ -19,8 +19,8 @@ __all__ = [
     "IncidentRepository",
     "ReviewQueueRecord",
     "ReviewQueueRepository",
-    "RunRecordRecord",
-    "RunRecordRepository",
+    "RunRecord",
+    "RunRepository",
     "SeedRepository",
     "SessionRecord",
     "SessionRepository",

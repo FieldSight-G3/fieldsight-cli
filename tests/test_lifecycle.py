@@ -10,7 +10,7 @@ from fieldsight.harness.run.lifecycle import run_turn
 from fieldsight.repository import (
     IncidentRepository,
     ReviewQueueRepository,
-    RunRecordRepository,
+    RunRepository,
 )
 from fieldsight.schemas.run_records import ModelCall, ToolInvocation
 from fieldsight.types.run import WorkflowResult
@@ -73,7 +73,7 @@ def test_ready_incident_runs_the_workflow_and_records_the_run():
     run = analyze(incident_id, dispatched)
 
     assert dispatched == [str(incident_id)]
-    saved = RunRecordRepository().get(run.run_id)
+    saved = RunRepository().get(run.run_id)
     assert saved is not None and saved.command == "analyze" and saved.incident_id == incident_id
     assert saved.workers_dispatched == {"items": ["recordability"], "plans": []}
     assert saved.rule_invocations is not None
@@ -90,7 +90,7 @@ def test_low_confidence_routes_to_analyst_and_queues_for_review(analyst):
     run = analyze(incident_id, dispatched, analyst)
 
     assert dispatched == [] and run.route == "route_to_analyst"
-    saved = RunRecordRepository().get(run.run_id)
+    saved = RunRepository().get(run.run_id)
     assert saved is not None and saved.escalation_triggers is not None
     assert saved.escalation_triggers["checks"]["confidence_gate"]["fired"] is True
     queue = ReviewQueueRepository()
@@ -105,7 +105,7 @@ def test_unknown_incident_still_leaves_a_run_record():
     run = analyze("INC-2026-0412", dispatched)
 
     assert dispatched == [] and run.route == "route_to_analyst" and run.escalation is None
-    saved = RunRecordRepository().get(run.run_id)
+    saved = RunRepository().get(run.run_id)
     assert saved is not None and saved.incident_id is None
 
 def test_workflow_records_land_in_the_run_record():
@@ -120,7 +120,7 @@ def test_workflow_records_land_in_the_run_record():
                               plans=[plan], tool_invocations=[tool], model_calls=[call], reviewer_verdicts=[None])
 
     run = run_turn({"command": "analyze", "incident_id": str(incident_id)}, workflow=workflow, answerer=no_answer)
-    saved = RunRecordRepository().get(run.run_id)
+    saved = RunRepository().get(run.run_id)
 
     assert saved.workers_dispatched == {"items": ["recordability"], "plans": [plan]}
     assert saved.tool_invocations == {"items": [tool.model_dump(mode="json")]}

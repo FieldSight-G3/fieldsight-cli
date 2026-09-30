@@ -17,7 +17,7 @@ from fieldsight.harness.run.wiring import turn
 from fieldsight.repository import (
     GatewayReadRepository,
     IncidentRepository,
-    RunRecordRepository,
+    RunRepository,
 )
 from fieldsight.types.run import WorkflowResult
 
@@ -104,4 +104,4 @@ def test_a_turn_stopped_by_the_ceiling_is_recorded_and_names_it(granted):
     assert run.refusal is not None and run.refusal["reason"] == "bound_reached"
     assert "session_cost_usd" in run.refusal["message"]
     assert run.usage is not None and run.usage.cost_usd == Decimal("0.00520")
-    assert RunRecordRepository().get(run.run_id) is not None
+    assert RunRepository().get(run.run_id) is not None

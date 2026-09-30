@@ -14,7 +14,7 @@ from fieldsight.security.redaction import redact_payload, redact_text
 from .base import _Repository
 
 
-class RunRecordRecord(BaseModel):
+class RunRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
     run_id: UUID
     correlation_id: UUID
@@ -28,7 +28,7 @@ class RunRecordRecord(BaseModel):
     reviewer_verdicts: dict[str, Any] | None
     created_at: datetime
 
-class RunRecordRepository(_Repository):
+class RunRepository(_Repository):
     def __init__(self, dsn: str | None = None) -> None:
         super().__init__("run_records", dsn)
 
@@ -56,8 +56,8 @@ class RunRecordRepository(_Repository):
         with self.engine.begin() as connection:
             return connection.execute(statement).scalar_one()
 
-    def get(self, run_id: UUID) -> RunRecordRecord | None:
-        return self._get("run_id", run_id, RunRecordRecord)
+    def get(self, run_id: UUID) -> RunRecord | None:
+        return self._get("run_id", run_id, RunRecord)
 
     def latest(self, incident_id: UUID, commands: tuple[str, ...] = ("analyze", "ask")) -> dict[str, Any] | None:
         """The incident's most recent run record of those commands, with every column the table has, or None."""
