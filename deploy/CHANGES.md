@@ -4,6 +4,13 @@ Changes in the code that affect a deployed piece: the ECS tool API, the AgentCor
 
 The ECS task definition (`vars.AWS_TASK_DEF_ARN`) and the AgentCore Runtime's environment live in AWS, not in this repo: `deploy.yml` only swaps their image, and `script/update_agent_runtime.py` sends every other Runtime setting back unchanged. So an environment variable they need has to be added in AWS.
 
+## 2026-09-30: `incidents.photo_verdicts` column (migration `c5e7a9b1d3f5`)
+
+`submit` now judges each photograph against the narrative with the reasoning-tier model (Nova Pro accepts images through Converse) and stores the verdicts; `analyze` reads them for the photo-contradiction escalation trigger.
+
+- **Affects:** the database, and the reasoning model's Bedrock usage (one image call per photo on `submit`).
+- **Do:** `alembic upgrade head` against RDS before deploying. Without the column, reading any incident fails. No new setting or model access is needed; photos over Bedrock's 3.75 MB image limit are skipped and reported as too large.
+
 ## 2026-09-30: `incidents.embedding` is 1024 dimensions (migration `b1d4f6a8c2e0`)
 
 The column was `vector(1536)`, but Titan Text Embeddings v2 is configured for 1024 (`aws/clients.EMBEDDING_DIMENSIONS`), and 1536 isn't a size it produces.

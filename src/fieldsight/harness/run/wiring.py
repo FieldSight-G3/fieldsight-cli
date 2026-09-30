@@ -175,7 +175,9 @@ def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None 
     with metered(start, limits or settings.bounds, pricing):
         packet = ingest_packet(supported, skipped, screen=screen)
     incident_id = IncidentRepository().create(establishment, packet["incident"].model_dump(mode="json", exclude={"incident_id"}),
-                                              packet["narrative"], owner_analyst_id=analyst)
+                                              packet["narrative"], owner_analyst_id=analyst,
+                                              # no judged photo means the photo trigger is unevaluated, not clear
+                                              photo_verdicts={"items": packet["photos"]} if packet["photos"] else None)
     RunRecordRepository().create(correlation_id, "submit", incident_id=incident_id)
     return SubmitResult(incident_id=str(incident_id), establishment=establishment, report=packet["report"],
                         withheld=packet["withheld"], photos=packet["photos"], refusal=None)

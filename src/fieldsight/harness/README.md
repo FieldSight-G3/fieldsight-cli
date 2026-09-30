@@ -4,7 +4,7 @@
 
 ```
 run_turn(raw request, workflow, answerer)                               run/lifecycle.py
-   load_incident: the stored record, or None                            run/incident.py
+   load_record: the stored row, read once; normalized, photo_contradicts run/incident.py
       |
    check_turn                                                           guardrails/turn_check.py
       1. input validation    TURN_REQUEST: command, incident id, question length,
@@ -46,7 +46,7 @@ Grouped by section 10's parts: guardrails, escalation, bounds, and the run that 
 |---|---|
 | `run/lifecycle.py` | `run_turn`: one turn start to finish, the entry point every command calls. |
 | `run/wiring.py` | `turn`: one command as the verified analyst, with the grant check, metering, the Coordinator's graph (`graph/graph.graph_workflow`, wrapped by `harness_workflow` so a meter refusal still ends and records the turn, and the cited scores reach escalation) and the RAG answerer (`rag_answerer`) composed around `run_turn`. Also `submit` (a packet in, a new incident out) and `latest_run` (the run record `trace` reads). The CLI and the AgentCore Runtime both call it. |
-| `run/incident.py` | `load_incident`: the stored record, or None for an unknown id so `check_turn` routes to the analyst. |
+| `run/incident.py` | `load_record`: the stored row, read once per turn, or None for an unknown id so `check_turn` routes to the analyst; `normalized` (its `NormalizedIncident`) and `photo_contradicts` (the escalation signal from the photo verdicts `submit` stored, None when no photo was judged). |
 | `run/workflow.py` | `run_workflow` and the `Workflow` type: the bounds check, then the Coordinator's graph. |
 | `run/answer.py` | `answer_question` and the `Answerer` type: a policy question answered from retrieval through `guard_answer`. |
 | `run/record.py` | `save_run`: the run record, the incident's outcome on `analyze`, and the review queue row. |

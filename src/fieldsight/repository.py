@@ -51,17 +51,19 @@ class IncidentRecord(BaseModel):
     outcome: dict[str, Any] | None
     deciding_rule: str | None
     status: str
+    photo_verdicts: dict[str, Any] | None
 
 class IncidentRepository(_Repository):
     def __init__(self, dsn: str | None = None) -> None:
         super().__init__("incidents", dsn)
 
-    def create(self, establishment: str, normalized_fields: dict[str, Any], narrative: str | None = None, owner_analyst_id: UUID | None = None) -> UUID:
+    def create(self, establishment: str, normalized_fields: dict[str, Any], narrative: str | None = None, owner_analyst_id: UUID | None = None, photo_verdicts: dict[str, Any] | None = None) -> UUID:
         statement = insert(self.table).values(
             establishment=establishment,
             normalized_fields=normalized_fields,
             narrative=narrative,
-            owner_analyst_id=owner_analyst_id
+            owner_analyst_id=owner_analyst_id,
+            photo_verdicts=photo_verdicts
         ).returning(self.table.c.incident_id)
         with self.engine.begin() as connection:
             return connection.execute(statement).scalar_one()

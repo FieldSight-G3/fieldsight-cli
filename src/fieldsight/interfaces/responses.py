@@ -91,7 +91,8 @@ def submitted(result: SubmitResult) -> str:
              f"Fields below the confidence floor: {', '.join(report['fields_below_floor']) or 'none'}"]
     lines += [f"Skipped {failure['artifact']}: {failure['reason']}" for failure in report["failures"]]
     lines += [f"Withheld by the Prompt Attacks filter: {source}" for source in result["withheld"]]
-    lines += [f"Photo not corroborated yet: {photo}" for photo in result["photos"]]
+    lines += [f"Photo {photo['artifact']}: {photo['verdict']}. {photo['observation']} ({photo['reason']})"
+              for photo in result["photos"]]
     return "\n".join(lines)
 
 

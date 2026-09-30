@@ -2,6 +2,7 @@
 
 from typing import Literal, NotRequired, TypedDict
 
+from ..schemas.corroboration import Corroboration
 from ..schemas.incidents import NormalizedIncident
 from .guardrails import Refusal
 
@@ -76,6 +77,15 @@ class IngestionReport(TypedDict):
     failures: list[ArtifactFailure]
 
 
+class PhotoCorroboration(TypedDict):
+    """ one photograph's verdict against the narrative, as the incident stores it for escalation """
+
+    artifact: str
+    verdict: Corroboration
+    observation: str
+    reason: str
+
+
 class IngestedPacket(TypedDict):
     """ a packet after ingestion: its normalized record, redacted narrative and report, ready to be saved """
 
@@ -83,7 +93,7 @@ class IngestedPacket(TypedDict):
     narrative: str | None
     report: IngestionReport
     withheld: list[str]
-    photos: list[str]
+    photos: list[PhotoCorroboration]
 
 
 class SubmitResult(TypedDict):
@@ -93,5 +103,5 @@ class SubmitResult(TypedDict):
     establishment: str | None
     report: IngestionReport | None
     withheld: list[str]         # cracked strings the Prompt Attacks filter kept from the model
-    photos: list[str]           # photographs not yet corroborated (section 7 step 3)
+    photos: list[PhotoCorroboration]    # each photograph judged against the narrative (section 7 step 3)
     refusal: Refusal | None

@@ -11,7 +11,7 @@ from ..bounds import BoundsConfig, SessionUsage, TurnUsage, start_turn
 from ..escalation.triggers import evaluate_escalation
 from ..guardrails.turn_check import check_turn
 from .answer import Answerer, answer_question
-from .incident import load_incident
+from .incident import load_record, normalized, photo_contradicts
 from .record import save_run
 from .workflow import Workflow, run_workflow
 
@@ -28,14 +28,17 @@ def run_turn(raw: dict, *, workflow: Workflow, answerer: Answerer, cracked: dict
 
     correlation_id = uuid4()
     cid = str(correlation_id)
-    incident = load_incident(raw.get("incident_id"))
+    stored = load_record(raw.get("incident_id"))
+    incident = normalized(stored)
     turn = check_turn(raw, incident=incident, cracked=cracked or {}, correlation_id=cid)
     request = turn["request"]
     command = request["command"] if request else str(raw.get("command") or "invalid")
     run = {"route": turn["route"], "refusal": turn["refusal"], "problems": turn["problems"], "events": list(turn["events"])}
     invocations = list(turn["rule_invocations"])
     # only what a stage actually produced; an absent signal is recorded as unevaluated, never as clear
-    signals: dict = {"prompt_attack_detected": turn["prompt_attack_detected"]}
+    signals: dict = {"prompt_attack_detected": turn["prompt_attack_detected"],
+                     # the photo verdicts submit stored; a contradicting photo is an escalation trigger (section 10)
+                     "photo_contradicts": photo_contradicts(stored)}
     workers: list[str] | None = None
     result = None
     

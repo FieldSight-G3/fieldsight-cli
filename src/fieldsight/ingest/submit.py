@@ -1,4 +1,4 @@
-""" a packet folder through section 7's ingestion: store, crack, screen, redact, normalize, report
+""" a packet folder through section 7's ingestion: store, crack, screen, redact, normalize, corroborate photos, report
 
     Ingest knows nothing about analysts or grants. The screen (the Prompt Attacks filter) is passed in by the
     harness, which also saves the result, the way run_turn is handed its workflow and answerer.
@@ -9,12 +9,14 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
+from ..errors import ExtractionError
 from ..schemas.rule_input import R5Inputs
-from ..types.artifacts import ArtifactFailure, IngestedPacket
+from ..types.artifacts import ArtifactFailure, IngestedPacket, PhotoCorroboration
 from ..types.guardrails import ARTIFACT_NAME
 from .artifacts.packet import crack_packet
 from .artifacts.redact import redact
 from .artifacts.report import ingestion_report
+from .corroborate import MAX_IMAGE_BYTES, corroborate, too_large
 from .normalize import normalize_chain
 
 log = logging.getLogger(__name__)
@@ -38,9 +40,27 @@ def packet_artifacts(folder: Path) -> tuple[list[Path], list[ArtifactFailure]]:
     return supported, skipped
 
 
+def corroborate_photos(photos: list[Path], narrative: str | None) -> tuple[list[PhotoCorroboration], list[ArtifactFailure]]:
+    """ each photo's verdict against the redacted narrative; one that's too large or can't be judged is skipped and logged """
+
+    verdicts, failures = [], []
+    for photo in photos:
+        if too_large(photo):
+            failures.append(ArtifactFailure(artifact=photo.name,
+                                            reason=f"photo too large for the model (over {MAX_IMAGE_BYTES / 1024 / 1024:.2f} MB)"))
+            continue
+        try:
+            verdicts.append(corroborate(photo, narrative))
+        except ExtractionError as error:
+            failures.append(ArtifactFailure(artifact=photo.name, reason=str(error)))
+    for failure in failures:
+        log.warning("skipped photo %s: %s", failure["artifact"], failure["reason"])
+    return verdicts, failures
+
+
 def ingest_packet(supported: list[Path], skipped: list[ArtifactFailure], *, screen: Screen) -> IngestedPacket:
     """ store and crack the forms (a malformed one is skipped and logged), screen every cracked string,
-        redact what passed, then normalize it in one structured-output call """
+        redact what passed, normalize it in one structured-output call, then judge each photo against it """
 
     extraction = crack_packet([path for path in supported if path.suffix.lower() == ".pdf"])
     notes = {path.name: path.read_text(encoding="utf-8") for path in supported if path.suffix.lower() == ".txt"}
@@ -55,8 +75,9 @@ def ingest_packet(supported: list[Path], skipped: list[ArtifactFailure], *, scre
     redacted = redact(fields, "\n\n".join(notes[name] for name in kept_notes) or None)
     incident = normalize_chain().invoke({"fields": redacted["fields"], "narrative": redacted["narrative"],
                                          "narrative_artifact": ", ".join(kept_notes)})
+    photos, photo_failures = corroborate_photos([path for path in supported if path.suffix.lower() in PHOTO_SUFFIXES],
+                                                redacted["narrative"])
     report = ingestion_report({"artifacts": [path.name for path in supported], "fields": extraction["fields"],
-                               "failures": skipped + extraction["failures"]}, FLOOR)
+                               "failures": skipped + extraction["failures"] + photo_failures}, FLOOR)
     return IngestedPacket(incident=incident, narrative=redacted["narrative"], report=report,
-                          withheld=[source for source in cracked if source not in screened],
-                          photos=[path.name for path in supported if path.suffix.lower() in PHOTO_SUFFIXES])
+                          withheld=[source for source in cracked if source not in screened], photos=photos)
