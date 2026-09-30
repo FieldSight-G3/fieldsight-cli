@@ -1,6 +1,6 @@
 """ entitlement for in-process reads, checked on every call: the analyst must hold a grant over the incident's establishment
 
-    The same queries and denial codes as the Gateway read tools (tool_store), so both paths judge access alike.
+    The Gateway read tools (tool_store) call this too, so both paths judge access alike.
     Tools return the denial as a structured result; the harness can raise it instead.
 """
 
@@ -12,8 +12,8 @@ from ..interfaces.tool_service import ToolFailure, ToolResponse
 from ..repository import GatewayReadRepository
 
 
-def require_grant(analyst_id: UUID | str, incident_id: UUID | str, *, repository: GatewayReadRepository | None = None) -> None:
-    """ raise ToolDenied unless the analyst holds a grant over the incident's establishment """
+def require_grant(analyst_id: UUID | str, incident_id: UUID | str, *, repository: GatewayReadRepository | None = None) -> dict[str, Any]:
+    """ raise ToolDenied unless the analyst holds a grant over the incident's establishment; returns the incident row """
 
     try:
         analyst, incident = UUID(str(analyst_id)), UUID(str(incident_id))
@@ -25,6 +25,7 @@ def require_grant(analyst_id: UUID | str, incident_id: UUID | str, *, repository
         raise ToolDenied("not_found", "The bound incident is unavailable")
     if not repository.has_grant(analyst, row["establishment"]):
         raise ToolDenied("not_entitled", "Caller has no grant for this establishment")
+    return row
 
 
 def entitlement_denial(state: dict[str, Any], *, repository: GatewayReadRepository | None = None) -> dict[str, Any] | None:

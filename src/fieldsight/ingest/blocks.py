@@ -12,9 +12,10 @@ def related(block: dict, by_id: dict[str, dict], relation: str) -> list[dict]:
 
     return [
         by_id[block_id]
-        for relationship in block.get("Relationships", [])
+        # Textract writes "Relationships": null on blocks with none, e.g. an empty table cell
+        for relationship in block.get("Relationships") or []
         if relationship.get("Type") == relation
-        for block_id in relationship.get("Ids", [])
+        for block_id in relationship.get("Ids") or []
         if block_id in by_id
     ]
 
