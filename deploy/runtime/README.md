@@ -1,6 +1,6 @@
 # FieldSight AgentCore Runtime
 
-The second image (requirements §15): the LangGraph workflow served by `fieldsight.interfaces.agent_runtime` on `:8080` (`POST /invocations`, `GET /ping`). Each invocation is one turn through `harness/run/wiring.turn()` — the same composition the CLI uses — as the analyst named by the caller proof.
+The second image (requirements §15): the LangGraph workflow served by `fieldsight.services.agent_runtime` on `:8080` (`POST /invocations`, `GET /ping`). Each invocation is one turn through `harness/run/wiring.turn()` — the same composition the CLI uses — as the analyst named by the caller proof.
 
 ## Invoking it
 

@@ -23,4 +23,4 @@ RUN python -m pip install --no-cache-dir --no-index --find-links=/wheels fieldsi
 USER 10001
 WORKDIR /home/fieldsight
 EXPOSE 8080
-CMD ["python", "-m", "fieldsight.interfaces.agent_runtime"]
+CMD ["python", "-m", "fieldsight.services.agent_runtime"]

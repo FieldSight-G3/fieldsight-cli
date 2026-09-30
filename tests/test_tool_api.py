@@ -8,8 +8,8 @@ from typing import Any
 from flask import request
 
 from fieldsight.errors import ToolDenied
-from fieldsight.interfaces.tool_api import create_app
 from fieldsight.schemas.incidents import SimilarCandidate
+from fieldsight.services.tool_api import create_app
 from fieldsight.tools.service import ToolService
 
 
