@@ -37,6 +37,8 @@ class SpecialistState(TypedDict):
     # output: set by the propose tool once it accepts a proposal
     proposal: dict | None
 
+    analyst_id: str
+
 
 def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer: BaseCheckpointSaver | None = None):
     """ each specialist is just its own graph. this is a factory function that can build multiple types of specialists """

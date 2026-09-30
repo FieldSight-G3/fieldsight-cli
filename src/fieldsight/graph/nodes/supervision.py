@@ -69,7 +69,7 @@ def _run_specialist(name: str, state: dict) -> dict:
     task = state.get("tasks", {}).get(name) or GOALS[name]
     try:
         result = get_specialists()[name].invoke(
-            {"task": task, "incident": state["incident"], "messages": [], "rounds": 0,
+            {"task": task, "incident": state["incident"],"analyst_id": state.get("analyst_id"), "messages": [], "rounds": 0,
              "decisions": {}, "retrieved": {}, "proposal": None},
             {"recursion_limit": settings.bounds.max_graph_recursion_depth},
         )
