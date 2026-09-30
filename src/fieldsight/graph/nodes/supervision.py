@@ -9,11 +9,11 @@ from ...config import settings
 from ...errors import PlanError
 from ...prompts import GOALS, PROMPTS
 from ...schemas.plan import DispatchPlan
+from ...schemas.run_records import ModelCall
 from ...types.dossier import DossierLeg
 from ..specialists import get_specialists
-from ..trace import record
-from ...schemas.run_records import ModelCall
 from ..trace import model_call, record
+
 
 def _plan(state: dict) -> tuple[DispatchPlan, list[ModelCall]]:
     """ the fast model's plan; one retry with a schema reminder, then a typed failure (section 13); every attempt is recorded """

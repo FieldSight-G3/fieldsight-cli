@@ -12,7 +12,7 @@ PRICES = {settings.bedrock_model_id: settings.reasoning_price, settings.bedrock_
 
 
 def model_call(agent: str, reply: AIMessage) -> ModelCall:
-    """ one Bedrock reply; its model id picks the price, so an unpriced model fails"""
+    """ turns one Bedrock reply into a model call; its model id picks the price, so an unpriced model fails"""
 
     usage = reply.usage_metadata or {}
     meta = reply.response_metadata
