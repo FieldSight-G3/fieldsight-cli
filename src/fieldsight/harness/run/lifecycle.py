@@ -33,7 +33,8 @@ def run_turn(raw: dict, *, workflow: Workflow, answerer: Answerer, cracked: dict
     # only what a stage actually produced; an absent signal is recorded as unevaluated, never as clear
     signals: dict = {"prompt_attack_detected": turn["prompt_attack_detected"]}
     workers: list[str] | None = None
-
+    result = None
+    
     if incident:
         key = UUID(incident.incident_id)
         usage = start_turn(usage, cid) if usage else SessionUsage(session_id=str(key), incident_id=key, turn=TurnUsage(turn_id=cid))
@@ -65,5 +66,5 @@ def run_turn(raw: dict, *, workflow: Workflow, answerer: Answerer, cracked: dict
         decision = evaluate_escalation(incident, results, signals=EscalationSignals(**signals), policy=policy)
 
     run_id = save_run(correlation_id, command, incident, results=results, decision=decision,
-                      rule_invocations=invocations, workers=workers)
+                      rule_invocations=invocations, workers=workers, workflow=result)
     return TurnRun(run_id=run_id, correlation_id=correlation_id, command=command, escalation=decision, usage=usage, **run)

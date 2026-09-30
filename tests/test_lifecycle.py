@@ -53,7 +53,7 @@ def test_ready_incident_runs_the_workflow_and_records_the_run():
     assert dispatched == [str(incident_id)]
     saved = RunRecordRepository().get(run.run_id)
     assert saved is not None and saved.command == "analyze" and saved.incident_id == incident_id
-    assert saved.workers_dispatched == {"items": ["recordability"]}
+    assert saved.workers_dispatched == {"items": ["recordability"], "plans": []}
     assert saved.rule_invocations is not None
     assert {"R5", "R1"} <= {item["decision"]["rule_id"] for item in saved.rule_invocations["items"]}
     stored = IncidentRepository().get(incident_id)

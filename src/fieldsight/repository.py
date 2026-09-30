@@ -67,7 +67,9 @@ class IncidentRepository(_Repository):
     def get(self, incident_id: UUID) -> IncidentRecord | None:
         return self._get("incident_id", incident_id, IncidentRecord)
 
-    def save_analysis(self, incident_id: UUID, correlation_id: UUID, outcome: dict[str, Any] | None, deciding_rule: str | None, rule_invocations: list[dict[str, Any]], escalation_triggers: dict[str, Any] | None, *, requires_review: bool, command: str = "analyze", workers_dispatched: dict[str, Any] | None = None) -> UUID:
+    def save_analysis(self, incident_id: UUID, correlation_id: UUID, outcome: dict[str, Any] | None, deciding_rule: str | None, rule_invocations: list[dict[str, Any]], escalation_triggers: dict[str, Any] | None, *, requires_review: bool, command: str = "analyze", workers_dispatched: dict[str, Any] | None = None,
+                      tool_invocations: dict[str, Any] | None = None, model_calls: dict[str, Any] | None = None,
+                      reviewer_verdicts: dict[str, Any] | None = None, review: dict[str, Any] | None = None) -> UUID:
         """One turn's writes in one transaction; outcome is None for a turn that must not overwrite it, like ask."""
         metadata = MetaData()
         run_records = Table("run_records", metadata, autoload_with=self.engine)
@@ -90,7 +92,10 @@ class IncidentRepository(_Repository):
                     command=command,
                     workers_dispatched=workers_dispatched,
                     rule_invocations={"items": rule_invocations},
-                    escalation_triggers=escalation_triggers
+                    escalation_triggers=escalation_triggers,
+                    tool_invocations=tool_invocations,
+                    model_calls=model_calls,
+                    reviewer_verdicts=reviewer_verdicts,
                 )
                 .returning(run_records.c.run_id)
             ).scalar_one()
@@ -98,7 +103,8 @@ class IncidentRepository(_Repository):
                 connection.execute(
                     insert(review_queue).values(
                         incident_id=incident_id,
-                        triggers=escalation_triggers
+                        triggers=escalation_triggers,
+                        **(review or {}),
                     )
                 )
         return run_id
