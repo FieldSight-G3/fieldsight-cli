@@ -127,7 +127,7 @@ register_configure_hook(_active, inheritable=True)
 def metered(usage: SessionUsage, limits: BoundsConfig, pricing: PricingConfig | None = None) -> Iterator[TurnMeter]:
     """ meter every model call made inside the block against this session's budget """
 
-    meter = TurnMeter(usage, limits, pricing or PricingConfig.from_environment())
+    meter = TurnMeter(usage, limits, pricing or PricingConfig.from_settings())
     token = _active.set(meter)
     try:
         yield meter

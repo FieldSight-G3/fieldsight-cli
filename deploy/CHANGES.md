@@ -4,6 +4,13 @@ Changes in the code that affect a deployed piece: the ECS tool API, the AgentCor
 
 The ECS task definition (`vars.AWS_TASK_DEF_ARN`) and the AgentCore Runtime's environment live in AWS, not in this repo: `deploy.yml` only swaps their image, and `script/update_agent_runtime.py` sends every other Runtime setting back unchanged. So an environment variable they need has to be added in AWS.
 
+## 2026-09-30: one price source for the turn meter and the run record
+
+The turn meter priced model calls from its own table (DeepSeek and Titan, plus `FIELDSIGHT_PRICING_JSON`), which had no price for the configured Nova models, so every metered model call failed with `UnpricedModel`. It now uses the same `FIELDSIGHT_REASONING_PRICE_*` and `FIELDSIGHT_FAST_PRICE_*` settings the run record uses.
+
+- **Affects:** both images: `submit`, `analyze` and `ask` could make no model call before this.
+- **Do:** nothing new. The four price settings (entry below) are the only prices read. `FIELDSIGHT_PRICING_JSON` is no longer read; remove it if it was set.
+
 ## 2026-09-30: `incidents.photo_verdicts` column (migration `c5e7a9b1d3f5`)
 
 `submit` now judges each photograph against the narrative with the reasoning-tier model (Nova Pro accepts images through Converse) and stores the verdicts; `analyze` reads them for the photo-contradiction escalation trigger.

@@ -7,12 +7,13 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from fieldsight.config import ModelPrice
 from fieldsight.graph import trace
+from fieldsight.harness.metering.pricing import PricingConfig
 
 
 @pytest.fixture(autouse=True)
 def priced(monkeypatch):
     # a known price, so the cost below doesn't depend on whatever .env holds
-    monkeypatch.setitem(trace.PRICES, "test-model", ModelPrice(input_per_mtok=Decimal(3), output_per_mtok=Decimal(15)))
+    monkeypatch.setattr(trace, "PRICING", PricingConfig(prices={"test-model": ModelPrice(input_per_mtok=Decimal(3), output_per_mtok=Decimal(15))}))
 
 
 def reply(tool_calls=(), model="test-model"):

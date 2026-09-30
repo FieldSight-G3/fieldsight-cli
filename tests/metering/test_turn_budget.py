@@ -10,7 +10,9 @@ from langchain_aws import ChatBedrockConverse
 from langchain_core.messages import HumanMessage
 from sqlalchemy import MetaData, Table, delete, insert
 
+from fieldsight.config import ModelPrice
 from fieldsight.harness.bounds import BoundsConfig
+from fieldsight.harness.metering.pricing import PricingConfig
 from fieldsight.harness.run.wiring import turn
 from fieldsight.repository import (
     GatewayReadRepository,
@@ -18,6 +20,9 @@ from fieldsight.repository import (
     RunRecordRepository,
 )
 from fieldsight.types.run import WorkflowResult
+
+# the stand-in model and its price; the dollar amounts below are this price at the fake token counts
+PRICING = PricingConfig(prices={"deepseek.v3.2": ModelPrice(input_per_mtok=Decimal("0.62"), output_per_mtok=Decimal("1.85"))})
 
 
 def normalized_fields() -> dict[str, Any]:
@@ -79,7 +84,7 @@ def test_the_turns_model_spend_is_carried_in_its_session_usage(granted):
     bedrock = FakeBedrock()
 
     run = turn({"command": "analyze", "incident_id": str(incident_id)}, analyst_id=analyst,
-               workflow=graph_calling_the_model(bedrock, calls=2), answerer=no_answer, limits=BoundsConfig())
+               workflow=graph_calling_the_model(bedrock, calls=2), answerer=no_answer, pricing=PRICING, limits=BoundsConfig())
 
     assert bedrock.calls == 2
     assert run.usage is not None and run.usage.cost_usd == Decimal("0.01040")
@@ -93,7 +98,7 @@ def test_a_turn_stopped_by_the_ceiling_is_recorded_and_names_it(granted):
     limits = BoundsConfig(session_cost_ceiling_usd=Decimal("0.006"))
 
     run = turn({"command": "analyze", "incident_id": str(incident_id)}, analyst_id=analyst,
-               workflow=graph_calling_the_model(bedrock, calls=3), answerer=no_answer, limits=limits)
+               workflow=graph_calling_the_model(bedrock, calls=3), answerer=no_answer, pricing=PRICING, limits=limits)
 
     assert bedrock.calls == 1
     assert run.refusal is not None and run.refusal["reason"] == "bound_reached"

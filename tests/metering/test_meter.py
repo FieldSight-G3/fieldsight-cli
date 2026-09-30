@@ -9,12 +9,15 @@ from langchain_aws import ChatBedrockConverse
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableLambda, RunnableParallel
 
+from fieldsight.config import ModelPrice
 from fieldsight.harness.bounds import BoundsConfig, SessionUsage, TurnUsage
 from fieldsight.harness.bounds_runtime import BoundStopped
 from fieldsight.harness.metering.meter import metered
 from fieldsight.harness.metering.pricing import PricingConfig
 
 START = datetime(2026, 9, 29, 12, tzinfo=UTC)
+# the stand-in model and its price; the dollar amounts below are this price at the fake token counts
+PRICING = PricingConfig(prices={"deepseek.v3.2": ModelPrice(input_per_mtok=Decimal("0.62"), output_per_mtok=Decimal("1.85"))})
 
 
 class FakeBedrock:
@@ -44,7 +47,7 @@ def session(spent: str = "0", started: datetime | None = None) -> SessionUsage:
 def test_each_call_is_priced_from_the_tokens_bedrock_reports():
     bedrock = FakeBedrock(6000, 800)
 
-    with metered(session(), BoundsConfig(), PricingConfig()) as meter:
+    with metered(session(), BoundsConfig(), PRICING) as meter:
         model(bedrock).invoke([HumanMessage("Is this recordable?")])
         model(bedrock).invoke([HumanMessage("And reportable?")])
 
@@ -57,7 +60,7 @@ def test_each_call_is_priced_from_the_tokens_bedrock_reports():
 def test_a_call_the_session_cannot_afford_never_starts():
     bedrock = FakeBedrock()
     # $4.999 already spent of a $5.00 ceiling: the next call's worst case (prompt + 1000 output tokens) doesn't fit
-    with metered(session(spent="4.999"), BoundsConfig(), PricingConfig()) as meter, pytest.raises(BoundStopped) as stopped:
+    with metered(session(spent="4.999"), BoundsConfig(), PRICING) as meter, pytest.raises(BoundStopped) as stopped:
         model(bedrock, max_tokens=1000).invoke([HumanMessage("x" * 4000)])
 
     assert bedrock.calls == 0
@@ -70,7 +73,7 @@ def test_spending_accumulates_until_the_next_call_is_refused():
     # after two calls $0.0104 is spent; a third call's worst case (~$0.0017) would pass $0.012
     limits = BoundsConfig(session_cost_ceiling_usd=Decimal("0.012"))
 
-    with metered(session(), limits, PricingConfig()) as meter:
+    with metered(session(), limits, PRICING) as meter:
         model(bedrock, max_tokens=900).invoke([HumanMessage("first")])
         model(bedrock, max_tokens=900).invoke([HumanMessage("second")])
         with pytest.raises(BoundStopped):
@@ -84,7 +87,7 @@ def test_a_spent_turn_clock_refuses_the_next_call():
     bedrock = FakeBedrock()
     limits = BoundsConfig(max_turn_wall_clock_seconds=120)
 
-    with metered(session(started=START), limits, PricingConfig()) as meter, pytest.raises(BoundStopped) as stopped:
+    with metered(session(started=START), limits, PRICING) as meter, pytest.raises(BoundStopped) as stopped:
         meter.clock = lambda: START + timedelta(seconds=121)
         model(bedrock).invoke([HumanMessage("late")])
 
@@ -96,7 +99,7 @@ def test_calls_nested_in_chains_and_parallel_branches_are_metered():
     ask = RunnableLambda(lambda question: model(bedrock).invoke([HumanMessage(question)]))
     fan_out = RunnableParallel(recordability=ask, reportability=ask)
 
-    with metered(session(), BoundsConfig(), PricingConfig()) as meter:
+    with metered(session(), BoundsConfig(), PRICING) as meter:
         fan_out.invoke("the incident")
 
     assert bedrock.calls == 2 and len(meter.calls) == 2
@@ -104,7 +107,7 @@ def test_calls_nested_in_chains_and_parallel_branches_are_metered():
 
 def test_nothing_is_metered_outside_a_turn():
     bedrock = FakeBedrock()
-    with metered(session(), BoundsConfig(), PricingConfig()) as meter:
+    with metered(session(), BoundsConfig(), PRICING) as meter:
         pass
 
     model(bedrock).invoke([HumanMessage("after the turn")])

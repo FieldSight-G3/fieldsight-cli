@@ -4,11 +4,12 @@ import hashlib
 
 from langchain_core.messages import AIMessage, AnyMessage, ToolMessage
 
-from ..config import settings
 from ..harness.idempotency import canonicalize
+from ..harness.metering.pricing import PricingConfig
 from ..schemas.run_records import ModelCall, ToolInvocation
 
-PRICES = {settings.bedrock_model_id: settings.reasoning_price, settings.bedrock_fast_model_id: settings.fast_price}
+# the same prices the turn meter charges, so the run record and the budget agree
+PRICING = PricingConfig.from_settings()
 
 
 def model_call(agent: str, reply: AIMessage) -> ModelCall:
@@ -16,13 +17,12 @@ def model_call(agent: str, reply: AIMessage) -> ModelCall:
 
     usage = reply.usage_metadata or {}
     meta = reply.response_metadata
-    price = PRICES[meta["model_name"]]
     tokens_in, tokens_out = usage.get("input_tokens", 0), usage.get("output_tokens", 0)
 
     return ModelCall(
         agent=agent, model_id=meta["model_name"], input_tokens=tokens_in, output_tokens=tokens_out,
         latency_ms=sum(meta.get("metrics", {}).get("latencyMs", [])),     # langchain-aws wraps it in a list
-        cost_usd=(tokens_in * price.input_per_mtok + tokens_out * price.output_per_mtok) / 1_000_000,
+        cost_usd=PRICING.cost(meta["model_name"], tokens_in, tokens_out),
     )
 
 def record(agent: str, messages: list[AnyMessage]) -> tuple[list[ToolInvocation], list[ModelCall]]:
