@@ -8,8 +8,8 @@ import pytest
 pytest.importorskip("mcp", reason="the Gateway client dependencies are installed only in the agent Runtime image")
 httpx = pytest.importorskip("httpx")
 
-from fieldsight.interfaces import gateway_client
-from fieldsight.interfaces.gateway_client import (
+from fieldsight.aws import gateway_client
+from fieldsight.aws.gateway_client import (
     GATEWAY_TOOL_NAMES,
     UNREACHABLE,
     available_gateway_tools,

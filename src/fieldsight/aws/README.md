@@ -32,6 +32,7 @@ errors.py   @raises(FieldSightError subclass, action): a boto failure becomes a 
 | `s3.py` | Reads and writes on the project bucket. |
 | `knowledge_base.py` | Writes a chunk and its `.metadata.json` sidecar to the KB's S3 data source, and starts and reads KB sync jobs. |
 | `errors.py` | The `@raises` decorator. |
+| `gateway_client.py` | The SigV4-signed MCP client to the AgentCore Gateway: `gateway_tools`, and `available_gateway_tools`, which degrades to native tools when the Gateway or the ECS API is unreachable. |
 
 ## Decisions
 

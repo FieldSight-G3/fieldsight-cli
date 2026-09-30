@@ -4,39 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
-
-from fieldsight.errors import FailureCode
 from fieldsight.schemas.incidents import SimilarCandidate
-
-
-class GetExtractionInput(BaseModel):
-    """Read the extraction for the authenticated caller's bound session."""
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class SimilarIncidentsInput(BaseModel):
-    """Choose the number of candidates, never the subject incident."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    limit: int = Field(default=3, ge=1, le=5, description="Maximum number of similar incidents")
-
-
-class ToolFailure(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    code: FailureCode
-    message: str
-
-
-class ToolResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    ok: bool
-    result: dict[str, Any] | None = None
-    error: ToolFailure | None = None
+from fieldsight.schemas.tools import (
+    GetExtractionInput,
+    SimilarIncidentsInput,
+    ToolResponse,
+)
 
 
 class ReadStore(Protocol):

@@ -8,8 +8,8 @@ from typing import Any
 from uuid import UUID
 
 from ..errors import ToolDenied
-from ..interfaces.tool_service import ToolFailure, ToolResponse
 from ..repository import GatewayReadRepository
+from ..schemas.tools import ToolFailure, ToolResponse
 
 
 def require_grant(analyst_id: UUID | str, incident_id: UUID | str, *, repository: GatewayReadRepository | None = None) -> dict[str, Any]:

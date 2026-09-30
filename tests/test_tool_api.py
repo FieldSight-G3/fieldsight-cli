@@ -9,8 +9,8 @@ from flask import request
 
 from fieldsight.errors import ToolDenied
 from fieldsight.interfaces.tool_api import create_app
-from fieldsight.interfaces.tool_service import ToolService
 from fieldsight.schemas.incidents import SimilarCandidate
+from fieldsight.tools.service import ToolService
 
 
 class FakeStore:

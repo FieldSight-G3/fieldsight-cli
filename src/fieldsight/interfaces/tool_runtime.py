@@ -3,13 +3,13 @@
 from flask import Flask
 
 from fieldsight.config import settings
-from fieldsight.interfaces.iam_caller_proof import (
-    caller_resolver,
-    enrolled_analyst_roles,
-)
 from fieldsight.interfaces.tool_api import create_app
 from fieldsight.logging_context import configure_logging
 from fieldsight.repository import AnalystRepository
+from fieldsight.security.iam_caller_proof import (
+    caller_resolver,
+    enrolled_analyst_roles,
+)
 
 
 def create_production_app() -> Flask:

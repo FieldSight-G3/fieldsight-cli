@@ -11,7 +11,7 @@ from botocore.credentials import Credentials
 from flask import Flask
 
 from fieldsight.errors import ToolDenied
-from fieldsight.interfaces.iam_caller_proof import (
+from fieldsight.security.iam_caller_proof import (
     caller_resolver,
     issue_proof,
     verify_proof,
@@ -168,7 +168,7 @@ class CallerProofTests(unittest.TestCase):
             "X-Fieldsight-Email": "forged@example.invalid",
         }
         with app.test_request_context(headers=headers), patch(
-            "fieldsight.interfaces.iam_caller_proof.verify_proof", return_value=ROLE_ARN
+            "fieldsight.security.iam_caller_proof.verify_proof", return_value=ROLE_ARN
         ):
             self.assertEqual(resolver(), "logan@example.invalid")
 

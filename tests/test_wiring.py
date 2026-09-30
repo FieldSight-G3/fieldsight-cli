@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import MetaData, Table, delete, insert
 
 from fieldsight.errors import ToolDenied
-from fieldsight.interfaces.wiring import (
+from fieldsight.harness.run.wiring import (
     graph_workflow,
     rag_answerer,
     turn,

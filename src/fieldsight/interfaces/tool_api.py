@@ -11,9 +11,10 @@ from flask import Flask, g, jsonify, request
 from pydantic import ValidationError
 
 from fieldsight.errors import FailureCode, ToolDenied
-from fieldsight.interfaces.tool_service import ToolFailure, ToolResponse, ToolService
 from fieldsight.logging_context import correlation_id, valid_correlation_id
 from fieldsight.repository import database_ready
+from fieldsight.schemas.tools import ToolFailure, ToolResponse
+from fieldsight.tools.service import ToolService
 
 logger = logging.getLogger(__name__)
 CORRELATION_HEADER = "X-Correlation-Id"

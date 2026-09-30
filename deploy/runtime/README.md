@@ -1,10 +1,10 @@
 # FieldSight AgentCore Runtime
 
-The second image (requirements §15): the LangGraph workflow served by `fieldsight.interfaces.agent_runtime` on `:8080` (`POST /invocations`, `GET /ping`). Each invocation is one turn through `interfaces/wiring.turn()` — the same composition the CLI uses — as the analyst named by the caller proof.
+The second image (requirements §15): the LangGraph workflow served by `fieldsight.interfaces.agent_runtime` on `:8080` (`POST /invocations`, `GET /ping`). Each invocation is one turn through `harness/run/wiring.turn()` — the same composition the CLI uses — as the analyst named by the caller proof.
 
 ## Invoking it
 
-Send `{"command": "analyze" | "ask", "incident_id": "...", "question": "...", "caller_proof": "..."}` with a runtime session id. `caller_proof` is the 60-second STS proof from `iam_caller_proof.issue_proof(session_id, region)`, signed with the **analyst's own** assumed role and bound to that session id. The runtime verifies it against regional STS, requires an enrolled analyst role (`FIELDSIGHT_ANALYST_ROLE_ARNS`), checks the analyst's establishment grant, then runs the turn. Every denial is a structured `{"ok": false, "error": {"code": ...}}`. The proof is never logged or returned.
+Send `{"command": "analyze" | "ask", "incident_id": "...", "question": "...", "caller_proof": "..."}` with a runtime session id. `caller_proof` is the 60-second STS proof from `security/iam_caller_proof.issue_proof(session_id, region)`, signed with the **analyst's own** assumed role and bound to that session id. The runtime verifies it against regional STS, requires an enrolled analyst role (`FIELDSIGHT_ANALYST_ROLE_ARNS`), checks the analyst's establishment grant, then runs the turn. Every denial is a structured `{"ok": false, "error": {"code": ...}}`. The proof is never logged or returned.
 
 ## One-time AWS setup
 

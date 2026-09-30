@@ -7,8 +7,8 @@ from uuid import UUID
 from pydantic import ValidationError
 
 from fieldsight.errors import ToolDenied
-from fieldsight.interfaces.tool_service import ToolService
 from fieldsight.schemas.incidents import SimilarCandidate
+from fieldsight.tools.service import ToolService
 
 CASE_ID = UUID("00000000-0000-0000-0000-000000000123")
 

@@ -12,7 +12,7 @@ from langchain_core.messages import HumanMessage
 from sqlalchemy import MetaData, Table, delete, insert
 
 from fieldsight.harness.bounds import BoundsConfig
-from fieldsight.interfaces.wiring import turn
+from fieldsight.harness.run.wiring import turn
 from fieldsight.repository import (
     GatewayReadRepository,
     IncidentRepository,

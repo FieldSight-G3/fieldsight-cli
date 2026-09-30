@@ -1,4 +1,4 @@
-""" one assembled turn: the Coordinator's graph and the retrieval chain behind run_turn
+""" one assembled turn: the Coordinator's graph and the retrieval chain behind run_turn, and a packet's submit
 
     The CLI and the AgentCore Runtime both call turn(), so there is one composition of the system, not two.
     The graph's final state becomes a WorkflowResult here, and stage 4 (guard_dossier) runs on that dossier
@@ -8,24 +8,28 @@
 import logging
 from collections.abc import Callable
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-from ..config import settings
-from ..graph.graph import run_graph
-from ..harness.bounds import BoundsConfig, SessionUsage, TurnUsage
-from ..harness.bounds_runtime import BoundStopped
-from ..harness.guardrails.common import refuse
-from ..harness.guardrails.dossier_guard import guard_dossier
-from ..harness.metering.meter import metered
-from ..harness.metering.pricing import PricingConfig
-from ..harness.run.answer import Answerer
-from ..harness.run.lifecycle import run_turn
-from ..harness.run.workflow import Workflow
-from ..repository import IncidentRepository
-from ..schemas.incidents import NormalizedIncident
-from ..security.entitlement import require_grant
-from ..types.run import TurnRun, WorkflowResult
+from ...config import settings
+from ...graph.graph import run_graph
+from ...ingest.submit import ingest_packet, packet_artifacts
+from ...repository import IncidentRepository, RunRecordRepository
+from ...schemas.incidents import NormalizedIncident
+from ...security.entitlement import require_grant, submit_establishment
+from ...types.artifacts import SubmitResult
+from ...types.run import TurnRun, WorkflowResult
+from ..bounds import BoundsConfig, SessionUsage, TurnUsage
+from ..bounds_runtime import BoundStopped
+from ..guardrails.common import refuse
+from ..guardrails.dossier_guard import guard_dossier
+from ..guardrails.turn_check import check_turn
+from ..metering.meter import metered
+from ..metering.pricing import PricingConfig
+from .answer import Answerer
+from .lifecycle import run_turn
+from .workflow import Workflow
 
 logger = logging.getLogger(__name__)
 
@@ -87,7 +91,7 @@ def rag_answerer(chain: Any = None) -> Answerer:
 
     def answer(question: str, objections: list[str]) -> Any:
         if built[0] is None:
-            from ..retrieval.chain import build_rag_chain
+            from ...retrieval.chain import build_rag_chain
 
             built[0] = build_rag_chain()
         if objections:
@@ -131,3 +135,35 @@ def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = 
     if meter.stopped is not None and result.refusal is None:
         update["refusal"] = refuse("bound_reached", f"This session's {meter.stopped.reason_code} limit ({meter.stopped.limit}) is spent.")
     return result.model_copy(update=update) if update else result
+
+
+def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None = None,
+           pricing: PricingConfig | None = None) -> SubmitResult:
+    """ one packet in as the verified analyst, filed under their most recent grant and owned by them
+
+        Stage 1 runs before anything is uploaded; stage 2 screens every cracked string before redaction and the
+        model; the normalize call is metered like any other. Raises ToolDenied if the analyst holds no grant.
+    """
+
+    analyst = UUID(str(analyst_id))
+    establishment = submit_establishment(analyst)
+    correlation_id = uuid4()
+    supported, skipped = packet_artifacts(folder)
+    raw = {"command": "submit", "incident_id": folder.name,
+           "artifacts": [{"name": path.name, "size_bytes": path.stat().st_size} for path in supported]}
+    validated = check_turn(raw, incident=None, cracked={}, correlation_id=str(correlation_id))
+    if validated["refusal"]:
+        return SubmitResult(incident_id=None, establishment=establishment, report=None, withheld=[], photos=[],
+                            refusal=validated["refusal"])
+
+    def screen(cracked: dict[str, str]) -> dict[str, str]:
+        return check_turn(raw, incident=None, cracked=cracked, correlation_id=str(correlation_id))["texts"]
+
+    start = SessionUsage(session_id=str(analyst), incident_id=UUID(int=0), turn=TurnUsage(turn_id=str(correlation_id)))
+    with metered(start, limits or settings.bounds, pricing):
+        packet = ingest_packet(supported, skipped, screen=screen)
+    incident_id = IncidentRepository().create(establishment, packet["incident"].model_dump(mode="json", exclude={"incident_id"}),
+                                              packet["narrative"], owner_analyst_id=analyst)
+    RunRecordRepository().create(correlation_id, "submit", incident_id=incident_id)
+    return SubmitResult(incident_id=str(incident_id), establishment=establishment, report=packet["report"],
+                        withheld=packet["withheld"], photos=packet["photos"], refusal=None)

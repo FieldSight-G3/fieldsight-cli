@@ -45,6 +45,7 @@ Grouped by section 10's parts: guardrails, escalation, bounds, and the run that 
 | File | Contains |
 |---|---|
 | `run/lifecycle.py` | `run_turn`: one turn start to finish, the entry point every command calls. |
+| `run/wiring.py` | `turn`: one command as the verified analyst, with the grant check, metering, the Coordinator's graph (`graph_workflow`, `workflow_result`) and the RAG answerer (`rag_answerer`) composed around `run_turn`. The CLI and the AgentCore Runtime both call it. |
 | `run/incident.py` | `load_incident`: the stored record, or None for an unknown id so `check_turn` routes to the analyst. |
 | `run/workflow.py` | `run_workflow` and the `Workflow` type: the bounds check, then the Coordinator's graph. |
 | `run/answer.py` | `answer_question` and the `Answerer` type: a policy question answered from retrieval through `guard_answer`. |
