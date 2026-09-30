@@ -22,7 +22,8 @@ def cmd_analyze(args: argparse.Namespace, analyst_id: UUID) -> str:
 
 
 def cmd_dossier(args: argparse.Namespace, analyst_id: UUID) -> str:
-    return "fieldsight dossier isn't built yet"
+    run = wiring.latest_run(args.incident_id, analyst_id=analyst_id, commands=("analyze",))
+    return responses.dossier(run, args.incident_id)
 
 
 def cmd_ask(args: argparse.Namespace, analyst_id: UUID) -> str:
@@ -31,11 +32,12 @@ def cmd_ask(args: argparse.Namespace, analyst_id: UUID) -> str:
 
 
 def cmd_sources(args: argparse.Namespace, analyst_id: UUID) -> str:
-    return "fieldsight sources isn't built yet"
+    run = wiring.latest_run(args.incident_id, analyst_id=analyst_id, commands=("analyze",))
+    return responses.sources(run, args.incident_id, args.ref)
 
 
 def cmd_trace(args: argparse.Namespace, analyst_id: UUID) -> str:
-    return "fieldsight trace isn't built yet"
+    return responses.trace(wiring.latest_run(args.incident_id, analyst_id=analyst_id), args.incident_id)
 
 
 def cmd_queue(args: argparse.Namespace, analyst_id: UUID) -> str:

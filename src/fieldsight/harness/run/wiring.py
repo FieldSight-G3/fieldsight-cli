@@ -115,6 +115,15 @@ def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = 
     return result.model_copy(update=update) if update else result
 
 
+def latest_run(incident_id: UUID | str, *, analyst_id: UUID | str,
+               commands: tuple[str, ...] = ("analyze", "ask")) -> dict[str, Any] | None:
+    """ the incident's latest run record of those commands, for trace, dossier and sources;
+        raises ToolDenied unless the analyst holds a grant """
+
+    require_grant(analyst_id, incident_id)
+    return RunRecordRepository().latest(UUID(str(incident_id)), commands)
+
+
 def review_queue(analyst_id: UUID | str) -> list[ReviewQueueRecord]:
     """ the pending reviews over establishments the analyst holds a grant for, oldest first """
 

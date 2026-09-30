@@ -19,8 +19,12 @@ def _items(records: list) -> dict:
 def save_run(correlation_id: UUID, command: str, incident: NormalizedIncident | None, *,
              results: IncidentRuleResults | None, decision: EscalationDecision | None,
              rule_invocations: list[RuleInvocation], workers: list[str] | None,
-             workflow: WorkflowResult | None = None, review_snapshot: ReviewSnapshot | None = None) -> UUID:
-    """ one transaction when there's an incident; without one the row has no incident id, since it's a foreign key """
+             workflow: WorkflowResult | None = None, review_snapshot: ReviewSnapshot | None = None,
+             dossier: dict | None = None) -> UUID:
+    """ one transaction when there's an incident; without one the row has no incident id, since it's a foreign key
+
+        dossier is the one the turn showed (blocked legs withheld), kept so dossier and sources can read it later
+    """
 
     recorded = [invocation.model_dump(mode="json") for invocation in rule_invocations]
     triggers = decision.model_dump(mode="json") if decision else None
@@ -31,6 +35,8 @@ def save_run(correlation_id: UUID, command: str, incident: NormalizedIncident | 
         columns = {"tool_invocations": _items(workflow.tool_invocations),
                    "model_calls": _items(workflow.model_calls),
                    "reviewer_verdicts": _items(workflow.reviewer_verdicts)}
+    if dossier is not None:
+        columns["dossier"] = dossier
     if incident is None:
         return RunRecordRepository().create(correlation_id, command, workers_dispatched=dispatched,
                                             rule_invocations={"items": recorded}, escalation_triggers=triggers)

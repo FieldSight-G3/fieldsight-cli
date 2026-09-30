@@ -71,7 +71,7 @@ class IncidentRepository(_Repository):
 
     def save_analysis(self, incident_id: UUID, correlation_id: UUID, outcome: dict[str, Any] | None, deciding_rule: str | None, rule_invocations: list[dict[str, Any]], escalation_triggers: dict[str, Any] | None, *, requires_review: bool, command: str = "analyze", workers_dispatched: dict[str, Any] | None = None,
                       tool_invocations: dict[str, Any] | None = None, model_calls: dict[str, Any] | None = None,
-                      reviewer_verdicts: dict[str, Any] | None = None) -> UUID:
+                      reviewer_verdicts: dict[str, Any] | None = None, dossier: dict[str, Any] | None = None) -> UUID:
         """One turn's writes in one transaction; outcome is None for a turn that must not overwrite it, like ask."""
         metadata = MetaData()
         run_records = Table("run_records", metadata, autoload_with=self.engine)
@@ -98,6 +98,7 @@ class IncidentRepository(_Repository):
                     tool_invocations=tool_invocations,
                     model_calls=model_calls,
                     reviewer_verdicts=reviewer_verdicts,
+                    dossier=dossier,
                 )
                 .returning(run_records.c.run_id)
             ).scalar_one()
@@ -110,7 +111,7 @@ class IncidentRepository(_Repository):
                 )
         return run_id
 
-    def save_analysis_for_review(self, incident_id: UUID, correlation_id: UUID, outcome: dict[str, Any] | None, deciding_rule: str | None, rule_invocations: list[dict[str, Any]], escalation_triggers: dict[str, Any], *, submitting_analyst_id: UUID, dossier_snapshot: dict[str, Any], citations: dict[str, CitationReference], command: str = "analyze", workers_dispatched: dict[str, Any] | None = None, tool_invocations: dict[str, Any] | None = None, model_calls: dict[str, Any] | None = None, reviewer_verdicts: dict[str, Any] | None = None) -> UUID:
+    def save_analysis_for_review(self, incident_id: UUID, correlation_id: UUID, outcome: dict[str, Any] | None, deciding_rule: str | None, rule_invocations: list[dict[str, Any]], escalation_triggers: dict[str, Any], *, submitting_analyst_id: UUID, dossier_snapshot: dict[str, Any], citations: dict[str, CitationReference], command: str = "analyze", workers_dispatched: dict[str, Any] | None = None, tool_invocations: dict[str, Any] | None = None, model_calls: dict[str, Any] | None = None, reviewer_verdicts: dict[str, Any] | None = None, dossier: dict[str, Any] | None = None) -> UUID:
         """Like save_analysis with requires_review, but queues an immutable dossier snapshot for get_pending; outcome is None for a turn that must not overwrite it, like ask."""
         metadata = MetaData()
         run_records = Table("run_records", metadata, autoload_with=self.engine)
@@ -139,6 +140,7 @@ class IncidentRepository(_Repository):
                     tool_invocations=tool_invocations,
                     model_calls=model_calls,
                     reviewer_verdicts=reviewer_verdicts,
+                    dossier=dossier,
                 )
                 .returning(run_records.c.run_id)
             ).scalar_one()
@@ -197,6 +199,18 @@ class RunRecordRepository(_Repository):
 
     def get(self, run_id: UUID) -> RunRecordRecord | None:
         return self._get("run_id", run_id, RunRecordRecord)
+
+    def latest(self, incident_id: UUID, commands: tuple[str, ...] = ("analyze", "ask")) -> dict[str, Any] | None:
+        """The incident's most recent run record of those commands, with every column the table has, or None."""
+        statement = (
+            select(self.table)
+            .where(self.table.c.incident_id == incident_id, self.table.c.command.in_(commands))
+            .order_by(self.table.c.created_at.desc())
+            .limit(1)
+        )
+        with self.engine.connect() as connection:
+            row = connection.execute(statement).mappings().one_or_none()
+        return dict(row) if row is not None else None
 
     def record_correction(
         self,
