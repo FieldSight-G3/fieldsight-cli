@@ -5,11 +5,13 @@ from uuid import uuid4
 import pytest
 from sqlalchemy import MetaData, Table, delete, insert
 
+from fieldsight.aws.clients import EMBEDDING_DIMENSIONS
 from fieldsight.errors import ToolDenied
 from fieldsight.repository import GatewayReadRepository, SessionRepository
 from fieldsight.tool_store import GatewayReadStore
 
-DIMENSIONS = 1536
+# the column's size is the embedding model's, so the test builds vectors the model would
+DIMENSIONS = EMBEDDING_DIMENSIONS
 
 
 def _vector(*leading: float) -> list[float]:

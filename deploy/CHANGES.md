@@ -4,6 +4,13 @@ Changes in the code that affect a deployed piece: the ECS tool API, the AgentCor
 
 The ECS task definition (`vars.AWS_TASK_DEF_ARN`) and the AgentCore Runtime's environment live in AWS, not in this repo: `deploy.yml` only swaps their image, and `script/update_agent_runtime.py` sends every other Runtime setting back unchanged. So an environment variable they need has to be added in AWS.
 
+## 2026-09-30: `incidents.embedding` is 1024 dimensions (migration `b1d4f6a8c2e0`)
+
+The column was `vector(1536)`, but Titan Text Embeddings v2 is configured for 1024 (`aws/clients.EMBEDDING_DIMENSIONS`), and 1536 isn't a size it produces.
+
+- **Affects:** the database. The migration clears any existing embeddings, because a vector can't be cast to another size. Nothing writes them yet (seed and `submit` leave them empty), and they're rebuilt from the narrative.
+- **Do:** `alembic upgrade head` against RDS; the same run covers the migrations below.
+
 ## 2026-09-30: service entry points moved out of `interfaces/`
 
 `interfaces/` now holds only what an analyst uses: the CLI (`cli.py`, `requests.py`, `responses.py`). The processes other hosts call moved to `services/`:
