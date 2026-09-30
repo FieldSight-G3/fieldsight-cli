@@ -82,4 +82,4 @@ Paths are relative to `src/fieldsight/ingest/`. The shapes (`StoredArtifact`, `E
 
 - Photos over Bedrock's 3.75 MB image limit aren't downscaled: they're skipped and reported as too large, with no verdict.
 - The narrative embedding for similar-incident search: `submit` doesn't write `incidents.embedding` yet (1024 dimensions, matching Titan v2's `EMBEDDING_DIMENSIONS`), so `find_similar_incidents` has nothing to compare a new incident against.
-- `script/ingest_corpus_local.py` is broken: it imports `CorpusChunkRepository`, which `repository.py` doesn't have, and nothing reads the local pgvector table.
+- `script/ingest_corpus_local.py` is broken: it imports `CorpusChunkRepository`, which the `repository` package doesn't have, and nothing reads the local pgvector table.
