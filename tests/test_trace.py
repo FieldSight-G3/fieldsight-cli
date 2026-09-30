@@ -7,7 +7,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from fieldsight.config import ModelPrice
 from fieldsight.graph import trace
-from fieldsight.harness.metering.pricing import PricingConfig
+from fieldsight.harness.metering.pricing import PricingConfig, UnpricedModel
 
 
 @pytest.fixture(autouse=True)
@@ -45,5 +45,5 @@ def test_prices_tokens_and_reads_latency():
 
 
 def test_unpriced_model_fails_loudly():
-    with pytest.raises(KeyError):
+    with pytest.raises(UnpricedModel):
         trace.record("coordinator", [reply(model="unpriced")])
