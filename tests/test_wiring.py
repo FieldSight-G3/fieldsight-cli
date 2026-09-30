@@ -1,6 +1,7 @@
-"""The assembled turn: the graph's final state read back for the harness, with stage 4 applied, as the verified analyst."""
+"""The assembled turn: the graph's WorkflowResult as the harness runs it, as the verified analyst."""
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
@@ -9,18 +10,16 @@ import pytest
 from sqlalchemy import MetaData, Table, delete, insert
 
 from fieldsight.errors import ToolDenied
-from fieldsight.harness.run.wiring import (
-    graph_workflow,
-    rag_answerer,
-    turn,
-    workflow_result,
-)
+from fieldsight.harness.bounds import BoundDecision
+from fieldsight.harness.bounds_runtime import BoundStopped
+from fieldsight.harness.run.wiring import harness_workflow, rag_answerer, turn
 from fieldsight.repository import (
     GatewayReadRepository,
     IncidentRepository,
     RunRecordRepository,
 )
 from fieldsight.schemas.incidents import NormalizedIncident
+from fieldsight.types.run import WorkflowResult
 
 
 def normalized_fields() -> dict[str, Any]:
@@ -44,52 +43,33 @@ READY = NormalizedIncident(
     days_away=3, restricted_days=0, job_transfer=False, loss_of_consciousness=False, significant_diagnosis=False,
     confidences={"days_away": 0.95})
 HIT = {"chunk_id": "CFR-1904-a", "doc_id": "CFR-1904", "score": 0.82, "text": "1904.7(b)(3)"}
+PLANS = [{"trigger": "initial", "dispatches": [{"worker": "recordability", "reason": "days away"}],
+          "energized_equipment_quote": None, "ungrounded": []}]
 
 
-def leg(column: str) -> dict:
+def leg() -> dict:
     return {"task": "t", "decisions": {}, "cited": {"CFR-1904-a": HIT},
-            "proposal": {"outcome": "recordable", "log_column": column, "day_count": 3, "missing_field": None,
+            "proposal": {"outcome": "recordable", "log_column": "H", "day_count": 3, "missing_field": None,
                          "rationale": "Days away [1].", "chunk_ids": ["CFR-1904-a"]}}
 
 
-def state(dossier: dict, reviews: list) -> dict:
-    return {"dossier": dossier, "reviews": reviews, "review_iterations": len(reviews),
-            "plans": [{"trigger": "initial", "dispatches": [{"worker": "recordability", "reason": "days away"}]},
-                      {"trigger": "reviewer_rejected", "dispatches": [{"worker": "recordability", "reason": "wrong column"}]}]}
+def test_the_cited_hits_scores_go_to_escalation():
+    result = harness_workflow(lambda *_: WorkflowResult(dossier={"recordability": leg()}))(READY, None, "c-1")
+
+    assert result.retrieval_scores == [0.82]
 
 
-def test_the_final_state_reads_back_with_stage_4_applied():
-    result = workflow_result(state({"recordability": leg("I")}, [SimpleNamespace(approved=False), {"approved": True}]), READY, "c-1")
+def test_no_cited_hits_leave_retrieval_unevaluated_not_failed():
+    result = harness_workflow(lambda *_: WorkflowResult(dossier={}))(READY, None, "c-1")
 
-    assert result.workers_dispatched == ["recordability"]
-    assert result.reviewer_approved is True and result.reviewer_iterations == 2
-    # the guard ran the rules itself and blocked the leg whose column no rule produced
-    assert result.blocked == {"recordability": ["log_column must be H"]}
-    assert result.rule_invocations and result.retrieval_scores == [0.82]
-    assert any(event["failure"] == "unattributed_threshold" for event in result.events)
+    assert result.retrieval_scores is None
 
 
-def test_no_reviews_and_no_hits_are_unevaluated_not_failed():
-    result = workflow_result({"dossier": {}}, READY, "c-1")
+def test_a_meter_refusal_ends_the_workflow_instead_of_raising():
+    def spent(*_):
+        raise BoundStopped(BoundDecision(allowed=False, reason_code="session_cost_usd", current=Decimal(6), limit=Decimal(5)))
 
-    assert result.reviewer_approved is None and result.retrieval_scores is None
-    assert result.blocked == {} and result.workers_dispatched == []
-
-
-def test_the_workflow_runs_the_graph_on_the_stored_narrative():
-    incident_id = IncidentRepository().create("Substation 7", normalized_fields(), narrative="Slipped on wet stairs.")
-    incident = NormalizedIncident.model_validate({**normalized_fields(), "incident_id": str(incident_id)})
-    analyst = uuid4()
-    calls = []
-
-    def fake_graph(analyst_id, incident, narrative):
-        calls.append((analyst_id, incident.incident_id, narrative))
-        return {"dossier": {}, "reviews": [SimpleNamespace(approved=True)], "review_iterations": 1}
-
-    result = graph_workflow(analyst, run=fake_graph)(incident, None, "c-1")
-
-    assert calls == [(analyst, str(incident_id), "Slipped on wet stairs.")]
-    assert result.reviewer_approved is True
+    assert harness_workflow(spent)(READY, None, "c-1") == WorkflowResult(dossier={})
 
 
 def test_objections_are_carried_into_the_regenerated_question():
@@ -125,15 +105,15 @@ def test_a_turn_runs_end_to_end_as_the_verified_analyst(granted):
     analyst, establishment = granted
     incident_id = IncidentRepository().create(establishment, normalized_fields())
 
-    def approved_graph(analyst_id, incident, narrative):
-        return {"dossier": {}, "reviews": [SimpleNamespace(approved=True)], "review_iterations": 1,
-                "plans": [{"trigger": "initial", "dispatches": [{"worker": "recordability", "reason": "days away"}]}]}
+    def approved(incident, question, correlation_id):
+        return WorkflowResult(dossier={}, workers_dispatched=["recordability"], reviewer_approved=True,
+                              reviewer_iterations=1, plans=PLANS)
 
-    run = turn({"command": "analyze", "incident_id": str(incident_id)}, analyst_id=analyst, run=approved_graph, answerer=no_answer)
+    run = turn({"command": "analyze", "incident_id": str(incident_id)}, analyst_id=analyst, workflow=approved, answerer=no_answer)
 
     saved = RunRecordRepository().get(run.run_id)
     assert saved is not None and saved.incident_id == incident_id
-    assert saved.workers_dispatched == {"items": ["recordability"]}
+    assert saved.workers_dispatched == {"items": ["recordability"], "plans": PLANS}
 
 
 def test_a_turn_without_a_grant_is_denied_before_anything_is_read_or_written(granted):
@@ -144,7 +124,7 @@ def test_a_turn_without_a_grant_is_denied_before_anything_is_read_or_written(gra
         raise AssertionError("the graph must not run for an unentitled analyst")
 
     with pytest.raises(ToolDenied) as denied:
-        turn({"command": "analyze", "incident_id": str(incident_id)}, analyst_id=analyst, run=never, answerer=no_answer)
+        turn({"command": "analyze", "incident_id": str(incident_id)}, analyst_id=analyst, workflow=never, answerer=no_answer)
 
     assert denied.value.code == "not_entitled"
     runs = RunRecordRepository()

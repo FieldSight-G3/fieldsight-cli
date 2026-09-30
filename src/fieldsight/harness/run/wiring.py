@@ -1,19 +1,18 @@
 """ one assembled turn: the Coordinator's graph and the retrieval chain behind run_turn, and a packet's submit
 
     The CLI and the AgentCore Runtime both call turn(), so there is one composition of the system, not two.
-    The graph's final state becomes a WorkflowResult here, and stage 4 (guard_dossier) runs on that dossier
-    before run_turn evaluates escalation and saves the turn.
+    The Coordinator's graph (graph.graph_workflow) runs stage 4 in its eligibility check and hands back a
+    WorkflowResult; run_turn then evaluates escalation and saves the turn.
 """
 
 import logging
-from collections.abc import Callable
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 from ...config import settings
-from ...graph.graph import run_graph
+from ...graph.graph import graph_workflow
 from ...ingest.submit import ingest_packet, packet_artifacts
 from ...repository import IncidentRepository, RunRecordRepository
 from ...schemas.incidents import NormalizedIncident
@@ -23,7 +22,6 @@ from ...types.run import TurnRun, WorkflowResult
 from ..bounds import BoundsConfig, SessionUsage, TurnUsage
 from ..bounds_runtime import BoundStopped
 from ..guardrails.common import refuse
-from ..guardrails.dossier_guard import guard_dossier
 from ..guardrails.turn_check import check_turn
 from ..metering.meter import metered
 from ..metering.pricing import PricingConfig
@@ -33,55 +31,21 @@ from .workflow import Workflow
 
 logger = logging.getLogger(__name__)
 
-GraphRunner = Callable[[UUID, NormalizedIncident, str | None], dict]
+def harness_workflow(workflow: Workflow) -> Workflow:
+    """ the graph's workflow as the harness runs it: a meter refusal ends the turn instead of raising, and the cited
+        hits' scores go to escalation's retrieval trigger """
 
-
-def _approved(verdict: Any) -> bool:
-    """ a verdict from the checkpoint can come back as a model or a plain dict """
-
-    if verdict is None:
-        return False
-    return bool(verdict.get("approved") if isinstance(verdict, dict) else verdict.approved)
-
-
-def workflow_result(state: dict, incident: NormalizedIncident, correlation_id: str) -> WorkflowResult:
-    """ the graph's final state as the harness reads it, with stage 4 applied to the dossier """
-
-    dossier = dict(state.get("dossier") or {})
-    workers = list(dict.fromkeys(d["worker"] for plan in state.get("plans") or [] for d in plan.get("dispatches", [])))
-    reviews = state.get("reviews") or []
-    guarded = guard_dossier(dossier, incident=incident, rule_invocations=[], correlation_id=correlation_id)
-    # only what was actually retrieved; no cited hits means retrieval is unevaluated, not failed
-    scores = [hit["score"] for leg in dossier.values() for hit in (leg.get("cited") or {}).values() if "score" in hit]
-    return WorkflowResult(
-        dossier=dossier,
-        workers_dispatched=workers,
-        rule_invocations=guarded["rule_invocations"],
-        reviewer_approved=_approved(reviews[-1]) if reviews else None,
-        reviewer_iterations=state.get("review_iterations"),
-        citations_supported=guarded["citations_supported"],
-        blocked=guarded["blocked"],
-        retrieval_scores=scores or None,
-        events=guarded["events"],
-    )
-
-
-def graph_workflow(analyst_id: UUID, *, run: GraphRunner = run_graph) -> Workflow:
-    """ the run_workflow route for this analyst: the graph on the stored narrative, read back as a WorkflowResult
-
-        The graph takes no question yet, so an ask that runs the workflow re-plans from the narrative alone.
-    """
-
-    def workflow(incident: NormalizedIncident, question: str | None, correlation_id: str) -> WorkflowResult:
-        stored = IncidentRepository().get(UUID(incident.incident_id))
+    def run(incident: NormalizedIncident, question: str | None, correlation_id: str) -> WorkflowResult:
         try:
-            state = run(analyst_id, incident, stored.narrative if stored else None)
+            result = workflow(incident, question, correlation_id)
         except BoundStopped:
             # the meter refused the next model call: the turn still ends, is recorded, and names the ceiling
             return WorkflowResult(dossier={})
-        return workflow_result(state, incident, correlation_id)
+        # only what was actually retrieved; no cited hits means retrieval is unevaluated, not failed
+        scores = [hit["score"] for leg in result.dossier.values() for hit in (leg.get("cited") or {}).values() if "score" in hit]
+        return result.model_copy(update={"retrieval_scores": scores or None})
 
-    return workflow
+    return run
 
 
 def rag_answerer(chain: Any = None) -> Answerer:
@@ -102,12 +66,13 @@ def rag_answerer(chain: Any = None) -> Answerer:
 
 
 def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = None, usage: SessionUsage | None = None,
-         run: GraphRunner = run_graph, answerer: Answerer | None = None, limits: BoundsConfig | None = None,
+         workflow: Workflow | None = None, answerer: Answerer | None = None, limits: BoundsConfig | None = None,
          pricing: PricingConfig | None = None) -> TurnRun:
     """ one command as the verified analyst; raises ToolDenied before anything is read if they hold no grant
 
         Every model call is metered against the session's cost ceiling and the turn's wall clock. The returned
         TurnRun's usage carries the session's spend, including this turn's, for the next turn to start from.
+        workflow defaults to the Coordinator's graph for this analyst; tests pass a stand-in.
     """
 
     analyst = UUID(str(analyst_id))
@@ -123,7 +88,7 @@ def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = 
                          incident_id=usage.incident_id if usage else incident or UUID(int=0),
                          cost_usd=usage.cost_usd if usage else Decimal(0), turn=TurnUsage(turn_id=str(uuid4())))
     with metered(start, limits, pricing) as meter:
-        result = run_turn(raw, workflow=graph_workflow(analyst, run=run), answerer=answerer or rag_answerer(),
+        result = run_turn(raw, workflow=harness_workflow(workflow or graph_workflow(analyst)), answerer=answerer or rag_answerer(),
                           cracked=cracked, usage=usage, limits=limits, analyst_id=analyst)
     for call in meter.calls:
         logger.info("model call priced", extra={"model_id": call.model_id, "input_tokens": call.input_tokens,

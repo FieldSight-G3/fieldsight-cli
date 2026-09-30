@@ -2,7 +2,6 @@
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
 
@@ -18,6 +17,7 @@ from fieldsight.repository import (
     IncidentRepository,
     RunRecordRepository,
 )
+from fieldsight.types.run import WorkflowResult
 
 
 def normalized_fields() -> dict[str, Any]:
@@ -46,16 +46,16 @@ class FakeBedrock:
 
 
 def graph_calling_the_model(bedrock: FakeBedrock, calls: int):
-    """ a stand-in graph that makes real (faked-client) model calls, then finishes approved """
+    """ a stand-in workflow that makes real (faked-client) model calls, then finishes approved """
 
-    def run(analyst_id, incident, narrative):
+    def workflow(incident, question, correlation_id):
         chat = ChatBedrockConverse(model_id="deepseek.v3.2", region_name="us-east-1", max_tokens=900)
         chat.client = bedrock
         for _ in range(calls):
             chat.invoke([HumanMessage("plan the dispatch")])
-        return {"dossier": {}, "reviews": [SimpleNamespace(approved=True)], "review_iterations": 1}
+        return WorkflowResult(dossier={}, reviewer_approved=True, reviewer_iterations=1)
 
-    return run
+    return workflow
 
 
 @pytest.fixture
@@ -79,7 +79,7 @@ def test_the_turns_model_spend_is_carried_in_its_session_usage(granted):
     bedrock = FakeBedrock()
 
     run = turn({"command": "analyze", "incident_id": str(incident_id)}, analyst_id=analyst,
-               run=graph_calling_the_model(bedrock, calls=2), answerer=no_answer, limits=BoundsConfig())
+               workflow=graph_calling_the_model(bedrock, calls=2), answerer=no_answer, limits=BoundsConfig())
 
     assert bedrock.calls == 2
     assert run.usage is not None and run.usage.cost_usd == Decimal("0.01040")
@@ -93,7 +93,7 @@ def test_a_turn_stopped_by_the_ceiling_is_recorded_and_names_it(granted):
     limits = BoundsConfig(session_cost_ceiling_usd=Decimal("0.006"))
 
     run = turn({"command": "analyze", "incident_id": str(incident_id)}, analyst_id=analyst,
-               run=graph_calling_the_model(bedrock, calls=3), answerer=no_answer, limits=limits)
+               workflow=graph_calling_the_model(bedrock, calls=3), answerer=no_answer, limits=limits)
 
     assert bedrock.calls == 1
     assert run.refusal is not None and run.refusal["reason"] == "bound_reached"
