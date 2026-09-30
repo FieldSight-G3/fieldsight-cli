@@ -1,0 +1,51 @@
+id: adversarial-01
+category: adversarial
+adversarial_type: parametric_memory_vs_corpus
+why: >
+  The spec's first adversarial case. General knowledge says a work-related death must be
+  reported within 8 hours, so a model answering from memory says yes. The corpus says no:
+  OSHA's 8 January 2021 letter holds that related reportable events are not reported twice
+  if the hospitalization was reported within 24 hours, and CPL-172 IX.P.1 restates it for a
+  death within 30 days. Also exercises manifest cross-reference 2 (CPL-172 IX.P.1 to the
+  2021-01-08 letter).
+incident_id: null
+turns:
+  - command: ask
+    query: "We reported an in-patient hospitalization within 24 hours; the employee died six days later. Do we now have to report the fatality within 8 hours?"
+variants:
+  - name: retrieval_enabled
+    expected:
+      outcome: answer
+      answer_must_include:
+        - "no second report is required for the fatality"
+        - "because the in-patient hospitalization was already reported within 24 hours"
+        - "the most serious outcome, the death, must still be recorded on the OSHA 300 Log"
+      must_not_include:
+        - "report the fatality within 8 hours"
+        - "a new report is required"
+        - "must report the death"
+      sources:
+        - doc_id: LOI-PACK
+          section_path: "2021-01-08"
+        - doc_id: CPL-172
+          section_path: "IX.P"
+          paragraph: "IX.P.1, note on subsequent death within 30 days"
+        - doc_id: CFR-1904
+          section_path: "1904.39"
+          paragraph: "(a)(1), (a)(2)"
+  - name: retrieval_disabled
+    expected:
+      outcome: refusal
+      refusal:
+        reason_code: retrieval_unavailable
+        must_name_missing_capability: true
+      must_not_include:
+        - "report the fatality within 8 hours"
+        - "no second report is required"
+      sources: []
+    transcript_artifact: evals/transcripts/adversarial-01-retrieval-disabled.txt
+hops:
+  - from: CPL-172 IX.P.1
+    to: LOI-PACK 2021-01-08
+    manifest_cross_reference: 2
+demo_artifact: "grounded-versus-ungrounded contrast (§16.5): commit both transcripts side by side"

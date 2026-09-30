@@ -9,6 +9,7 @@ TEST_ENVIRONMENT = {
     "FIELDSIGHT_AWS_REGION": "us-east-1",
     "FIELDSIGHT_BEDROCK_MODEL_ID": "test-placeholder",
     "FIELDSIGHT_BEDROCK_EMBEDDING_MODEL_ID": "test-placeholder",
+    "FIELDSIGHT_ANALYST_ROLE_ARNS": "analyst",
     "FIELDSIGHT_BEDROCK_KB_ID": "test-placeholder",
     "FIELDSIGHT_BEDROCK_KB_DATA_SOURCE_ID": "test-placeholder",
     "FIELDSIGHT_BEDROCK_GUARDRAIL_ID": "test-placeholder",

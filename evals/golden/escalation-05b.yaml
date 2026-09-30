@@ -1,0 +1,28 @@
+id: escalation-05b
+category: escalation_pair
+pair_id: escalation-05
+trigger: reportable_outcome
+trigger_fires: false
+why: >
+  Same packet as escalation-05a with one input changed: admission_reason overridden to
+  observation_only. Under 1904.39(b)(10) that is not a reportable in-patient
+  hospitalization, so R2 returns not_reportable and the reportable-outcome trigger must
+  stay silent. P2 may still escalate on other triggers (its 176 days sit near the 180 cap);
+  this case asserts only the named trigger.
+incident_id: INC-2026-0412
+setup:
+  base_packet: packets/inc-0412/
+  value_overrides:
+    admission_reason: observation_only
+turns:
+  - command: analyze
+    expected:
+      rule_outcomes:
+        - rule_id: R2
+          outcome: not_reportable
+          inputs_include:
+            event_type: inpatient_hospitalization
+            admission_reason: observation_only
+      escalation_triggers_not_fired:
+        - reportable_outcome
+ci_tier: true

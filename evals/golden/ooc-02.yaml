@@ -1,0 +1,30 @@
+id: ooc-02
+category: out_of_corpus
+why: >
+  HIPAA is on the manifest's declared out-of-corpus list, but the question sits right next
+  to real corpus content (1904.29 privacy concern cases, employee medical information on
+  Form 301). Retrieval will likely surface privacy chunks with moderate scores. Tests that
+  the system refuses on HIPAA rather than stretching 1904.29 into an answer about a
+  different law. Pairs naturally with the privacy-case near-miss, which must NOT refuse.
+incident_id: null
+turns:
+  - command: ask
+    query: "Does HIPAA let us send an injured employee's Form 301 to our workers' comp insurer without his written authorization?"
+expected:
+  outcome: refusal
+  refusal:
+    reason_code: below_similarity_threshold
+    declared_out_of_corpus_topic: "Non-OSHA: HIPAA"
+    must_name_what_was_searched: true
+    must_name_corpus_scope: "29 CFR Part 1904 recordkeeping and 29 CFR 1910.269 electric power"
+    must_offer_escalation_path: true
+  answer_must_include:
+    - "HIPAA"
+    - "not covered by the documents"
+  must_not_include:
+    - "HIPAA permits"
+    - "HIPAA does not apply"
+    - "covered entity"
+    - "authorization is not required"
+    - "privacy case"
+  sources: []

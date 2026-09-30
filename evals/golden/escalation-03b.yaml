@@ -1,0 +1,42 @@
+id: escalation-03b
+category: escalation_pair
+pair_id: escalation-03
+trigger: near_boundary_value
+trigger_fires: false
+why: >
+  Same packet as escalation-03a with days away overridden to 150, 30 days short of the
+  cap and outside any reasonable margin. R4 still returns column H; the near-boundary
+  trigger must stay silent.
+incident_id: INC-2026-0412
+setup:
+  base_packet: packets/inc-0412/
+  value_overrides:
+    days_away: 150
+assumed_config:
+  near_boundary_margins:
+    r4_day_cap: {value: 7, unit: days}
+  holds_for_margin_range: "4 to 29 days"
+turns:
+  - command: analyze
+    expected:
+      rule_outcomes:
+        - rule_id: R4
+          outcome: H
+          day_count: 150
+      escalation_triggers_not_fired:
+        - near_boundary_value
+threshold:
+  rule_id: R4
+  boundary: "near-boundary margin around the 180-day cap"
+  boundary_source: "29 CFR 1904.7(b)(3)(vii); margin from typed config"
+  value: 150
+  side: outside_margin
+  rule_inputs:
+    recordable: true
+    death: false
+    days_away: 150
+    restricted_days: 0
+    job_transfer: false
+  expected_rule_outcome: H
+  expected_day_count: 150
+ci_tier: true

@@ -43,6 +43,7 @@ jobs:
     env:
       FIELDSIGHT_ENVIRONMENT: ci
       FIELDSIGHT_AWS_REGION: us-east-1
+      FIELDSIGHT_ANALYST_ROLE_ARNS: ci-placeholder
       FIELDSIGHT_BEDROCK_MODEL_ID: ci-placeholder
       FIELDSIGHT_BEDROCK_FAST_MODEL_ID: ci-placeholder
       FIELDSIGHT_BEDROCK_JUDGE_MODEL_ID: ci-placeholder

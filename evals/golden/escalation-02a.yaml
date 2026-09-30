@@ -1,0 +1,51 @@
+id: escalation-02a
+category: escalation_pair
+pair_id: escalation-02
+trigger: rules_engine_insufficient_data
+trigger_fires: true
+why: >
+  Named trigger 2 of 4 (§14): the rules engine returned insufficient_data. P4's R2 decision
+  turns entirely on admission_reason (observation vs care). With it removed, R2 must return
+  insufficient_data naming the field, the dossier must withhold the reportability outcome
+  rather than default it, and the analyst must be asked for the missing input.
+incident_id: INC-2026-0414
+setup:
+  base_packet: packets/inc-0414/
+  field_removals: [admission_reason]
+turns:
+  - command: analyze
+    expected:
+      rule_outcomes:
+        - rule_id: R2
+          outcome: insufficient_data
+          missing_field: admission_reason
+        - rule_id: R1
+          outcome: recordable
+        - rule_id: R4
+          outcome: H
+          day_count: 6
+      escalated_to_review_queue: true
+      escalation_triggers_fired:
+        - rules_engine_insufficient_data
+      dossier_must:
+        - "withhold the reportability outcome"
+        - "name admission_reason as the missing input"
+        - "ask the analyst to supply it"
+      must_not_include:
+        - "not reportable"
+        - "reportable within 24 hours"
+threshold:
+  rule_id: R2
+  boundary: "required input present vs absent"
+  boundary_source: "29 CFR 1904.39(b)(9)-(b)(10); §6 missing-input rule"
+  value: "admission_reason absent"
+  side: missing
+  rule_inputs:
+    work_related: true
+    event_type: inpatient_hospitalization
+    incident_at: "2026-07-14T13:30:00-04:00"
+    event_at: "2026-07-14T15:00:00-04:00"
+    learned_at: "2026-07-14T13:30:00-04:00"
+  expected_rule_outcome: insufficient_data
+  expected_missing_field: admission_reason
+ci_tier: true

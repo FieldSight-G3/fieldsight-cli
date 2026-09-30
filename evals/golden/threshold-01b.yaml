@@ -1,0 +1,40 @@
+id: threshold-01b
+category: threshold
+pair_id: threshold-01
+why: >
+  Same facts as threshold-01a, one minute past the 24-hour boundary. The admission is no
+  longer reportable under 1904.39(b)(6), but it is still recordable. The pair must come out
+  differently.
+incident_id: null
+turns:
+  - command: ask
+    query: "An employee was hurt at 8:00 AM on March 10, 2026. He was formally admitted to the hospital for treatment at 8:01 AM on March 11, 24 hours and one minute later, and we learned of the admission at 8:30 AM that day. Is this reportable to OSHA, and by when?"
+threshold:
+  rule_id: R2
+  boundary: "24 hours from the work-related incident to the in-patient hospitalization"
+  boundary_source: "29 CFR 1904.39(b)(6)"
+  value: "24h 1m"
+  side: above
+  rule_inputs:
+    work_related: true
+    event_type: inpatient_hospitalization
+    incident_at: "2026-03-10T08:00:00-05:00"
+    event_at: "2026-03-11T08:01:00-05:00"
+    learned_at: "2026-03-11T08:30:00-05:00"
+    admission_reason: care_or_treatment
+  expected_rule_outcome: not_reportable
+  expected_deadline: null
+expected:
+  outcome: answer
+  rules_engine_invocation_required: true
+  answer_must_include:
+    - "not reportable"
+    - "still must be recorded"
+  must_not_include:
+    - "report within 24 hours"
+    - "must be reported"
+  sources:
+    - doc_id: CFR-1904
+      section_path: "1904.39"
+      paragraph: "(b)(6)"
+distractor: "24 hours"
