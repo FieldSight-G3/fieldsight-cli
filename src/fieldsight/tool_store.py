@@ -8,6 +8,7 @@ from typing import Any
 from fieldsight.errors import ToolDenied
 from fieldsight.repository import GatewayReadRepository
 from fieldsight.schemas.incidents import SimilarCandidate
+from fieldsight.security.entitlement import require_grant
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +22,7 @@ class GatewayReadStore:
         session = self.repository.bound_session(email, thread_id)
         if session is None:
             raise ToolDenied("not_entitled", "No session is bound to this caller")
-        incident = self.repository.tool_incident(session["incident_id"])
-        if incident is None:
-            raise ToolDenied("not_found", "The bound incident is unavailable")
-        if not self.repository.has_grant(session["analyst_id"], incident["establishment"]):
-            raise ToolDenied("not_entitled", "Caller has no grant for this establishment")
+        incident = require_grant(session["analyst_id"], session["incident_id"], repository=self.repository)
         logger.info("gateway read authorized")
         return incident, session["analyst_id"]
 

@@ -9,11 +9,11 @@ from uuid import uuid4
 
 from flask import Flask, g, jsonify, request
 from pydantic import ValidationError
-from sqlalchemy import text as sql_text
 
 from fieldsight.errors import FailureCode, ToolDenied
 from fieldsight.interfaces.tool_service import ToolFailure, ToolResponse, ToolService
 from fieldsight.logging_context import correlation_id, valid_correlation_id
+from fieldsight.repository import database_ready
 
 logger = logging.getLogger(__name__)
 CORRELATION_HEADER = "X-Correlation-Id"
@@ -52,13 +52,8 @@ def create_app(service: ToolService | None = None, engine: Any = None, caller_re
 
     @app.get("/health/ready")
     def ready() -> Any:
-        if engine is None:
-            return jsonify({"status": "unavailable"}), 503
-        try:
-            with engine.connect() as connection:
-                connection.execute(sql_text("SELECT 1"))
-        except Exception:
-            logger.exception("readiness check failed")
+        if engine is None or not database_ready(engine):
+            logger.error("readiness check failed")
             return jsonify({"status": "unavailable"}), 503
         return jsonify({"status": "ready"})
 

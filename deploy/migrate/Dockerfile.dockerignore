@@ -1,0 +1,12 @@
+.git
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+tests
+src/fieldsight/tests
+docs
+upload
+*.env
+.env*
+*.pem

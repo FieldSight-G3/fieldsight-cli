@@ -116,6 +116,21 @@ def verify_proof(proof: str, thread_id: str, region: str, account_id: str, allow
         raise ToolDenied("unauthenticated", "Valid enrolled IAM role proof is required") from exc
 
 
+_ENROLLED_ROLE = re.compile(r"arn:aws:iam::(\d{12}):role/[\w+=,.@-]{1,64}", re.ASCII)
+
+
+def enrolled_analyst_roles(configured: str) -> tuple[frozenset[str], str]:
+    """The enrolled analyst role ARNs from comma-separated config, and the one AWS account they all belong to."""
+    role_arns = frozenset(arn.strip() for arn in configured.split(",") if arn.strip())
+    matches = [_ENROLLED_ROLE.fullmatch(arn) for arn in role_arns]
+    if not matches or any(match is None for match in matches):
+        raise RuntimeError("Configure valid analyst IAM role ARNs")
+    account_ids = {match.group(1) for match in matches if match is not None}
+    if len(account_ids) != 1:
+        raise RuntimeError("Analyst IAM roles must belong to one AWS account")
+    return role_arns, next(iter(account_ids))
+
+
 def caller_resolver(lookup_email: Callable[[str], str | None], region: str, account_id: str, allowed_role_arns: Collection[str]) -> Callable[[], str]:
     """Build the Flask resolver; the repository maps a unique analyst role to an email."""
     from flask import request
