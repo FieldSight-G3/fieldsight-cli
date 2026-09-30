@@ -13,7 +13,7 @@ def screen(text: str, source: str = "INPUT") -> dict:
         source is INPUT for analyst input and strings cracked out of an artifact, OUTPUT for a model's reply
     """
 
-    response = clients.bedrock_runtime().apply_guardrail(
+    response = clients.guardrail_client().apply_guardrail(
         guardrailIdentifier=settings.bedrock_guardrail_id,
         guardrailVersion=settings.bedrock_guardrail_version,
         source=source,
