@@ -46,6 +46,9 @@ ingestion_report --> processed, extracted, below floor, failures           artif
 | `artifacts/packet.py` | `crack_artifact` and `crack_packet`: every artifact's fields, with failures recorded and skipped. |
 | `artifacts/redact.py` | `redact`: removes PII from the fields and narrative and returns the removed spans. |
 | `artifacts/report.py` | `ingestion_report`. |
+| `normalize.py` | `normalize_chain`: the one structured-output call to a `NormalizedIncident`; each field's confidence and source artifact come from the Textract fields (`FORM_SOURCES`), never the model. |
+| `corroborate.py` | `corroborate` / `corroborate_chain`: one photo judged against the redacted narrative by the reasoning tier (multimodal), returning a `PhotoVerdict` (corroborates, contradicts or inconclusive); `too_large` checks Bedrock's image limit first. |
+| `submit.py` | `packet_artifacts` (skip and log unsupported files) and `ingest_packet` (crack, screen, redact, normalize, report); the screen is passed in, and `harness/run/wiring.submit` composes and saves it. |
 | `corpus/sources.py` | `corpus_docs`, `letters`, and each doc's local PDF path and S3 key. |
 | `corpus/cracking.py` | `crack_corpus`: all corpus Textract jobs started in parallel, then awaited. |
 | `corpus/layout.py` | Layout and table blocks as page markdown, with tables kept column-aligned. |
@@ -77,9 +80,6 @@ Paths are relative to `src/fieldsight/ingest/`. The shapes (`StoredArtifact`, `E
 
 ## Not implemented
 
-- The `submit` command that runs store, crack, redact, normalize and report, then writes the incident row.
-- Normalize: the one structured-output call that produces `NormalizedIncident` with each field's source artifact and confidence (section 7 step 5).
-- Photograph corroboration with Bedrock's multimodal model (section 7 step 3).
-- Passing the cracked strings through the Prompt Attacks filter: `harness/guardrails/turn_check.check_turn(..., cracked=...)` does it, but nothing calls it from `submit` yet.
-- `redact` and `ingestion_report` have no caller yet.
-- `script/ingest_corpus_local.py` is broken: it imports `CorpusChunkRepository`, which `repository.py` doesn't have, and nothing reads the local pgvector table.
+- Photos over Bedrock's 3.75 MB image limit aren't downscaled: they're skipped and reported as too large, with no verdict.
+- The narrative embedding for similar-incident search: `submit` doesn't write `incidents.embedding` yet (1024 dimensions, matching Titan v2's `EMBEDDING_DIMENSIONS`), so `find_similar_incidents` has nothing to compare a new incident against.
+- `script/ingest_corpus_local.py` is broken: it imports `CorpusChunkRepository`, which the `repository` package doesn't have, and nothing reads the local pgvector table.

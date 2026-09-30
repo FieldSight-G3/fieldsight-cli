@@ -1,4 +1,4 @@
-name: Deploy to ECS
+name: Deploy ECS and AgentCore Runtime
 
 # Run when code is pushed to test, or start it manually.
 on:
@@ -9,8 +9,9 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: fieldsightosha
+  RUNTIME_ECR_REPOSITORY: fieldsight-runtime
   ECS_CLUSTER: fieldsight-cluster
-  ECS_SERVICE: farsight-task-def-service-3xizk5l9
+  ECS_SERVICE: fieldsight-tools
   CONTAINER_NAME: Main
   PYTHON_BASE_IMAGE: python:3.14-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d
 
@@ -59,6 +60,32 @@ jobs:
           esac
           echo "uri=$DIGEST_URI" >> "$GITHUB_OUTPUT"
 
+      # after the ECS build on purpose: once Buildx is the active builder, plain docker build no longer loads the image
+      - name: Set up QEMU for arm64
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push the AgentCore Runtime image (arm64)
+        id: runtime-image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+          TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          # AgentCore Runtime runs linux/arm64 containers
+          docker buildx build --platform linux/arm64             -f deploy/runtime/Dockerfile             --build-arg "PYTHON_BASE_IMAGE=$PYTHON_BASE_IMAGE"             -t "$REGISTRY/$RUNTIME_ECR_REPOSITORY:$TAG"             --metadata-file runtime-image.json --push .
+
+          # deploy by digest, not tag
+          DIGEST=$(python3 -c 'import json; print(json.load(open("runtime-image.json"))["containerimage.digest"])')
+          case "$DIGEST" in
+            sha256:*) ;;
+            *) echo "Pushed Runtime image has no digest: $DIGEST" >&2; exit 1 ;;
+          esac
+          echo "uri=$REGISTRY/$RUNTIME_ECR_REPOSITORY@$DIGEST" >> "$GITHUB_OUTPUT"
+
       - name: Put the image in the Task Definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
@@ -74,3 +101,18 @@ jobs:
           service: ${{ env.ECS_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
+
+      - name: Set up Python for the Runtime deploy
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Point AgentCore Runtime at the new image and wait for READY
+        env:
+          RUNTIME_ID: ${{ vars.AGENT_RUNTIME_ID }}
+          IMAGE: ${{ steps.runtime-image.outputs.uri }}
+        run: |
+          set -euo pipefail
+          [ -n "$RUNTIME_ID" ] || { echo "Set the AGENT_RUNTIME_ID repository variable" >&2; exit 1; }
+          python -m pip install --quiet "boto3==1.43.96"
+          python script/update_agent_runtime.py --runtime-id "$RUNTIME_ID" --image "$IMAGE" --region "$AWS_REGION"

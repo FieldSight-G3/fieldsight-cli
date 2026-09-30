@@ -5,8 +5,8 @@ import asyncio
 
 import boto3
 
-from fieldsight.interfaces.gateway_client import gateway_tools
-from fieldsight.interfaces.iam_caller_proof import issue_proof
+from fieldsight.aws.gateway_client import gateway_tools
+from fieldsight.security.iam_caller_proof import issue_proof
 
 
 async def call_tool(thread_id: str) -> None:

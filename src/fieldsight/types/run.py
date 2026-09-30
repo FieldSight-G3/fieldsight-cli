@@ -4,9 +4,10 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..harness.bounds import SessionUsage, UsageEvent
+from ..harness.bounds import SessionUsage
 from ..schemas.retrieval import Citation
-from ..schemas.run_records import RuleInvocation
+from ..schemas.review import ReviewVerdict
+from ..schemas.run_records import ModelCall, RuleInvocation, ToolInvocation
 from .dossier import Dossier
 from .escalation import EscalationDecision, Score
 from .guardrails import GuardrailEvent, Refusal, Route
@@ -27,7 +28,12 @@ class WorkflowResult(BaseModel):
     blocked: dict[str, list[str]] = Field(default_factory=dict)  # legs still blocked when the caps ran out
     retrieval_scores: list[Score] | None = None
     events: list[GuardrailEvent] = Field(default_factory=list)
-    usage: UsageEvent = Field(default_factory=UsageEvent)
+
+    # the turn's run record; cost and budget are the turn meter's, which prices every model call itself
+    plans: list[dict] = Field(default_factory=list)
+    tool_invocations: list[ToolInvocation] = Field(default_factory=list)
+    model_calls: list[ModelCall] = Field(default_factory=list)
+    reviewer_verdicts: list[ReviewVerdict | None] = Field(default_factory=list)
 
 
 class TurnRun(BaseModel):

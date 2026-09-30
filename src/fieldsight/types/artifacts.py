@@ -1,6 +1,10 @@
 """ shapes of packet artifact data in the ingestion pipeline: plain dicts built by our own code """
 
-from typing import Literal, TypedDict
+from typing import Literal, NotRequired, TypedDict
+
+from ..schemas.corroboration import Corroboration
+from ..schemas.incidents import NormalizedIncident
+from .guardrails import Refusal
 
 
 class StoredArtifact(TypedDict):
@@ -41,6 +45,14 @@ class Redacted(TypedDict):
     spans: list[RedactedSpan]
 
 
+class NormalizeInput(TypedDict):
+    """ what normalize reads: a packet's screened, redacted fields and narrative, and the note the narrative came from """
+
+    fields: list[ExtractedField]
+    narrative: str | None
+    narrative_artifact: NotRequired[str]
+
+
 class ArtifactFailure(TypedDict):
     """ an artifact that was skipped, and why """
 
@@ -63,3 +75,33 @@ class IngestionReport(TypedDict):
     fields_extracted: int
     fields_below_floor: list[str]
     failures: list[ArtifactFailure]
+
+
+class PhotoCorroboration(TypedDict):
+    """ one photograph's verdict against the narrative, as the incident stores it for escalation """
+
+    artifact: str
+    verdict: Corroboration
+    observation: str
+    reason: str
+
+
+class IngestedPacket(TypedDict):
+    """ a packet after ingestion: its normalized record, redacted narrative and report, ready to be saved """
+
+    incident: NormalizedIncident
+    narrative: str | None
+    report: IngestionReport
+    withheld: list[str]
+    photos: list[PhotoCorroboration]
+
+
+class SubmitResult(TypedDict):
+    """ what submit hands back: the new incident and its ingestion report, or the refusal that stopped it """
+
+    incident_id: str | None
+    establishment: str | None
+    report: IngestionReport | None
+    withheld: list[str]         # cracked strings the Prompt Attacks filter kept from the model
+    photos: list[PhotoCorroboration]    # each photograph judged against the narrative (section 7 step 3)
+    refusal: Refusal | None

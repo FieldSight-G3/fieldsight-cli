@@ -6,7 +6,7 @@ import argparse
 
 import boto3
 
-from fieldsight.interfaces.iam_caller_proof import issue_proof, verify_proof
+from fieldsight.security.iam_caller_proof import issue_proof, verify_proof
 
 
 def main() -> None:

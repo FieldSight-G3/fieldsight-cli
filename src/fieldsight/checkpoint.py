@@ -7,6 +7,7 @@ from typing import Any
 from uuid import UUID
 
 from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from psycopg.rows import dict_row
 from psycopg_pool import ConnectionPool
 from sqlalchemy.engine import URL, make_url
@@ -14,6 +15,7 @@ from sqlalchemy.engine import URL, make_url
 from fieldsight.aws import clients
 from fieldsight.config import settings
 from fieldsight.repository import SessionRepository
+from fieldsight.schemas.review import ReviewVerdict
 
 # the recordability and reportability legs run concurrently, so the checkpointer needs more than one connection
 POOL_MAX_SIZE = 4
@@ -96,7 +98,7 @@ def postgres_checkpointer() -> PostgresSaver:
         if _SAVER is None:
             pool = ConnectionPool(conninfo(), kwargs=connection_kwargs, min_size=1, max_size=POOL_MAX_SIZE, open=True)
             atexit.register(pool.close)
-            saver = PostgresSaver(pool)
+            saver = PostgresSaver(pool, serde=JsonPlusSerializer(allowed_msgpack_modules=[ReviewVerdict]))
             _setup(saver, pool)
             _SAVER = saver
     return _SAVER

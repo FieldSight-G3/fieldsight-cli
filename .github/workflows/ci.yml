@@ -58,6 +58,10 @@ jobs:
       FIELDSIGHT_RETRIEVAL_MAX_CHUNKS: "8"
       FIELDSIGHT_GATEWAY_API_KEY: ci-placeholder
       FIELDSIGHT_ALLOW_DEV_IDENTITY: "true"
+      FIELDSIGHT_REASONING_PRICE_IN: "0.80"
+      FIELDSIGHT_REASONING_PRICE_OUT: "3.20"
+      FIELDSIGHT_FAST_PRICE_IN: "0.06"
+      FIELDSIGHT_FAST_PRICE_OUT: "0.24"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

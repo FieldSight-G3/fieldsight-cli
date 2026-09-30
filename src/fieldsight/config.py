@@ -1,17 +1,25 @@
 import os
+from decimal import Decimal
 
 from dotenv import load_dotenv
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .harness.bounds import BoundsConfig
 
 load_dotenv()
 
+class ModelPrice(BaseModel):
+    """ USD per million tokens, from the Bedrock price list for the pinned model """
+
+    model_config = ConfigDict(extra="forbid")
+
+    input_per_mtok: Decimal = Field(ge=0)
+    output_per_mtok: Decimal = Field(ge=0)
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="forbid")
-
     environment: str = Field(min_length=1)
     aws_region: str = Field(min_length=1)
     analyst_role_arns: str = Field(min_length=1)
@@ -32,6 +40,8 @@ class Settings(BaseSettings):
     allow_dev_identity: bool
     # every loop cap and budget: defaults in code, FIELDSIGHT_BOUNDS_* overrides them per environment
     bounds: BoundsConfig = Field(default_factory=BoundsConfig.from_environment)
+    reasoning_price: ModelPrice
+    fast_price: ModelPrice
 
 
 settings = Settings(
@@ -52,5 +62,7 @@ settings = Settings(
     retrieval_score_threshold=float(os.environ["FIELDSIGHT_RETRIEVAL_SCORE_THRESHOLD"]),
     retrieval_max_chunks=int(os.environ["FIELDSIGHT_RETRIEVAL_MAX_CHUNKS"]),
     gateway_api_key=os.environ["FIELDSIGHT_GATEWAY_API_KEY"],
-    allow_dev_identity=os.environ["FIELDSIGHT_ALLOW_DEV_IDENTITY"].lower() == "true"
+    allow_dev_identity=os.environ["FIELDSIGHT_ALLOW_DEV_IDENTITY"].lower() == "true",
+    reasoning_price=ModelPrice(input_per_mtok=os.environ["FIELDSIGHT_REASONING_PRICE_IN"],output_per_mtok=os.environ["FIELDSIGHT_REASONING_PRICE_OUT"]),
+    fast_price=ModelPrice(input_per_mtok=os.environ["FIELDSIGHT_FAST_PRICE_IN"],output_per_mtok=os.environ["FIELDSIGHT_FAST_PRICE_OUT"])
 )

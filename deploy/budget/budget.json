@@ -1,0 +1,6 @@
+{
+  "BudgetName": "fieldsight-monthly",
+  "BudgetType": "COST",
+  "TimeUnit": "MONTHLY",
+  "BudgetLimit": { "Amount": "50", "Unit": "USD" }
+}

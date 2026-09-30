@@ -7,7 +7,7 @@ from uuid import UUID
 import pytest
 
 from fieldsight.harness.idempotency import canonicalize, idempotency_key
-from fieldsight.interfaces.tool_service import SimilarIncidentsInput
+from fieldsight.schemas.tools import SimilarIncidentsInput
 
 SESSION = "analyst-1:inc-4:hazard_control"
 

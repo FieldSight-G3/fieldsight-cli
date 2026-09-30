@@ -22,6 +22,20 @@ class ReviewSnapshot(BaseModel):
     dossier: dict[str, Any]
     citations: dict[str, CitationReference]
 
+    @classmethod
+    def of(cls, submitting_analyst_id: UUID | str, dossier: dict[str, Any] | None) -> ReviewSnapshot:
+        """The dossier the Reviewer saw, with every cited chunk mapped to its source document, keyed by chunk id.
+
+        An empty dossier is valid: a case routed straight to a human still records who submitted it.
+        """
+        dossier = dict(dossier or {})
+        citations = {
+            chunk_id: CitationReference(document_id=hit["doc_id"], chunk_id=chunk_id)
+            for leg in dossier.values()
+            for chunk_id, hit in (leg.get("cited") or {}).items()
+        }
+        return cls(submitting_analyst_id=UUID(str(submitting_analyst_id)), dossier=dossier, citations=citations)
+
 
 class AnalysisRun(BaseModel):
     model_config = ConfigDict(extra="forbid")

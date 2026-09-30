@@ -15,6 +15,7 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from fieldsight.aws import clients
+from fieldsight.config import settings
 from fieldsight.graph.nodes import review
 from fieldsight.graph.nodes.review import reviewer_node
 from fieldsight.harness.bounds import BoundsConfig, SessionUsage, TurnUsage, UsageEvent
@@ -29,8 +30,13 @@ class ApprovingModel:
 
     def invoke(self, messages):
         if isinstance(messages[-1], HumanMessage):
-            return AIMessage("", tool_calls=[{"name": "submit_review", "args": {"verdict": {"approved": True}}, "id": f"submit-{uuid4()}"}])
-        return AIMessage("Approved.")
+            reply = AIMessage("", tool_calls=[{"name": "submit_review", "args": {"verdict": {"approved": True}}, "id": f"submit-{uuid4()}"}])
+        else:
+            reply = AIMessage("Approved.")
+        # look like a Bedrock reply, so the run record can price it
+        reply.response_metadata["model_name"] = settings.bedrock_model_id
+        reply.usage_metadata = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        return reply
 
 
 def _dossier(incident: str) -> dict:

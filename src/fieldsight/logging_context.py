@@ -1,4 +1,4 @@
-"""Structured JSON logs that carry the turn's correlation id from a contextvar."""
+"""Structured JSON logs that carry the turn's correlation id from a contextvar, PII-redacted before they are written."""
 
 from __future__ import annotations
 
@@ -13,7 +13,12 @@ from functools import wraps
 from typing import Any, ParamSpec, TypeVar
 from uuid import uuid4
 
+from fieldsight.security.redaction import redact_payload, redact_text
+
 correlation_id: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+
+# attributes every LogRecord has; anything else on a record came from a caller's extra=
+_STANDARD_ATTRIBUTES = set(vars(logging.LogRecord("", 0, "", 0, "", None, None))) | {"message", "asctime", "correlation_id"}
 
 # an inbound id is trusted only if it looks like one; anything else gets a fresh id
 _VALID_ID = re.compile(r"[A-Za-z0-9._:-]{1,64}")
@@ -62,11 +67,15 @@ class JsonFormatter(logging.Formatter):
             "level": record.levelname,
             "logger": record.name,
             "correlation_id": getattr(record, "correlation_id", None) or correlation_id.get() or "-",
-            "message": record.getMessage(),
+            "message": redact_text(record.getMessage(), "log"),
         }
+        extra = {key: value for key, value in vars(record).items() if key not in _STANDARD_ATTRIBUTES}
+        if extra:
+            # guardrail events and refused questions arrive here; they are redacted like the message
+            entry["extra"] = redact_payload(extra)
         if record.exc_info:
-            entry["exception"] = self.formatException(record.exc_info)
-        return json.dumps(entry, ensure_ascii=False)
+            entry["exception"] = redact_text(self.formatException(record.exc_info), "log")
+        return json.dumps(entry, ensure_ascii=False, default=lambda value: redact_text(str(value), "log"))
 
 
 def configure_logging(level: int | str = logging.INFO) -> None:

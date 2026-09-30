@@ -5,14 +5,17 @@
 ```
 config.settings
       |
-clients.py   session() --> client(service)    adaptive retries, 4 attempts, 5 s connect / 30 s read
+clients.py   RETRIES: adaptive retries, 4 attempts, 5 s connect / 30 s read, on every client below
       |
-      +-- chat_model()        ChatBedrockConverse + Guardrails      --> specialists, Reviewer, RAG chain
+      |   LangChain, configured in place (region + RETRIES; each builds its own Bedrock client)
+      +-- chat_model()        ChatBedrockConverse + Guardrails      --> specialists, Reviewer, RAG chain, ingest
       |   chat_model(fast=True)  the fast tier                      --> harness/guardrails/turn_check.py (readiness)
-      +-- bedrock_runtime() --> guardrails.py    screen (ApplyGuardrail), prompt_attack_detected
+      +-- embeddings()        BedrockEmbeddings, Titan v2, 1024 dims, unit length --> retrieval/corpus.py
+      +-- corpus_retriever()  AmazonKnowledgeBasesRetriever         --> retrieval/corpus.py
+      |
+      |   boto3, for the AWS APIs LangChain doesn't wrap: session() --> client(service)
+      +-- guardrail_client() --> guardrails.py   screen (ApplyGuardrail), prompt_attack_detected
       |                                          --> harness/guardrails/turn_check.py
-      +-- embeddings()        Titan v2, 1024 dims, unit length      --> script/ingest_corpus_local.py
-      +-- corpus_retriever()  Bedrock KB retriever, score-gated     --> retrieval/corpus.py
       +-- textract() -------> textract.py        start_analysis, get_analysis_status, get_blocks,
       |                                          load_output, analyze_bytes        --> ingest/
       +-- s3() -------------> s3.py              upload, put_text, list_objects, list_keys,
@@ -26,12 +29,13 @@ errors.py   @raises(FieldSightError subclass, action): a boto failure becomes a 
 
 | File | Contains |
 |---|---|
-| `clients.py` | The one place AWS clients and Bedrock models are built: `session`, `client`, `chat_model`, `embeddings`, `corpus_retriever`, and a getter per service. |
+| `clients.py` | The one place AWS clients and Bedrock models are built. `chat_model`, `embeddings` and `corpus_retriever` are LangChain classes configured in place with the region and `RETRIES`. boto3 clients (`session`, `client`, and `guardrail_client`, `bedrock_agent`, `textract`, `s3`, `rds`) only for the APIs LangChain doesn't wrap: ApplyGuardrail, KB ingestion jobs, Textract, S3 and the RDS IAM token. |
 | `textract.py` | The async Textract flow (`start_analysis`, `get_analysis_status`, `get_blocks`), reading saved output from S3 (`load_output`), and the synchronous `analyze_bytes` for single-page checks. |
 | `guardrails.py` | `screen`: the ApplyGuardrail API over a string, with no model call; `prompt_attack_detected` reads the result. |
 | `s3.py` | Reads and writes on the project bucket. |
 | `knowledge_base.py` | Writes a chunk and its `.metadata.json` sidecar to the KB's S3 data source, and starts and reads KB sync jobs. |
 | `errors.py` | The `@raises` decorator. |
+| `gateway_client.py` | The SigV4-signed MCP client to the AgentCore Gateway: `gateway_tools`, and `available_gateway_tools`, which degrades to native tools when the Gateway or the ECS API is unreachable. |
 
 ## Decisions
 
