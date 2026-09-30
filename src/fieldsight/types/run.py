@@ -4,7 +4,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..harness.analysis import ReviewSnapshot
 from ..harness.bounds import SessionUsage, UsageEvent
 from ..schemas.retrieval import Citation
 from ..schemas.review import ReviewVerdict
@@ -35,7 +34,6 @@ class WorkflowResult(BaseModel):
     tool_invocations: list[ToolInvocation] = Field(default_factory=list)
     model_calls: list[ModelCall] = Field(default_factory=list)
     reviewer_verdicts: list[ReviewVerdict | None] = Field(default_factory=list)
-    review_snapshot: ReviewSnapshot | None = None
 
 
 class TurnRun(BaseModel):

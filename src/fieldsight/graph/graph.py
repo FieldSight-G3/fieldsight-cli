@@ -100,7 +100,6 @@ def graph_workflow(analyst_id: UUID) -> Workflow:
             tool_invocations=turn["tool_invocations"],
             model_calls=turn["model_calls"],
             reviewer_verdicts=reviews,
-            review_snapshot=state.get("review_snapshot"),
         )
 
     return workflow

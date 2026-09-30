@@ -3,7 +3,6 @@
 import operator
 from typing import Annotated, TypedDict
 
-from ..harness.analysis import ReviewSnapshot
 from ..schemas.review import ReviewVerdict
 from ..schemas.run_records import ModelCall, RuleInvocation, ToolInvocation
 from ..types.dossier import Dossier
@@ -35,6 +34,5 @@ class WorkflowState(TypedDict):
     citations_supported: bool
     rule_invocations: list[RuleInvocation]
     events: list[GuardrailEvent]
-    review_snapshot: ReviewSnapshot | None
 
 

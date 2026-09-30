@@ -6,6 +6,7 @@ from ...config import settings
 from ...rules.engine import evaluate_incident
 from ...types.escalation import EscalationPolicy, EscalationSignals
 from ...types.run import TurnRun
+from ..analysis import ReviewSnapshot
 from ..bounds import BoundsConfig, SessionUsage, TurnUsage, start_turn
 from ..escalation.triggers import evaluate_escalation
 from ..guardrails.turn_check import check_turn
@@ -16,10 +17,13 @@ from .workflow import Workflow, run_workflow
 
 
 def run_turn(raw: dict, *, workflow: Workflow, answerer: Answerer, cracked: dict[str, str] | None = None,
-             usage: SessionUsage | None = None, limits: BoundsConfig | None = None) -> TurnRun:
+             usage: SessionUsage | None = None, limits: BoundsConfig | None = None,
+             analyst_id: UUID | str | None = None) -> TurnRun:
     """ every command goes through here, and every turn leaves a run record, refused or not
 
-        usage is the session's from its last turn, so the cost ceiling accumulates; the TurnRun carries it on
+        usage is the session's from its last turn, so the cost ceiling accumulates; the TurnRun carries it on.
+        analyst_id is the verified analyst from the session, never a request field; a turn that escalates needs it,
+        because the review queue row records who submitted the dossier.
     """
 
     correlation_id = uuid4()
@@ -65,6 +69,10 @@ def run_turn(raw: dict, *, workflow: Workflow, answerer: Answerer, cracked: dict
         policy = EscalationPolicy(retrieval_score_threshold=settings.retrieval_score_threshold)
         decision = evaluate_escalation(incident, results, signals=EscalationSignals(**signals), policy=policy)
 
+    # the one write for the turn: the run record, and the queue row with its snapshot when escalation fired
+    snapshot = None
+    if decision and decision.requires_review and analyst_id is not None:
+        snapshot = ReviewSnapshot.of(analyst_id, run.get("dossier"))
     run_id = save_run(correlation_id, command, incident, results=results, decision=decision,
-                      rule_invocations=invocations, workers=workers, workflow=result)
+                      rule_invocations=invocations, workers=workers, workflow=result, review_snapshot=snapshot)
     return TurnRun(run_id=run_id, correlation_id=correlation_id, command=command, escalation=decision, usage=usage, **run)

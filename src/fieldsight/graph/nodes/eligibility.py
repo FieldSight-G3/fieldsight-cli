@@ -1,28 +1,14 @@
-""" the eligibility check: stage 4 (guard_dossier) on the reviewed dossier, and the snapshot a reviewer would need; run_turn escalates and writes """
+""" the eligibility check: stage 4 (guard_dossier) on the reviewed dossier, where the graph hands the finished cycle back
+
+    It writes nothing. run_turn evaluates escalation over the whole turn and saves once: the run record, and the
+    review queue row with its dossier snapshot when a trigger fired.
+"""
 
 from datetime import UTC, datetime
-from uuid import UUID
 
-from ...harness.analysis import ReviewSnapshot
-from ...harness.escalation.review import CitationReference
 from ...harness.guardrails.dossier_guard import guard_dossier
 from ...schemas.incidents import NormalizedIncident
 from ...schemas.run_records import RuleInvocation
-
-
-def review_snapshot(state: dict) -> ReviewSnapshot:
-    """ the dossier the Reviewer saw, with every cited chunk mapped to its source document; keyed by chunk id """
-
-    citations = {
-        chunk_id: CitationReference(document_id=hit["doc_id"], chunk_id=chunk_id)
-        for leg in state["dossier"].values()
-        for chunk_id, hit in leg["cited"].items()
-    }
-    return ReviewSnapshot(
-        submitting_analyst_id=UUID(str(state["analyst_id"])),
-        dossier=state["dossier"],
-        citations=citations,
-    )
 
 
 def eligibility_check_node(state: dict) -> dict:
@@ -33,6 +19,5 @@ def eligibility_check_node(state: dict) -> dict:
     # the workers' own evaluate_rule results; §6 says the tool path records an invocation too
     worker_rules = [RuleInvocation(incident_id=incident.incident_id, recorded_at=datetime.now(UTC), decision=decision)
                     for leg in dossier.values() for decision in leg["decisions"].values()]
-    guard = guard_dossier(dossier, incident=incident, rule_invocations=worker_rules,
-                          correlation_id=state["correlation_id"])
-    return {**guard, "review_snapshot": review_snapshot({**state, "dossier": dossier})}
+    return guard_dossier(dossier, incident=incident, rule_invocations=worker_rules,
+                         correlation_id=state["correlation_id"])
