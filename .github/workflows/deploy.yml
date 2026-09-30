@@ -11,7 +11,7 @@ env:
   ECR_REPOSITORY: fieldsightosha
   RUNTIME_ECR_REPOSITORY: fieldsight-runtime
   ECS_CLUSTER: fieldsight-cluster
-  ECS_SERVICE: farsight-task-def-service-3xizk5l9
+  ECS_SERVICE: fieldsight-tools
   CONTAINER_NAME: Main
   PYTHON_BASE_IMAGE: python:3.14-slim@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d
 
