@@ -12,43 +12,44 @@ from ...schemas.plan import DispatchPlan
 from ...types.dossier import DossierLeg
 from ..specialists import get_specialists
 from ..trace import record
+from ...schemas.run_records import ModelCall
+from ..trace import model_call, record
 
-def _plan(state: dict) -> DispatchPlan:
-    """ the fast model's plan; one retry with a schema reminder, then a typed failure (section 13) """
+def _plan(state: dict) -> tuple[DispatchPlan, list[ModelCall]]:
+    """ the fast model's plan; one retry with a schema reminder, then a typed failure (section 13); every attempt is recorded """
 
-    model = clients.chat_model(fast=True).with_structured_output(DispatchPlan)
+    model = clients.chat_model(fast=True).with_structured_output(DispatchPlan, include_raw=True)
     messages = [SystemMessage(PROMPTS["coordinator"]),
                 HumanMessage(json.dumps({"fields": state["incident"], "narrative": state.get("narrative")}))]
+    calls = []
     for _ in range(2):
-        try:
-            plan = model.invoke(messages)
-        except ValueError as error:
-            problem = str(error)
-        else:
-            if plan:
-                return plan
-            problem = "no plan was returned"
+        out = model.invoke(messages)
+        calls.append(model_call("coordinator", out["raw"]))
+        if out["parsed"]:
+            return out["parsed"], calls
+        problem = str(out["parsing_error"] or "no plan was returned")
         messages.append(HumanMessage(f"That plan was invalid: {problem}. Return one that matches the DispatchPlan schema."))
     raise PlanError("the Coordinator returned no valid plan after one retry")
 
+
 def coordinator_node(state: dict) -> dict:
     """ first pass: the model plans. After a Reviewer rejection: re-dispatch only the rejected workers, no model call """
-
+    call = []
     if state.get("review_iterations"):
         # route_after_review only comes back here on a rejection; one dispatch per rejected worker
         problems = {r.worker: r.problem for r in state["reviews"][-1].rejections}
         dispatches = [{"worker": worker, "reason": problem} for worker, problem in problems.items()]
         quote, trigger = state["plans"][-1]["energized_equipment_quote"], "reviewer_rejected"
     else:
-        plan = _plan(state)
+        plan, call = _plan(state) 
         dispatches = [d.model_dump() for d in plan.dispatches]
         quote, trigger = plan.energized_equipment_quote, "initial"
 
     # the model chooses hazard_control; this checks its grounds are really in the narrative
     grounded = bool(quote) and quote in (state.get("narrative") or "")
     kept = [d for d in dispatches if grounded or d["worker"] != "hazard_control"]
-    update = {"plans": [{"trigger": trigger, "dispatches": kept, "energized_equipment_quote": quote,
-                         "ungrounded": [d for d in dispatches if d not in kept]}]}
+    update = {"plans": [{"trigger": trigger, "dispatches": kept, "energized_equipment_quote": quote, 
+                         "ungrounded": [d for d in dispatches if d not in kept]}],"model_calls": call}
     if trigger == "initial":
         # a new turn starts from the default goals, not last turn's narrowed ones
         update["tasks"] = dict(GOALS)
@@ -83,7 +84,7 @@ def _run_specialist(name: str, state: dict) -> dict:
         decisions=result["decisions"],
         cited={chunk_id: result["retrieved"][chunk_id] for chunk_id in proposal["chunk_ids"]} if proposal else {},
     )
-    
+
     tools, calls = record(name, result["messages"])
     return {"dossier": {name: leg}, "tool_invocations": tools, "model_calls": calls}
 
