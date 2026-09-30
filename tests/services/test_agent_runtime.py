@@ -5,8 +5,8 @@ from uuid import UUID, uuid4
 import pytest
 
 from fieldsight.errors import ToolDenied
-from fieldsight.interfaces import agent_runtime
-from fieldsight.interfaces.agent_runtime import handle
+from fieldsight.services import agent_runtime
+from fieldsight.services.agent_runtime import handle
 from fieldsight.types.run import TurnRun
 
 SESSION = "runtime-session-0123456789abcdef0123456789"

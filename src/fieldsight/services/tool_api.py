@@ -1,4 +1,4 @@
-"""Flask API for the two read-only ECS tool endpoints."""
+"""Flask API for the two read-only ECS tool endpoints; ECS runs create_production_app under gunicorn."""
 
 from __future__ import annotations
 
@@ -10,10 +10,16 @@ from uuid import uuid4
 from flask import Flask, g, jsonify, request
 from pydantic import ValidationError
 
+from fieldsight.config import settings
 from fieldsight.errors import FailureCode, ToolDenied
-from fieldsight.logging_context import correlation_id, valid_correlation_id
-from fieldsight.repository import database_ready
+from fieldsight.logging_context import (
+    configure_logging,
+    correlation_id,
+    valid_correlation_id,
+)
+from fieldsight.repository import AnalystRepository, database_ready
 from fieldsight.schemas.tools import ToolFailure, ToolResponse
+from fieldsight.security import iam_caller_proof
 from fieldsight.tools.service import ToolService
 
 logger = logging.getLogger(__name__)
@@ -106,3 +112,13 @@ def _failure(code: FailureCode, message: str, status: int) -> Any:
 def _unconfigured_caller() -> str:
     """Deny until a verified Gateway caller binding is implemented."""
     raise ToolDenied("unauthenticated", "Verified caller is required")
+
+
+def create_production_app() -> Flask:
+    """ the app ECS serves: callers verified by their STS proof, and only enrolled analyst roles map to an analyst """
+
+    configure_logging()
+    role_arns, account_id = iam_caller_proof.enrolled_analyst_roles(settings.analyst_role_arns)
+    repository = AnalystRepository()
+    resolve_caller = iam_caller_proof.caller_resolver(repository.email_for_iam_principal, settings.aws_region, account_id, role_arns)
+    return create_app(caller_resolver=resolve_caller)
