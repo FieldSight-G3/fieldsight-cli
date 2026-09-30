@@ -21,7 +21,7 @@ run_turn(raw request, workflow, answerer)                               run/life
       |                             threshold with no invocation --> run the rules, inject, regenerate
       |                             determination-shaped language --> regenerate once, then refuse
       |                             PII --> redact, never regenerate;  no disclosure --> append it
-      +-- classify ---------> run_workflow: preflight, then the graph   run/workflow.py, bounds.py
+      +-- classify ---------> run_workflow: the graph, under the meter  run/workflow.py, metering/
       |                          Coordinator, workers, Reviewer, then eligibility_check:
       |                          4. guard_dossier                       guardrails/dossier_guard.py
       |                             blocked legs --> back to the Coordinator; still blocked at the cap --> withheld
@@ -47,10 +47,10 @@ Grouped by section 10's parts: guardrails, escalation, bounds, and the run that 
 | `run/lifecycle.py` | `run_turn`: one turn start to finish, the entry point every command calls. |
 | `run/wiring.py` | `turn`: one command as the verified analyst, with the grant check, metering, the Coordinator's graph (`graph/graph.graph_workflow`, wrapped by `harness_workflow` so a meter refusal still ends and records the turn, and the cited scores reach escalation) and the RAG answerer (`rag_answerer`) composed around `run_turn`. Also `submit` (a packet in, a new incident out) and `latest_run` (the run record `trace` reads). The CLI and the AgentCore Runtime both call it. |
 | `run/incident.py` | `load_record`: the stored row, read once per turn, or None for an unknown id so `check_turn` routes to the analyst; `normalized` (its `NormalizedIncident`) and `photo_contradicts` (the escalation signal from the photo verdicts `submit` stored, None when no photo was judged). |
-| `run/workflow.py` | `run_workflow` and the `Workflow` type: the bounds check, then the Coordinator's graph. |
+| `run/workflow.py` | The `Workflow` type: the Coordinator's graph as `run_turn` calls it. The turn meter (`metering/`) is the only budget. |
 | `run/answer.py` | `answer_question` and the `Answerer` type: a policy question answered from retrieval through `guard_answer`. |
 | `run/record.py` | `save_run`: the run record, the incident's outcome on `analyze`, and the review queue row. |
-| `guardrails/turn_check.py` | `check_turn` (stages 1 to 3), `classify` (the fast-model label), `REQUIRED_FIELDS` and `ROUTES`. |
+| `guardrails/turn_check.py` | `validate_request` (stage 1), `screen_texts` (stage 2), `check_turn` (stages 1 to 3, for turns), `classify` (the fast-model label), `REQUIRED_FIELDS` and `ROUTES`. `submit` calls the first two directly, each once. |
 | `guardrails/answer_guard.py` | `guard_answer` (stage 4 on a generated answer), `THRESHOLDS` and `MAX_REGENERATIONS`. |
 | `guardrails/dossier_guard.py` | `guard_dossier` (stage 4 on the dossier, run by the graph's eligibility_check) and `LEG_REVIEWS`. |
 | `guardrails/common.py` | `emit`, `refuse`, `citation_problems`, `latest`, `DISCLOSURE` and the `DETERMINATION` patterns. |

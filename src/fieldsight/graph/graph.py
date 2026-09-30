@@ -4,7 +4,6 @@ from langgraph.graph import END, START, StateGraph
 
 from ..checkpoint import Participant, open_thread, postgres_checkpointer
 from ..config import settings
-from ..harness.bounds import UsageEvent
 from ..harness.run.workflow import Workflow
 from ..repository import IncidentRepository
 from ..schemas.incidents import NormalizedIncident
@@ -94,8 +93,6 @@ def graph_workflow(analyst_id: UUID) -> Workflow:
             citations_supported=state.get("citations_supported"),
             blocked=state.get("blocked") or {},
             events=state.get("events") or [],
-            usage=UsageEvent(cost_usd=sum(c.cost_usd for c in turn["model_calls"]),
-                             tool_invocations=len(turn["tool_invocations"])),
             plans=turn["plans"],
             tool_invocations=turn["tool_invocations"],
             model_calls=turn["model_calls"],

@@ -28,6 +28,41 @@ def classify(question: str) -> ReadinessLabel:
     return model.invoke([SystemMessage(PROMPTS["readiness"]), HumanMessage(question)]).label
 
 
+def validate_request(raw: dict, *, correlation_id: str) -> dict:
+    """ stage 1, before any model call: the typed request, or the refusal naming the field that failed; and the events """
+
+    events: list[GuardrailEvent] = []
+    try:
+        request = TURN_REQUEST.validate_python(raw)
+    except ValidationError as error:
+        problem = error.errors()[0]
+        field = ".".join(map(str, problem["loc"])) or "request"
+        emit(events, correlation_id, "input_validation", "invalid_input", "refused", field)
+        return {"request": None, "refusal": refuse("invalid_input", f"{field}: {problem['msg']}"), "events": events}
+    needs = {"submit": "artifacts", "ask": "question"}.get(request["command"])
+    if needs and needs not in request:
+        emit(events, correlation_id, "input_validation", "invalid_input", "refused", needs)
+        return {"request": None, "refusal": refuse("invalid_input", f"{request['command']} needs {needs}"), "events": events}
+    return {"request": request, "refusal": None, "events": events}
+
+
+def screen_texts(request: dict, cracked: dict[str, str], *, correlation_id: str) -> dict:
+    """ stage 2: the Prompt Attacks filter on the analyst's question and every string cracked out of an artifact
+
+        returns the texts that passed, prompt_attack_detected for EscalationSignals, the refusal when the question
+        itself was attacked (an attacked artifact string is only withheld), and the events
+    """
+
+    events: list[GuardrailEvent] = []
+    texts = {**({"analyst": request["question"]} if "question" in request else {}), **cracked}
+    attacked = [source for source, text in texts.items() if text.strip() and prompt_attack_detected(screen(text))]
+    for source in attacked:
+        emit(events, correlation_id, "prompt_attack", "prompt_attack", "refused" if source == "analyst" else "withheld", source)
+    refusal = refuse("prompt_attack", "The question was blocked by the Prompt Attacks filter.") if "analyst" in attacked else None
+    return {"texts": {source: text for source, text in texts.items() if source not in attacked},
+            "prompt_attack_detected": bool(attacked), "refusal": refusal, "events": events}
+
+
 def check_turn(raw: dict, *, incident: NormalizedIncident | None, cracked: dict[str, str], correlation_id: str) -> dict:
     """ stages 1 to 3; cracked maps each source (an artifact, or one of its fields) to the text cracked out of it
 
@@ -40,28 +75,18 @@ def check_turn(raw: dict, *, incident: NormalizedIncident | None, cracked: dict[
             "prompt_attack_detected": False, "rule_invocations": [], "events": events}
 
     # 1. input validation, before any model call
-    try:
-        request = TURN_REQUEST.validate_python(raw)
-    except ValidationError as error:
-        problem = error.errors()[0]
-        field = ".".join(map(str, problem["loc"])) or "request"
-        emit(events, correlation_id, "input_validation", "invalid_input", "refused", field)
-        return {**turn, "refusal": refuse("invalid_input", f"{field}: {problem['msg']}")}
-    needs = {"submit": "artifacts", "ask": "question"}.get(request["command"])
-    if needs and needs not in request:
-        emit(events, correlation_id, "input_validation", "invalid_input", "refused", needs)
-        return {**turn, "refusal": refuse("invalid_input", f"{request['command']} needs {needs}")}
-    turn["request"] = request
+    validated = validate_request(raw, correlation_id=correlation_id)
+    events += validated["events"]
+    if validated["refusal"]:
+        return {**turn, "refusal": validated["refusal"]}
+    request = turn["request"] = validated["request"]
 
     # 2. the Prompt Attacks filter on the analyst's input and every string cracked out of an artifact
-    texts = {**({"analyst": request["question"]} if "question" in request else {}), **cracked}
-    attacked = [source for source, text in texts.items() if text.strip() and prompt_attack_detected(screen(text))]
-    for source in attacked:
-        emit(events, correlation_id, "prompt_attack", "prompt_attack", "refused" if source == "analyst" else "withheld", source)
-    turn |= {"prompt_attack_detected": bool(attacked),
-             "texts": {source: text for source, text in texts.items() if source not in attacked}}
-    if "analyst" in attacked:
-        return {**turn, "refusal": refuse("prompt_attack", "The question was blocked by the Prompt Attacks filter.")}
+    screened = screen_texts(request, cracked, correlation_id=correlation_id)
+    events += screened["events"]
+    turn |= {"prompt_attack_detected": screened["prompt_attack_detected"], "texts": screened["texts"]}
+    if screened["refusal"]:
+        return {**turn, "refusal": screened["refusal"]}
     if request["command"] == "submit":
         # submit ingests; readiness is decided when the incident is analyzed
         return {**turn, "route": None}

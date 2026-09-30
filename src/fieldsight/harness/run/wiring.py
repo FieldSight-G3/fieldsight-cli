@@ -35,7 +35,7 @@ from ..escalation.review import (
     submit_review,
 )
 from ..guardrails.common import refuse
-from ..guardrails.turn_check import check_turn
+from ..guardrails.turn_check import screen_texts, validate_request
 from ..metering.meter import metered
 from ..metering.pricing import PricingConfig
 from .answer import Answerer
@@ -102,7 +102,7 @@ def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = 
                          cost_usd=usage.cost_usd if usage else Decimal(0), turn=TurnUsage(turn_id=str(uuid4())))
     with metered(start, limits, pricing) as meter:
         result = run_turn(raw, workflow=harness_workflow(workflow or graph_workflow(analyst)), answerer=answerer or rag_answerer(),
-                          cracked=cracked, usage=usage, limits=limits, analyst_id=analyst)
+                          cracked=cracked, usage=usage, analyst_id=analyst)
     for call in meter.calls:
         logger.info("model call priced", extra={"model_id": call.model_id, "input_tokens": call.input_tokens,
                                                "output_tokens": call.output_tokens, "cost_usd": str(call.cost_usd),
@@ -163,13 +163,13 @@ def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None 
     supported, skipped = packet_artifacts(folder)
     raw = {"command": "submit", "incident_id": folder.name,
            "artifacts": [{"name": path.name, "size_bytes": path.stat().st_size} for path in supported]}
-    validated = check_turn(raw, incident=None, cracked={}, correlation_id=str(correlation_id))
+    validated = validate_request(raw, correlation_id=str(correlation_id))
     if validated["refusal"]:
         return SubmitResult(incident_id=None, establishment=establishment, report=None, withheld=[], photos=[],
                             refusal=validated["refusal"])
 
     def screen(cracked: dict[str, str]) -> dict[str, str]:
-        return check_turn(raw, incident=None, cracked=cracked, correlation_id=str(correlation_id))["texts"]
+        return screen_texts(validated["request"], cracked, correlation_id=str(correlation_id))["texts"]
 
     start = SessionUsage(session_id=str(analyst), incident_id=UUID(int=0), turn=TurnUsage(turn_id=str(correlation_id)))
     with metered(start, limits or settings.bounds, pricing):
