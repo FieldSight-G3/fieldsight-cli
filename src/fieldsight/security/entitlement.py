@@ -8,8 +8,21 @@ from typing import Any
 from uuid import UUID
 
 from ..errors import ToolDenied
-from ..repository import GatewayReadRepository
+from ..repository import AnalystRepository, GatewayReadRepository
 from ..schemas.tools import ToolFailure, ToolResponse
+
+
+def submit_establishment(analyst_id: UUID | str, *, analysts: AnalystRepository | None = None) -> str:
+    """ the establishment a new incident is filed under: the analyst's most recent grant; ToolDenied if they hold none """
+
+    try:
+        analyst = UUID(str(analyst_id))
+    except ValueError:
+        raise ToolDenied("unauthenticated", "A verified analyst is required") from None
+    establishment = (analysts or AnalystRepository()).latest_establishment(analyst)
+    if establishment is None:
+        raise ToolDenied("not_entitled", "Caller has no grant for any establishment")
+    return establishment
 
 
 def require_grant(analyst_id: UUID | str, incident_id: UUID | str, *, repository: GatewayReadRepository | None = None) -> dict[str, Any]:

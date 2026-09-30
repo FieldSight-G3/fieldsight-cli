@@ -56,11 +56,12 @@ class IncidentRepository(_Repository):
     def __init__(self, dsn: str | None = None) -> None:
         super().__init__("incidents", dsn)
 
-    def create(self, establishment: str, normalized_fields: dict[str, Any], narrative: str | None = None) -> UUID:
+    def create(self, establishment: str, normalized_fields: dict[str, Any], narrative: str | None = None, owner_analyst_id: UUID | None = None) -> UUID:
         statement = insert(self.table).values(
             establishment=establishment,
             normalized_fields=normalized_fields,
-            narrative=narrative
+            narrative=narrative,
+            owner_analyst_id=owner_analyst_id
         ).returning(self.table.c.incident_id)
         with self.engine.begin() as connection:
             return connection.execute(statement).scalar_one()
@@ -258,12 +259,34 @@ class ReviewQueueRepository(_Repository):
     def get(self, queue_id: UUID) -> ReviewQueueRecord | None:
         return self._get("queue_id", queue_id, ReviewQueueRecord)
 
-    def list_pending(self) -> list[ReviewQueueRecord]:
+    def list_pending(self, reviewer_id: UUID | None = None) -> list[ReviewQueueRecord]:
+        """Every pending item, oldest first; with a reviewer, only those over an establishment they hold a grant for."""
         columns = [self.table.c[name] for name in ReviewQueueRecord.model_fields]
         statement = select(*columns).where(self.table.c.status == "pending").order_by(self.table.c.created_at)
+        if reviewer_id is not None:
+            metadata = MetaData()
+            incidents = Table("incidents", metadata, autoload_with=self.engine)
+            grants = Table("grants", metadata, autoload_with=self.engine)
+            statement = (
+                statement.join(incidents, incidents.c.incident_id == self.table.c.incident_id)
+                .join(grants, grants.c.establishment == incidents.c.establishment)
+                .where(grants.c.analyst_id == reviewer_id)
+            )
         with self.engine.connect() as connection:
             rows = connection.execute(statement).mappings().all()
         return [ReviewQueueRecord.model_validate(dict(row)) for row in rows]
+
+    def pending_for_incident(self, incident_id: UUID) -> PendingReview | None:
+        """The incident's oldest pending review with its snapshot, or None when it has none."""
+        statement = (
+            select(self.table.c.queue_id)
+            .where(self.table.c.incident_id == incident_id, self.table.c.status == "pending")
+            .order_by(self.table.c.created_at)
+            .limit(1)
+        )
+        with self.engine.connect() as connection:
+            queue_id = connection.execute(statement).scalar_one_or_none()
+        return self.get_pending(queue_id) if queue_id is not None else None
 
     def get_pending(self, queue_id: UUID) -> PendingReview | None:
         columns = [self.table.c[name] for name in ("queue_id", "incident_id", "submitting_analyst_id", "dossier_snapshot", "citations")]
@@ -364,6 +387,18 @@ class AnalystRepository(_Repository):
 
     def analyst_id_for_iam_principal(self, role_arn: str) -> UUID | None:
         statement = select(self.table.c.analyst_id).where(self.table.c.iam_role_arn == role_arn)
+        with self.engine.connect() as connection:
+            return connection.execute(statement).scalar_one_or_none()
+
+    def latest_establishment(self, analyst_id: UUID) -> str | None:
+        """The establishment of the analyst's most recent grant, or None when they hold no grant."""
+        grants = Table("grants", MetaData(), autoload_with=self.engine)
+        statement = (
+            select(grants.c.establishment)
+            .where(grants.c.analyst_id == analyst_id)
+            .order_by(grants.c.created_at.desc(), grants.c.establishment)
+            .limit(1)
+        )
         with self.engine.connect() as connection:
             return connection.execute(statement).scalar_one_or_none()
 

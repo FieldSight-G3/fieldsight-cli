@@ -91,7 +91,6 @@ Paths are relative to `src/fieldsight/harness/`. The shapes (`TurnRequest`, `Gua
 ## Not implemented
 
 - Two save paths: the graph's eligibility node calls `analyze_incident`, which writes a run record and queue row inside the graph, and `run_turn` writes its own after the graph. Wiring the node into `run_turn` must pick one, or every analyze leaves two run records.
-- Nothing calls `run_turn` yet: the CLI commands (GF-57) will. The real `Workflow` needs the Coordinator and the parent graph (GF-50).
 - Guardrail events are returned in `TurnRun` and logged, not persisted: `run_records` has no column for them (GF-53).
 - `SessionUsage` is returned in `TurnRun`, not persisted, so the session cost ceiling resets between commands until it has a table.
 - Nothing uses `idempotency_key` yet: the tool dispatcher needs to compute it from each tool call's `args` and the session's thread id, and skip or replay a call whose key it has already seen.

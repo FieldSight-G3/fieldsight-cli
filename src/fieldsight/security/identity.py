@@ -1,10 +1,11 @@
 """ who the analyst is: an STS caller proof, signed by the analyst's own assumed role, mapped to an enrolled analyst
 
-    Identity never comes from a request field or a flag. The AgentCore Runtime verifies a proof the invoker sent.
+    Identity never comes from a request field or a flag. The AgentCore Runtime verifies a proof the invoker sent;
+    the CLI signs one with this machine's role credentials and verifies it the same way.
 """
 
 from collections.abc import Callable
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from ..errors import ToolDenied
 
@@ -29,3 +30,13 @@ def production_resolver() -> AnalystResolver:
         return analyst_id
 
     return resolve
+
+
+def current_analyst() -> UUID:
+    """ the analyst running this process: its assumed IAM role, proven to STS and mapped to an enrolled analyst """
+
+    from ..config import settings
+    from .iam_caller_proof import issue_proof
+
+    session = f"cli-{uuid4()}"
+    return production_resolver()(issue_proof(session, settings.aws_region), session)

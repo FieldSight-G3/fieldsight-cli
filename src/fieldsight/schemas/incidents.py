@@ -70,6 +70,10 @@ class NormalizedIncident(BaseModel):
     confidences: dict[str, ConfidenceScore] = Field(
         description="Confidence score for each extracted incident field"
     )
+    sources: dict[str, str] = Field(
+        default_factory=dict,
+        description="Artifact each extracted incident field was read from"
+    )
 
 
 class SimilarCandidate(BaseModel):
