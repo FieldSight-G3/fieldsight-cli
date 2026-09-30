@@ -11,6 +11,7 @@ from ...prompts import PROMPTS
 from ...schemas.review import ReviewVerdict
 from ...tools.tools import TOOLSETS
 from ..specialists import build_specialist
+from ..trace import record
 
 _REVIEWER = None
 _REVIEWER_LOCK = threading.Lock()
@@ -35,13 +36,17 @@ def reviewer_node(state: dict) -> dict:
         "configurable": {"thread_id": thread_id(state["analyst_id"], state["incident"]["incident_id"], Participant.REVIEWER)},
         "recursion_limit": settings.bounds.max_graph_recursion_depth,
     }
+
+    reviewer = get_reviewer()
+    seen = len(reviewer.get_state(config).values.get("messages", []))
     try:
-        result = get_reviewer().invoke(
+        result = reviewer.invoke(
             {"task": json.dumps(state["dossier"]), "rounds": 0, "proposal": None}, config)
         verdict = ReviewVerdict.model_validate(result["proposal"]) if result["proposal"] else None
+        tools, calls = record("reviewer", result["messages"][seen:])
     except GraphRecursionError:
         # the independent hard cap: no verdict, which the route treats as not approved
-        verdict = None
+        verdict, tools, calls = None, [], []
 
     # the Coordinator re-dispatches each rejected worker with its narrowed goals
     tasks: dict[str, str] = {}
@@ -53,6 +58,8 @@ def reviewer_node(state: dict) -> dict:
         "reviews": [verdict],
         "review_iterations": state.get("review_iterations", 0) + 1,
         "tasks": tasks,
+        "tool_invocations": tools,
+        "model_calls": calls,
     }
 
 

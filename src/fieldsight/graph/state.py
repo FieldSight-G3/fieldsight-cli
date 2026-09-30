@@ -4,7 +4,9 @@ import operator
 from typing import Annotated, TypedDict
 
 from ..schemas.review import ReviewVerdict
+from ..schemas.run_records import ModelCall, RuleInvocation, ToolInvocation
 from ..types.dossier import Dossier
+from ..types.guardrails import GuardrailEvent
 
 
 class WorkflowState(TypedDict):
@@ -23,3 +25,14 @@ class WorkflowState(TypedDict):
 
     analysis_run_id: str
     requires_review: bool      
+
+    tool_invocations: Annotated[list[ToolInvocation], operator.add]
+    model_calls: Annotated[list[ModelCall], operator.add]
+
+    correlation_id: str
+    blocked: dict[str, list[str]]
+    citations_supported: bool
+    rule_invocations: list[RuleInvocation]
+    events: list[GuardrailEvent]
+
+

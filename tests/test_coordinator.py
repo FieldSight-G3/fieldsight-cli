@@ -1,5 +1,7 @@
 import pytest
+from langchain_core.messages import AIMessage
 
+from fieldsight.config import settings
 from fieldsight.errors import PlanError
 from fieldsight.graph.nodes import supervision
 from fieldsight.graph.nodes.supervision import coordinator_node, route_after_coordinator
@@ -11,17 +13,24 @@ STATE = {"incident": {"incident_id": "inc-1"}, "narrative": NARRATIVE, "review_i
 
 
 class Planner:
-    """ stands in for the fast model: each invoke validates the next scripted reply against the schema """
+    """ stands in for the fast model: validates each scripted reply against the schema,
+        and answers the way with_structured_output(include_raw=True) does """
 
     def __init__(self, replies):
         self.replies = list(replies)
 
-    def with_structured_output(self, schema):
+    def with_structured_output(self, schema, include_raw=False):
         self.schema = schema
         return self
 
     def invoke(self, messages):
-        return self.schema.model_validate(self.replies.pop(0))
+        raw = AIMessage("", response_metadata={"model_name": settings.bedrock_fast_model_id},
+                        usage_metadata={"input_tokens": 0, "output_tokens": 0, "total_tokens": 0})
+        try:
+            return {"raw": raw, "parsed": self.schema.model_validate(self.replies.pop(0)), "parsing_error": None}
+        except ValueError as error:
+            return {"raw": raw, "parsed": None, "parsing_error": error}
+
 
 
 @pytest.fixture
@@ -72,11 +81,12 @@ def test_rejection_redispatches_only_the_rejected_worker(plan):
     assert update["plans"][0]["trigger"] == "reviewer_rejected"
     assert "tasks" not in update  # the Reviewer's narrowed goal survives
 
-
 def test_one_retry_then_plan_error(plan):
     invalid = {"dispatches": dispatch("hazard_control")}  # no quote, so valid_plan rejects it
     plan(invalid, {"dispatches": []})
-    assert route_after_coordinator(coordinator_node(STATE)) == "eligibility_check"
+    update = coordinator_node(STATE)
+    assert route_after_coordinator(update) == "eligibility_check"
+    assert len(update["model_calls"]) == 2    # the invalid attempt was billed too, so it's recorded
 
     plan(None, invalid)
     with pytest.raises(PlanError):
