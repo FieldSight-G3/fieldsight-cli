@@ -15,11 +15,12 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from fieldsight.aws import clients
+from fieldsight.config import settings
 from fieldsight.graph.nodes import review
 from fieldsight.graph.nodes.review import reviewer_node
 from fieldsight.harness.bounds import BoundsConfig, SessionUsage, TurnUsage, UsageEvent
 from fieldsight.harness.bounds_runtime import BoundStopped, TurnBudget
-from fieldsight.config import settings
+
 
 class ApprovingModel:
     """Stateless stand-in for Bedrock, safe to share across threads: approve each new dossier, then stop."""

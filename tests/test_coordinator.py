@@ -1,9 +1,7 @@
 import pytest
-
 from langchain_core.messages import AIMessage
 
 from fieldsight.config import settings
-
 from fieldsight.errors import PlanError
 from fieldsight.graph.nodes import supervision
 from fieldsight.graph.nodes.supervision import coordinator_node, route_after_coordinator

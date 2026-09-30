@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from fieldsight.harness.run.lifecycle import run_turn
@@ -7,6 +8,7 @@ from fieldsight.repository import (
     ReviewQueueRepository,
     RunRecordRepository,
 )
+from fieldsight.schemas.run_records import ModelCall, ToolInvocation
 from fieldsight.types.run import WorkflowResult
 
 
@@ -81,3 +83,22 @@ def test_unknown_incident_still_leaves_a_run_record():
     assert dispatched == [] and run.route == "route_to_analyst" and run.escalation is None
     saved = RunRecordRepository().get(run.run_id)
     assert saved is not None and saved.incident_id is None
+
+def test_workflow_records_land_in_the_run_record():
+    incident_id = IncidentRepository().create("Substation 7", normalized_fields())
+    plan = {"trigger": "initial", "dispatches": [{"worker": "recordability", "reason": "treatment beyond first aid"}],
+            "energized_equipment_quote": None, "ungrounded": []}
+    tool = ToolInvocation(agent="recordability", tool="evaluate_rule", args={"rule_id": "R1"}, args_hash="h", outcome="recordable")
+    call = ModelCall(agent="recordability", model_id="m", input_tokens=10, output_tokens=2, latency_ms=5, cost_usd=Decimal("0.001"))
+
+    def workflow(incident, question, correlation_id):
+        return WorkflowResult(dossier={}, workers_dispatched=["recordability"], reviewer_approved=True, reviewer_iterations=1,
+                              plans=[plan], tool_invocations=[tool], model_calls=[call], reviewer_verdicts=[None])
+
+    run = run_turn({"command": "analyze", "incident_id": str(incident_id)}, workflow=workflow, answerer=no_answer)
+    saved = RunRecordRepository().get(run.run_id)
+
+    assert saved.workers_dispatched == {"items": ["recordability"], "plans": [plan]}
+    assert saved.tool_invocations == {"items": [tool.model_dump(mode="json")]}
+    assert saved.model_calls["items"][0]["cost_usd"] == "0.001"   # Decimal survives as exact text, not a float
+    assert saved.reviewer_verdicts == {"items": [None]}           # a Reviewer with no verdict stays visible as null

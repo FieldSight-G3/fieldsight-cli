@@ -156,6 +156,7 @@ class RunRecordRecord(BaseModel):
     rule_invocations: dict[str, Any] | None
     escalation_triggers: dict[str, Any] | None
     model_calls: dict[str, Any] | None
+    reviewer_verdicts: dict[str, Any] | None
     created_at: datetime
 
 class RunRecordRepository(_Repository):
