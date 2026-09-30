@@ -14,13 +14,26 @@ from uuid import UUID, uuid4
 from ...config import settings
 from ...graph.graph import graph_workflow
 from ...ingest.submit import ingest_packet, packet_artifacts
-from ...repository import IncidentRepository, RunRecordRepository
+from ...repository import (
+    IncidentRepository,
+    ReviewQueueRecord,
+    ReviewQueueRepository,
+    RunRecordRepository,
+)
 from ...schemas.incidents import NormalizedIncident
 from ...security.entitlement import require_grant, submit_establishment
 from ...types.artifacts import SubmitResult
 from ...types.run import TurnRun, WorkflowResult
 from ..bounds import BoundsConfig, SessionUsage, TurnUsage
 from ..bounds_runtime import BoundStopped
+from ..escalation.review import (
+    PendingReview,
+    ReviewConflict,
+    ReviewDecision,
+    ReviewRequest,
+    document_for_chunk,
+    submit_review,
+)
 from ..guardrails.common import refuse
 from ..guardrails.turn_check import check_turn
 from ..metering.meter import metered
@@ -100,6 +113,31 @@ def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = 
     if meter.stopped is not None and result.refusal is None:
         update["refusal"] = refuse("bound_reached", f"This session's {meter.stopped.reason_code} limit ({meter.stopped.limit}) is spent.")
     return result.model_copy(update=update) if update else result
+
+
+def review_queue(analyst_id: UUID | str) -> list[ReviewQueueRecord]:
+    """ the pending reviews over establishments the analyst holds a grant for, oldest first """
+
+    return ReviewQueueRepository().list_pending(reviewer_id=UUID(str(analyst_id)))
+
+
+def pending_review(incident_id: UUID | str, *, analyst_id: UUID | str) -> PendingReview | None:
+    """ the incident's decision card: its pending review and frozen dossier; raises ToolDenied without a grant """
+
+    require_grant(analyst_id, incident_id)
+    return ReviewQueueRepository().pending_for_incident(UUID(str(incident_id)))
+
+
+def record_review(incident_id: UUID | str, request: ReviewRequest, *, analyst_id: UUID | str) -> ReviewDecision:
+    """ one human decision on the incident's pending review, as the verified analyst; submit_review loads the item,
+        checks the grant and the two-person rule, and records it only while it's still pending """
+
+    queue = ReviewQueueRepository()
+    queue_id = queue.pending_queue_id(UUID(str(incident_id)))
+    if queue_id is None:
+        raise ReviewConflict(f"No pending review for {incident_id}")
+    return submit_review(request, queue_id=queue_id, verified_reviewer_id=UUID(str(analyst_id)), store=queue,
+                         source_for_chunk=document_for_chunk)
 
 
 def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None = None,

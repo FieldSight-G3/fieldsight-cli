@@ -285,8 +285,8 @@ class ReviewQueueRepository(_Repository):
             rows = connection.execute(statement).mappings().all()
         return [ReviewQueueRecord.model_validate(dict(row)) for row in rows]
 
-    def pending_for_incident(self, incident_id: UUID) -> PendingReview | None:
-        """The incident's oldest pending review with its snapshot, or None when it has none."""
+    def pending_queue_id(self, incident_id: UUID) -> UUID | None:
+        """The queue id of the incident's oldest pending review, or None when it has none."""
         statement = (
             select(self.table.c.queue_id)
             .where(self.table.c.incident_id == incident_id, self.table.c.status == "pending")
@@ -294,7 +294,11 @@ class ReviewQueueRepository(_Repository):
             .limit(1)
         )
         with self.engine.connect() as connection:
-            queue_id = connection.execute(statement).scalar_one_or_none()
+            return connection.execute(statement).scalar_one_or_none()
+
+    def pending_for_incident(self, incident_id: UUID) -> PendingReview | None:
+        """The incident's oldest pending review with its snapshot, or None when it has none."""
+        queue_id = self.pending_queue_id(incident_id)
         return self.get_pending(queue_id) if queue_id is not None else None
 
     def get_pending(self, queue_id: UUID) -> PendingReview | None:
