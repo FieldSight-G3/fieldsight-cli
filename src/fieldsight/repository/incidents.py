@@ -9,7 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import MetaData, Table, insert, select, update
 
-from fieldsight.harness.escalation.review import ReviewSnapshot
+from fieldsight.harness.escalation.snapshot import ReviewSnapshot
 
 from .base import _Repository
 

@@ -7,7 +7,7 @@ from ...rules.engine import evaluate_incident
 from ...types.escalation import EscalationPolicy, EscalationSignals
 from ...types.run import TurnRun
 from ..bounds import SessionUsage, TurnUsage, start_turn
-from ..escalation.review import ReviewSnapshot
+from ..escalation.snapshot import ReviewSnapshot
 from ..escalation.triggers import evaluate_escalation
 from ..guardrails.turn_check import check_turn
 from .answer import Answerer, answer_question

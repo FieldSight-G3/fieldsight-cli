@@ -30,8 +30,8 @@ from ...types.artifacts import SubmitResult
 from ...types.run import TurnRun, WorkflowResult
 from ..bounds import BoundsConfig, SessionUsage, TurnUsage
 from ..bounds_runtime import BoundStopped
+from ..escalation.pending import PendingReview
 from ..escalation.review import (
-    PendingReview,
     ReviewConflict,
     ReviewDecision,
     ReviewRequest,

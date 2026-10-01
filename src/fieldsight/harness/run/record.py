@@ -8,7 +8,7 @@ from ...schemas.incidents import NormalizedIncident
 from ...schemas.run_records import RuleInvocation
 from ...types.escalation import EscalationDecision
 from ...types.run import WorkflowResult
-from ..escalation.review import ReviewSnapshot
+from ..escalation.snapshot import ReviewSnapshot
 
 
 def _items(records: list) -> dict:

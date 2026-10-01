@@ -13,9 +13,9 @@ from sqlalchemy import MetaData, Table, insert, or_, select, update
 from sqlalchemy.exc import OperationalError
 
 from fieldsight.harness.bounds import BoundsConfig
+from fieldsight.harness.escalation.pending import PendingReview
 from fieldsight.harness.escalation.review import (
     CitationReference,
-    PendingReview,
     ReviewConflict,
     ReviewDecision,
     ReviewWriteFailed,

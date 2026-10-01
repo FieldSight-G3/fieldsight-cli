@@ -6,10 +6,10 @@ from uuid import UUID
 
 from pydantic import ValidationError
 
+from fieldsight.harness.escalation.pending import PendingReview
 from fieldsight.harness.escalation.review import (
     CitationReference,
     CitationRepoint,
-    PendingReview,
     ReviewConflict,
     ReviewDecision,
     ReviewEdit,

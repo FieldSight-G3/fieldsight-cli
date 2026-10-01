@@ -14,9 +14,9 @@ from fieldsight.harness.escalation.review import (
     CitationReference,
     ReviewConflict,
     ReviewDecision,
-    ReviewSnapshot,
     ReviewWriteFailed,
 )
+from fieldsight.harness.escalation.snapshot import ReviewSnapshot
 from fieldsight.repository import IncidentRepository, ReviewQueueRepository
 
 DOSSIER = {"narrative": "Worker slipped on wet stairs.", "outcome": {"recordable": True}}
