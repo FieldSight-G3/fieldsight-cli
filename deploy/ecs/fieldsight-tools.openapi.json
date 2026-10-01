@@ -1,0 +1,134 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FieldSight Gateway read tools",
+    "version": "1.0.0"
+  },
+  "components": {
+    "securitySchemes": {
+      "sigv4Reference": {
+        "type": "apiKey",
+        "name": "Authorization",
+        "in": "header",
+        "x-amazon-apigateway-authtype": "awsSigv4"
+      }
+    }
+  },
+  "paths": {
+    "/tools/get_incident_extraction": {
+      "post": {
+        "operationId": "get_incident_extraction",
+        "summary": "Read the current incident's extracted facts",
+        "security": [
+          {
+            "sigv4Reference": []
+          }
+        ],
+        "x-amazon-apigateway-auth": {
+          "type": "AWS_IAM"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "description": "Read the extraction for the authenticated caller's bound session.",
+                "properties": {},
+                "title": "GetExtractionInput",
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful read: a ToolResponse"
+          },
+          "400": {
+            "description": "Structured validation error"
+          },
+          "401": {
+            "description": "Unauthenticated caller"
+          },
+          "403": {
+            "description": "Caller has no grant"
+          },
+          "503": {
+            "description": "Structured unavailable error"
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "POST",
+          "connectionType": "VPC_LINK",
+          "connectionId": "jc7xe7",
+          "integrationTarget": "arn:aws:elasticloadbalancing:us-east-1:397345411365:loadbalancer/app/fieldsight-tools-alb/b91ca218b9d63c66",
+          "uri": "http://internal-fieldsight-tools-alb-2088834501.us-east-1.elb.amazonaws.com/tools/get_incident_extraction"
+        }
+      }
+    },
+    "/tools/find_similar_incidents": {
+      "post": {
+        "operationId": "find_similar_incidents",
+        "summary": "Find closed precedent cases for the current incident",
+        "security": [
+          {
+            "sigv4Reference": []
+          }
+        ],
+        "x-amazon-apigateway-auth": {
+          "type": "AWS_IAM"
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": false,
+                "description": "Choose the number of candidates, never the subject incident.",
+                "properties": {
+                  "limit": {
+                    "default": 3,
+                    "description": "Maximum number of similar incidents",
+                    "maximum": 5,
+                    "minimum": 1,
+                    "title": "Limit",
+                    "type": "integer"
+                  }
+                },
+                "title": "SimilarIncidentsInput",
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful read: a ToolResponse"
+          },
+          "400": {
+            "description": "Structured validation error"
+          },
+          "401": {
+            "description": "Unauthenticated caller"
+          },
+          "403": {
+            "description": "Caller has no grant"
+          },
+          "503": {
+            "description": "Structured unavailable error"
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "httpMethod": "POST",
+          "connectionType": "VPC_LINK",
+          "connectionId": "jc7xe7",
+          "integrationTarget": "arn:aws:elasticloadbalancing:us-east-1:397345411365:loadbalancer/app/fieldsight-tools-alb/b91ca218b9d63c66",
+          "uri": "http://internal-fieldsight-tools-alb-2088834501.us-east-1.elb.amazonaws.com/tools/find_similar_incidents"
+        }
+      }
+    }
+  }
+}
