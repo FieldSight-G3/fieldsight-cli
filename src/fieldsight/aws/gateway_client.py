@@ -13,18 +13,38 @@ import boto3
 import httpx
 from botocore.auth import SigV4Auth
 from botocore.awsrequest import AWSRequest
+from langchain_core.tools import BaseTool, StructuredTool
 from langchain_mcp_adapters.tools import load_mcp_tools
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import McpError
 
 from fieldsight.harness.bounds import BoundsConfig
+from fieldsight.schemas.tools import GetExtractionInput, SimilarIncidentsInput
 
 logger = logging.getLogger(__name__)
 
 # the read tools the Gateway routes to the ECS API
 GATEWAY_TOOL_NAMES = ("get_incident_extraction", "find_similar_incidents")
 UNREACHABLE = "The AgentCore Gateway or the ECS tool API could not be reached"
+# each tool's own input, which the API reads as the JSON request body
+TOOL_INPUTS = {"get_incident_extraction": GetExtractionInput, "find_similar_incidents": SimilarIncidentsInput}
+
+
+def api_tool(tool: BaseTool) -> BaseTool:
+    """ the Gateway offers an API Gateway target's tools as {basePath, body}; callers pass the API's own input instead
+
+        Without a body the API rejects the call (400, "A JSON object is required"), so the input always goes in it.
+    """
+
+    name = next((n for n in TOOL_INPUTS if tool.name == n or tool.name.endswith(f"___{n}")), None)
+    if name is None:
+        return tool
+
+    async def call(**arguments: Any) -> Any:
+        return await tool.ainvoke({"body": arguments})
+
+    return StructuredTool.from_function(coroutine=call, name=tool.name, description=tool.description, args_schema=TOOL_INPUTS[name])
 
 
 class SigV4HttpxAuth(httpx.Auth):
@@ -86,7 +106,7 @@ async def gateway_tools(thread_id: str, *, caller_proof: str, region: str | None
         ClientSession(read, write) as session,
     ):
         await session.initialize()
-        yield await load_mcp_tools(session)
+        yield [api_tool(tool) for tool in await load_mcp_tools(session)]
 
 
 class GatewayToolset(NamedTuple):

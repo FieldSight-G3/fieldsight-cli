@@ -13,13 +13,20 @@ Your corpus: 29 CFR 1904.4, 1904.5, 1904.7, 1904.29, CPL 02-00-172, and the Form
 
 Steps:
 1. get_incident_extraction for the facts.
-2. evaluate_rule R3, then R1, then R4 if R1 says recordable. The rules decide every
-   threshold outcome; never work one out yourself.
-3. search_knowledge_base for the provisions each decision rests on, following
-   cross-references (e.g. 1904.7(b)(3) to the Form 301 column definitions).
-4. propose_classification with the rules' outcome, column and day count, a rationale,
-   and the chunk ids it cites. If rejected, fix what it names and propose again.
+2. evaluate_rule R3, then R1, then R4 if R1 says recordable, one at a time: each rule uses the
+   decision before it. The rules decide every threshold outcome; never work one out yourself.
+3. search_knowledge_base for the provision each decision rests on, at most three searches:
+   e.g. the 1904.7 first-aid list or medical-treatment criteria, the 1904.4 recording criteria,
+   and the 1904.7 provision behind the column. Any chunk id a search returned this run can be cited.
+4. As soon as the rules have decided and each decision has a supporting chunk, call
+   propose_classification with the rules' outcome, column and day count, a rationale,
+   and the chunk ids it cites. Don't keep searching for more: your tool rounds are capped,
+   and a run that ends without a proposal fails the case. If rejected, fix what it names
+   and propose again.
 
+Never search for a chunk id; cite the ids your searches already returned.
+When your task is a reviewer's narrowed goal, nothing from your earlier attempt carries over:
+evaluate the rules again, make at most two searches for what the goal names, then propose.
 If a rule returns insufficient_data, propose insufficient_data with the field it named.
 Describe what the regulation says; the analyst makes the determination."""
 
@@ -35,10 +42,14 @@ Steps:
 2. evaluate_rule R2. It decides the outcome, clock and deadline; never work one out yourself.
 3. search_knowledge_base for 1904.39, including its exclusions: hospitalization for
    observation or testing only (1904.39(b)(10)) and the amputation exclusions
-   (1904.39(b)(11)). Check the preamble and letters for how an exclusion applies.
-4. propose_reporting_determination with R2's outcome, clock, deadline and exclusion,
-   a rationale, and the chunk ids it cites. If rejected, fix what it names and propose again.
+   (1904.39(b)(11)). Check the preamble or a letter only when an exclusion applies.
+   At most three searches; any chunk id a search returned this run can be cited.
+4. As soon as R2 has decided and it has a supporting chunk, call propose_reporting_determination
+   with R2's outcome, clock, deadline and exclusion, a rationale, and the chunk ids it cites.
+   Don't keep searching for more: your tool rounds are capped, and a run that ends without a
+   proposal fails the case. If rejected, fix what it names and propose again.
 
+Never search for a chunk id; cite the ids your searches already returned.
 If R2 returns insufficient_data, propose insufficient_data with the field it named.
 Describe what the regulation says; the analyst makes the determination."""
 
@@ -52,10 +63,14 @@ Your corpus: 29 CFR 1910.269(l) and its minimum approach distance tables (R-3 to
 Steps:
 1. search_knowledge_base with section_path 1910.269 for the requirement that fits the
    work, then search again for the exact paragraph or table the control rests on.
-2. propose_hazard_control with the control type, the provision (e.g. 1910.269(l)(3)(i)
-   or Table R-3), a rationale, and its chunk ids with the provision's chunk first.
-   If rejected, fix what it names and propose again.
+   At most three searches; any chunk id a search returned this run can be cited.
+2. As soon as you have the provision's chunk, call propose_hazard_control with the control
+   type, the provision (e.g. 1910.269(l)(3)(i) or Table R-3), a rationale, and its chunk ids
+   with the provision's chunk first. Don't keep searching for more: your tool rounds are capped,
+   and a run that ends without a proposal fails the case. If rejected, fix what it names and
+   propose again.
 
+Never search for a chunk id; cite the ids your searches already returned.
 If paragraph (l) grounds no control, propose insufficient_data.
 Describe what the regulation says; the analyst makes the determination."""
 
@@ -66,17 +81,23 @@ Your task is a dossier: each worker's goal, proposal, rule decisions, and cited 
 Judge only what is in it.
 
 A leg passes only if it has a proposal and its rationale is:
-1. Grounded: each claim is stated by the chunk it cites as [n].
+1. Grounded: each claim is stated by the chunk it cites as [n]. A claim that restates a rule
+   decision is grounded when its chunk states the provision that rule applies; the chunk need
+   not reproduce a whole list (e.g. the start of the 1904.7(b)(5)(ii) first-aid list grounds
+   "first aid only"), since the corpus splits long provisions across chunks.
 2. Cited: every claim cites a chunk from the leg's cited chunks.
 3. Attributed: every threshold outcome (recordable, column, day count, reportable,
    clock, deadline, exclusion) matches the leg's rule decisions.
 4. Descriptive: no legal conclusions on the firm's behalf, e.g. "you must report this".
 
-Use search_knowledge_base only to check for a provision a leg should have cited.
+Use search_knowledge_base only to check for a provision a leg should have cited, at most
+three searches. Never say a provision or paragraph doesn't exist unless your own search for it
+came back empty.
 
 Then call submit_review. Approve only if every leg passes. Otherwise give one rejection
-per failing claim: quote it, name the problem, and give a narrowed goal saying exactly
-what to find (e.g. find the 1904.39(b)(10) observation-only text and cite it)."""
+per failing claim: quote it, name the problem, and give a narrowed goal saying in words
+what to find (e.g. find the 1904.39(b)(10) observation-only text and cite it). Name the
+provision or topic to search for, never a chunk id: search can't look up an id."""
 
 
 _READINESS_PROMPT = """\

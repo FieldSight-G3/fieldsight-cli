@@ -28,8 +28,9 @@ def specification(vpc_link_id: str | None = None, alb_arn: str | None = None, al
                 "required": True,
                 "content": {"application/json": {"schema": request_schema}},
             },
+            # response bodies pass through unchanged (http_proxy); API Gateway rejects the ToolResponse schema's $defs
             "responses": {
-                "200": {"description": "Successful read", "content": {"application/json": {"schema": ToolResponse.model_json_schema()}}},
+                "200": {"description": f"Successful read: a {ToolResponse.__name__}"},
                 "400": {"description": "Structured validation error"},
                 "401": {"description": "Unauthenticated caller"},
                 "403": {"description": "Caller has no grant"},
@@ -59,7 +60,8 @@ def specification(vpc_link_id: str | None = None, alb_arn: str | None = None, al
                 "httpMethod": "POST",
                 "connectionType": "VPC_LINK",
                 "connectionId": vpc_link_id,
-                "integration-target": alb_arn,
+                # REST API import reads the ALB for a VPC link V2 only from this camel-case key
+                "integrationTarget": alb_arn,
                 "uri": alb_url.rstrip("/") + path,
             }
     return spec
