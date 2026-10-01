@@ -7,6 +7,20 @@ SOURCES = [
     "OSHA Form 300 column definitions",
 ]
 
+# the 1904.7(b) paragraph that says how each column's kind of case is entered on the log
+COLUMN_PROVISIONS = {
+    "G": "29 CFR 1904.7(b)(2)",
+    "H": "29 CFR 1904.7(b)(3)",
+    "I": "29 CFR 1904.7(b)(4)",
+    "J": "29 CFR 1904.7(b)(5)",
+}
+
+
+def column_sources(column: str) -> list[str]:
+    """ the provisions a column decision applied: the paragraph for that kind of case, then the log's column rules """
+
+    return [COLUMN_PROVISIONS[column], "29 CFR 1904.29(b)(3)", "OSHA Form 300 column definitions"]
+
 
 def log_classification(data: R4Inputs) -> RuleDecision:
     inputs = data.model_dump(mode="json")
@@ -66,7 +80,7 @@ def log_classification(data: R4Inputs) -> RuleDecision:
         rule_id="R4",
         outcome=column,
         inputs=inputs,
-        sources=SOURCES,
+        sources=column_sources(column),
         log_column=column,
         day_count=day_count,
     )

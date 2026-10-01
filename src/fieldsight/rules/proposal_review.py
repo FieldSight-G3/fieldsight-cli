@@ -1,5 +1,8 @@
 """ check a specialist's proposal against this run's rule decisions and retrieved chunks; nothing is written """
 
+import re
+
+from ..ingest.corpus.outline import covers
 from ..schemas.rule_decision import RuleDecision
 from ..schemas.rule_proposal import (
     ClassificationProposal,
@@ -80,4 +83,44 @@ def review_hazard_control(proposal: HazardControlProposal, retrieved: set[str]) 
     in_table = proposal.control_type == "minimum_approach_distance" and proposal.provision.startswith("Table R-")
     if not (in_paragraph or in_table):
         problems.append(f"{proposal.control_type} rests on {paragraph}, not {proposal.provision}")
+    return problems
+
+
+# a sentence that restates a rule decision, and the citations in it
+RULE_MENTION = re.compile(r"\bR([1-4])\b")
+CITATION = re.compile(r"\[(\d+)\]")
+PROVISION = re.compile(r"(\d{4}\.\d+)((?:\([^)]+\))*)")
+# a source that names no CFR provision, and the document that states it
+NAMED_SOURCES = {"OSHA Form 300 column definitions": "FORM-301"}
+
+
+def grounds(source: str, hit: dict) -> bool:
+    """ whether a retrieved chunk states a rule's source provision: a regulation chunk of that paragraph (or of a
+        paragraph under it, or a parent chunk holding its lines), or the named document """
+
+    found = PROVISION.search(source)
+    if found:
+        return hit.get("doc_id", "").startswith("CFR-") and covers(
+            hit.get("paragraph") or hit.get("section_path", ""), hit.get("text", ""), found.group(1) + found.group(2))
+    return hit.get("doc_id") == NAMED_SOURCES.get(source)
+
+
+def rule_citation_problems(proposal: Proposal, decisions: dict[str, dict], retrieved: dict[str, dict]) -> list[str]:
+    """ each sentence that restates a rule decision cites a chunk of a provision that rule applied
+
+        A rule decision lists the provisions it applied (its sources). A sentence attributing an outcome to a rule is
+        grounded by one of those provisions, at paragraph level, not by whatever a search turned up nearby; the
+        problem names the provisions so the worker can read_provision them and cite the result.
+    """
+
+    problems = []
+    for sentence in re.split(r"(?<=[.!?])\s+", proposal.rationale.strip()):
+        rules = list(dict.fromkeys(f"R{n}" for n in RULE_MENTION.findall(sentence) if f"R{n}" in decisions))
+        if not rules:
+            continue
+        sources = list(dict.fromkeys(source for rule in rules for source in decisions[rule].get("sources") or []))
+        cited = [proposal.chunk_ids[int(n) - 1] for n in CITATION.findall(sentence) if 0 < int(n) <= len(proposal.chunk_ids)]
+        if not any(grounds(source, retrieved.get(chunk_id) or {}) for source in sources for chunk_id in cited):
+            problems.append(f'"{sentence[:80]}" restates {"/".join(rules)} but cites no chunk stating a provision it '
+                            f"applied: read_provision({sources}) and cite a chunk it returns")
     return problems

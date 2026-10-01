@@ -72,16 +72,17 @@ def test_a_meter_refusal_ends_the_workflow_instead_of_raising():
     assert harness_workflow(spent)(READY, None, "c-1") == WorkflowResult(dossier={})
 
 
-def test_objections_are_carried_into_the_regenerated_question():
+def test_objections_reach_the_model_but_never_the_search():
     seen = []
-    chain = SimpleNamespace(invoke=lambda inputs: seen.append(inputs["question"]) or "answer")
+    chain = SimpleNamespace(invoke=lambda inputs: seen.append(inputs) or "answer")
     answer = rag_answerer(chain)
 
     assert answer("What counts as first aid?", []) == "answer"
     answer("What counts as first aid?", ["uncited claim: 'sutures are first aid'"])
 
-    assert seen[0] == "What counts as first aid?"
-    assert "uncited claim: 'sutures are first aid'" in seen[1] and seen[1].startswith("What counts as first aid?")
+    # the question searched stays the analyst's, so a retry retrieves what the first try did
+    assert [inputs["question"] for inputs in seen] == ["What counts as first aid?"] * 2
+    assert seen[0]["objections"] == "" and "uncited claim: 'sutures are first aid'" in seen[1]["objections"]
 
 
 @pytest.fixture

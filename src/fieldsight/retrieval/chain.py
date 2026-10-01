@@ -24,12 +24,21 @@ corpus of federal regulatory text.
 The excerpts below are the ONLY source you may use. They override anything you
 believe about OSHA rules.
 
-- If the excerpts answer the question, answer from them. Cite every claim as [n],
+- If the excerpts answer the question, answer from them. Cite every sentence as [n],
   where n is the position of the excerpt's chunk id in your chunk_ids list.
+- Don't restate the question's facts in a sentence of their own; apply the regulation
+  to them in a cited sentence instead.
 - If the excerpts do NOT cover the question, set grounded to false and say what is
   missing. Do not fill the gap from general knowledge.
 - Describe what the regulation says. Never state whether this employer must record
   or report; the analyst determines that.
+- State an obligation as what the provision requires, e.g. "1904.39(a)(1) requires
+  employers to report a fatality within 8 hours", never as "must be reported", "must
+  be recorded" or "you must", which read as a determination. Paraphrase a provision's
+  "must" sentence this way; don't quote it.
+- When an excerpt from a letter of interpretation or the directive addresses the
+  question's specific situation, it applies the general rule to that situation: lead
+  with what it says, then the general rule it applies.
 
 Excerpts:
 {context}"""
@@ -49,8 +58,8 @@ def build_rag_chain() -> Runnable:
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", GROUNDED_SYSTEM),
-        ("human", "{question}")
-    ])
+        ("human", "{question}{objections}")
+    ]).partial(objections="")
 
     structured_model: Runnable[Any, DraftAnswer] = cast(
         "Runnable[Any, DraftAnswer]",

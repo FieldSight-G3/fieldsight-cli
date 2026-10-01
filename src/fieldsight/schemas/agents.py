@@ -21,16 +21,17 @@ class DispatchPlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     dispatches: list[Dispatch] = Field(max_length=3, description="0 to 3 workers; empty when none can help")
+    # required, though nullable: an optional field is one a model leaves out, so the quote never arrived
     energized_equipment_quote: str | None = Field(
-        default=None, description="Verbatim narrative text showing work on or near energized equipment; null if none")
+        description="Required when hazard_control is dispatched: the narrative text, copied exactly, "
+                                  "that shows work on or near energized equipment; null if none")
 
     @model_validator(mode="after")
     def valid_plan(self) -> "DispatchPlan":
         workers = [d.worker for d in self.dispatches]
         if len(workers) != len(set(workers)):
             raise ValueError("each worker is dispatched at most once")
-        if "hazard_control" in workers and not self.energized_equipment_quote:
-            raise ValueError("hazard_control neds an energized-equipment quote")
-
+        # a hazard_control dispatch without a quote isn't refused here: the Coordinator drops it as ungrounded and
+        # records why, so a missing quote costs that one worker, never the whole plan
         return self
 

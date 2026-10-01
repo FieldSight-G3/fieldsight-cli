@@ -1,7 +1,9 @@
-""" the golden set: one YAML case per file under evals/golden/, and the checks §14 puts on the set as a whole
+""" the golden set: one YAML case per file, and the checks §14 puts on it
 
-    A case is a plain dict, read as written; the runners read the fields they need and a missing one is a problem
-    this module reports, not a crash in a runner.
+    evals/golden/ holds the 15 cases §14's table names. evals/escalation/ holds the paired escalation cases §14
+    requires on top of them, and the other side of each threshold boundary; both run in both tiers, and a pair may
+    span the two folders. A case is a plain dict, read as written; a missing field is a problem this module
+    reports, not a crash in a runner.
 """
 
 from collections import Counter
@@ -10,9 +12,12 @@ from typing import Any
 
 import yaml
 
-GOLDEN = Path(__file__).resolve().parents[3] / "evals" / "golden"
+EVALS = Path(__file__).resolve().parents[3] / "evals"
+GOLDEN = EVALS / "golden"
+ESCALATION = EVALS / "escalation"
 
 # §14's table: the minimum cases per category
+# §14's table: exactly these cases per category in evals/golden/
 REQUIRED = {"single_document": 2, "multi_hop": 1, "threshold": 3, "incident_backed": 1, "out_of_corpus": 2,
             "determination_probe": 1, "adversarial": 4, "near_miss": 1}
 # §14: one fires-and-doesn't pair for each of these named triggers (the injection pair's "fires" half is adversarial-02)
@@ -29,6 +34,12 @@ def load_cases(directory: Path = GOLDEN) -> list[dict[str, Any]]:
         case = yaml.safe_load(path.read_text(encoding="utf-8"))
         cases.append({**case, "_file": path.name})
     return cases
+
+
+def load_all() -> list[dict[str, Any]]:
+    """ the golden set and the escalation cases, the set every runner runs """
+
+    return load_cases(GOLDEN) + load_cases(ESCALATION)
 
 
 def turns(case: dict[str, Any]) -> list[dict[str, Any]]:
@@ -76,14 +87,18 @@ def case_problems(case: dict[str, Any]) -> list[str]:
     return problems
 
 
-def set_problems(cases: list[dict[str, Any]]) -> list[str]:
-    """ the set-level rules: category counts, unique ids, complete pairs, multi-turn cases, the paired triggers """
+def set_problems(golden: list[dict[str, Any]], extra: list[dict[str, Any]] | None = None) -> list[str]:
+    """ the set-level rules: the golden set is §14's table exactly; ids, pairs and paired triggers span both folders """
 
+    extra = extra or []
+    cases = golden + extra
     problems = [problem for case in cases for problem in case_problems(case)]
 
-    counts = Counter(case.get("category") for case in cases)
-    problems += [f"{category}: {counts[category]} case(s), §14 requires {minimum}"
-                 for category, minimum in REQUIRED.items() if counts[category] < minimum]
+    counts = Counter(case.get("category") for case in golden)
+    problems += [f"golden {category}: {counts[category]} case(s), §14's table has {wanted}"
+                 for category, wanted in REQUIRED.items() if counts[category] != wanted]
+    problems += [f"golden: {case['_file']} is an escalation pair; those go in evals/escalation/"
+                 for case in golden if case.get("category") == "escalation_pair"]
 
     duplicates = [case_id for case_id, n in Counter(case.get("id") for case in cases).items() if n > 1]
     problems += [f"duplicate case id {case_id}" for case_id in duplicates]
@@ -104,6 +119,6 @@ def set_problems(cases: list[dict[str, Any]]) -> list[str]:
             if (trigger, fires) not in fired:
                 problems.append(f"no case where {trigger} {'fires' if fires else 'does not fire'}")
 
-    if sum(1 for case in cases if len(turns(case)) > 1) < 2:
+    if sum(1 for case in golden if len(turns(case)) > 1) < 2:
         problems.append("§14 needs at least two multi-turn cases")
     return problems

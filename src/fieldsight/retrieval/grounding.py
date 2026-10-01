@@ -1,6 +1,7 @@
 """ keep grounded answers; refuse the rest with what was searched and where to escalate """
 
 import logging
+import re
 
 from ..schemas.retrieval import (
     Citation,
@@ -21,6 +22,9 @@ PROBLEMS: dict[RefusalReason, str] = {
     "not_grounded": "The retrieved passages don't answer this question.",
     "unresolved_citation": "The answer cited passages that weren't retrieved, so it can't be trusted.",
 }
+
+# a citation in an answer, [n]
+CITATION = re.compile(r"\[(\d+)\]")
 
 
 def searched(retrievals: list[Retrieval]) -> list[str]:
@@ -53,8 +57,15 @@ def refuse(evidence: dict, reason: RefusalReason | None = None, detail: str = ""
 def enforce_grounding(evidence: dict) -> GroundedAnswer:
     """ keep the answer only if the model says it's grounded and every cited chunk was retrieved """
 
-    draft: DraftAnswer = evidence["draft"]
+    draft: DraftAnswer | None = evidence["draft"]
     retrieved = {meta(doc)["chunk_id"]: meta(doc) for doc in evidence["docs"]}
+    if draft is None:
+        # the model answered in prose instead of the structured draft: nothing it said can be checked
+        return refuse(evidence, "not_grounded", " The model returned no structured answer.")
+    cited = [int(n) for n in CITATION.findall(draft.answer)]
+    if cited and len(draft.chunk_ids) < max(cited) <= len(evidence["docs"]):
+        # the model numbered its citations by the excerpts as shown, not by its own chunk_ids list
+        draft = draft.model_copy(update={"chunk_ids": [meta(doc)["chunk_id"] for doc in evidence["docs"]]})
     if not draft.grounded or not draft.chunk_ids:
         return refuse(evidence, "not_grounded", f" The model said: {draft.answer}")
     unresolved = [chunk_id for chunk_id in draft.chunk_ids if chunk_id not in retrieved]

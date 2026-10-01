@@ -33,6 +33,10 @@ def _plan(state: dict) -> tuple[DispatchPlan, list[ModelCall]]:
     raise PlanError("the Coordinator returned no valid plan after one retry")
 
 
+def _words(text: str) -> str:
+    return " ".join(text.split()).casefold()
+
+
 def coordinator_node(state: dict) -> dict:
     """ first pass: the model plans. After a Reviewer rejection: re-dispatch only the rejected workers, no model call """
     call = []
@@ -46,9 +50,14 @@ def coordinator_node(state: dict) -> dict:
         dispatches = [d.model_dump() for d in plan.dispatches]
         quote, trigger = plan.energized_equipment_quote, "initial"
 
-    # the model chooses hazard_control; this checks its grounds are really in the narrative
-    grounded = bool(quote) and quote in (state.get("narrative") or "")
-    kept = [d for d in dispatches if grounded or d["worker"] != "hazard_control"]
+    # the model chooses hazard_control; this checks its grounds are really in the narrative, word for word
+    # (case and spacing aside: a quote that starts mid-sentence lowercases its first letter)
+    grounded = bool(quote) and _words(quote) in _words(state.get("narrative") or "")
+    # reportability needs a 1904.39 event: an "other" event with no death can't be one, whatever the plan says
+    fields = state.get("incident") or {}
+    no_event = fields.get("event_type") == "other" and fields.get("death") is False
+    kept = [d for d in dispatches if (grounded or d["worker"] != "hazard_control")
+            and not (no_event and d["worker"] == "reportability")]
     update = {"plans": [{"trigger": trigger, "dispatches": kept, "energized_equipment_quote": quote, 
                          "ungrounded": [d for d in dispatches if d not in kept]}],"model_calls": call}
     if trigger == "initial":

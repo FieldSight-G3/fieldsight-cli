@@ -74,17 +74,20 @@ def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer:
     # node for prompting the model: it investigates with its tools, then proposes its finding through its propose tool
     def agent(state: SpecialistState) -> dict:
         messages = list(state.get("messages") or [])
+        # a reused thread's last run can end on tool calls the cap stopped; they're closed on the thread first, so
+        # the stored thread stays valid for Bedrock, and this run starts after them
+        closing = unanswered(messages) if not state.get("rounds") else []
         # a reused thread (the Reviewer's) keeps every earlier run, but the model sees only this one: replaying them
         # all grew each call past 30K tokens, and the task already holds everything this run judges
-        start = len(messages) if not state.get("rounds") else state.get("run_start", 0)
+        start = len(messages) + len(closing) if not state.get("rounds") else state.get("run_start", 0)
         # the brief goes in fresh on every call, never into the thread: a reused thread would otherwise keep the
         # brief it was first run with, and a changed prompt would never reach it
         history = [message for message in messages[start:] if not isinstance(message, SystemMessage)]
         seed: list = []
-        # every run starts with its task, after closing any tool calls a reused thread's last run left unanswered
+        # every run starts with its task
         if not state.get("rounds"):
-            seed = unanswered(history) + [HumanMessage(state["task"])]
-            history += seed
+            history.append(HumanMessage(state["task"]))
+            seed = closing + history[-1:]
         # the cap drops the last round's tool calls, so warn while two rounds can still run: one to propose, one to fix it
         elif state["rounds"] == MAX_SPECIALIST_TOOL_ROUNDS - 3:
             seed = [HumanMessage(WIND_DOWN)]

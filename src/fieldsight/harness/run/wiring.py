@@ -49,6 +49,9 @@ from .workflow import Workflow
 
 logger = logging.getLogger(__name__)
 
+# where a submit's run record keeps what its Prompt Attacks screen found
+SUBMIT_SCREEN = "submit_screen"
+
 def harness_workflow(workflow: Workflow) -> Workflow:
     """ the graph's workflow as the harness runs it: a meter refusal ends the turn instead of raising, and the cited
         hits' scores go to escalation's retrieval trigger """
@@ -67,7 +70,8 @@ def harness_workflow(workflow: Workflow) -> Workflow:
 
 
 def rag_answerer(chain: Any = None) -> Answerer:
-    """ the retrieval chain as run_turn's answerer; a regeneration carries the guard's objections into the question """
+    """ the retrieval chain as run_turn's answerer; a regeneration carries the guard's objections to the model,
+        never into the search, so a retry retrieves what the question did """
 
     built: list[Any] = [chain]
 
@@ -76,9 +80,9 @@ def rag_answerer(chain: Any = None) -> Answerer:
             from ...retrieval.chain import build_rag_chain
 
             built[0] = build_rag_chain()
-        if objections:
-            question += "\n\nYour previous answer was refused. Fix these before answering again:\n" + "\n".join(f"- {o}" for o in objections)
-        return built[0].invoke({"question": question})
+        fixes = ("\n\nYour previous answer was refused. Fix these before answering again:\n"
+                 + "\n".join(f"- {o}" for o in objections)) if objections else ""
+        return built[0].invoke({"question": question, "objections": fixes})
 
     return answer
 
@@ -202,8 +206,12 @@ def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None 
         return SubmitResult(incident_id=None, establishment=establishment, report=None, withheld=[], photos=[],
                             refusal=validated["refusal"])
 
+    attacked: list[bool] = []
+
     def screen(cracked: dict[str, str]) -> dict[str, str]:
-        return screen_texts(validated["request"], cracked, correlation_id=str(correlation_id))["texts"]
+        screened = screen_texts(validated["request"], cracked, correlation_id=str(correlation_id))
+        attacked.append(screened["prompt_attack_detected"])
+        return screened["texts"]
 
     start = SessionUsage(session_id=str(analyst), incident_id=UUID(int=0), turn=TurnUsage(turn_id=str(correlation_id)))
     with metered(start, limits or settings.bounds, pricing) as meter:
@@ -215,6 +223,8 @@ def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None 
                                               # what find_similar_incidents searches with for this incident
                                               embedding=embed_narrative(packet["narrative"]))
     # the normalizer's and the photo checks' calls, priced by the meter
-    RunRepository().create(correlation_id, "submit", incident_id=incident_id, model_calls=metered_calls("submit", meter.calls))
+    # an attack withheld here is a signal every later turn on the incident escalates on, so the submit records it
+    RunRepository().create(correlation_id, "submit", incident_id=incident_id, model_calls=metered_calls("submit", meter.calls),
+                           escalation_triggers={SUBMIT_SCREEN: {"prompt_attack_detected": any(attacked)}})
     return SubmitResult(incident_id=str(incident_id), establishment=establishment, report=packet["report"],
                         withheld=packet["withheld"], photos=packet["photos"], refusal=None)

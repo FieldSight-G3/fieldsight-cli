@@ -22,14 +22,25 @@ THRESHOLDS = {
 }
 
 
-def guard_answer(generate: Callable[[list[str]], DraftAnswer], *, incident: NormalizedIncident | None,
+def guard_answer(generate: Callable[[list[str]], DraftAnswer], *,
+                 incident: NormalizedIncident | Callable[[], NormalizedIncident | None] | None,
                  retrieved: set[str], rule_invocations: list[RuleInvocation], names: set[str],
                  correlation_id: str) -> dict:
     """ generate(objections) drafts the answer again with the objections attached
 
         returns the text safe to show (or a refusal), citations_supported for EscalationSignals,
         this turn's rule invocations including any the guard ran, and the events
+
+        incident is the facts the answer's thresholds are attributed to; a callable is resolved only when a threshold
+        needs them, so a turn that states none never pays for reading them
     """
+
+    facts: list[NormalizedIncident | None] = []
+
+    def subject() -> NormalizedIncident | None:
+        if not facts:
+            facts.append(incident() if callable(incident) else incident)
+        return facts[0]
 
     def result(text: str | None, refusal: dict | None) -> dict:
         return {"text": text, "refusal": refusal, "citations_supported": citations_supported,
@@ -50,8 +61,8 @@ def guard_answer(generate: Callable[[list[str]], DraftAnswer], *, incident: Norm
 
         # a threshold outcome with no rules-engine invocation: run the rules (the harness path), inject, regenerate
         unattributed = [rule for rule, pattern in THRESHOLDS.items() if pattern.search(draft.answer) and rule not in latest(invocations)]
-        if unattributed and incident:
-            invocations += evaluate_incident(incident).invocations
+        if unattributed and subject():
+            invocations += evaluate_incident(subject()).invocations
             emit(events, correlation_id, "output", "unattributed_threshold", "rule_run", ",".join(unattributed))
         decisions = latest(invocations)
         objections += [f"{rule} returned {decisions[rule]['outcome']}; state only that, attributed to {rule}" if rule in decisions

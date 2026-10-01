@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from ..aws.gateway_reads import GATEWAY_UNAVAILABLE
 from ..errors import RetrievalError, RuleError
 from ..harness.guardrails.common import DETERMINATION
-from ..retrieval.corpus import meta, search
+from ..retrieval.corpus import meta, provision_text, search
 from ..rules import proposal_review
 from ..rules.engine import evaluate_rule as run_rule
 from ..schemas.review import ReviewVerdict
@@ -86,12 +86,44 @@ def search_knowledge_base(
         docs = search(query, doc_type=doc_type, section_path=section_path)
     except RetrievalError as error:
         return {"error": str(error)}
-    results = [
-        {**{key: meta(doc)[key] for key in ("chunk_id", "doc_id", "title", "doc_type", "section_path")},
-         "score": doc.metadata["score"], "text": doc.page_content}
-        for doc in docs]
+    results = [hit_of(doc) for doc in docs]
     # keep each hit, not just its id, so the Reviewer can judge a claim against the text it cites
     return respond({"results": results}, tool_call_id, retrieved={hit["chunk_id"]: hit for hit in results})
+
+
+def hit_of(doc) -> dict:
+    """ a retrieved chunk as a tool returns it and the worker's state keeps it """
+
+    found = {key: meta(doc)[key] for key in ("chunk_id", "doc_id", "title", "doc_type", "section_path")}
+    return {**found, "paragraph": meta(doc).get("paragraph", found["section_path"]),
+            "score": doc.metadata["score"], "text": doc.page_content}
+
+
+@tool(parse_docstring=True)
+def read_provision(
+    provisions: list[str],
+    tool_call_id: Annotated[str, InjectedToolCallId],
+) -> Command | dict:
+    """ Read regulation provisions by their citations, all in one call, e.g. every provision your rule decisions list.
+
+    Returns, for each provision, the chunks that state it, each with the chunk_id to cite. A sentence restating a
+    rule decision cites one of the chunks for a provision in that decision's sources.
+
+    Args:
+        provisions: The provisions as rule decisions' sources name them, e.g. ["29 CFR 1904.7(b)(5)(ii)", "29 CFR 1904.4(a)"].
+    """
+
+    by_provision, retrieved = {}, {}
+    for provision in dict.fromkeys(provisions):
+        try:
+            # an exact lookup by paragraph, not a similarity search: its hits carry no score, so they never count as
+            # retrieval falling below the threshold
+            hits = [{key: value for key, value in hit_of(doc).items() if key != "score"} for doc in provision_text(provision)]
+        except RetrievalError as error:
+            return {"error": str(error)}
+        by_provision[provision] = hits or "no regulation chunk states it; cite the closest one your searches found"
+        retrieved |= {hit["chunk_id"]: hit for hit in hits}
+    return respond({"provisions": by_provision}, tool_call_id, retrieved=retrieved)
 
 
 @tool(parse_docstring=True)
@@ -124,7 +156,10 @@ def propose(proposal: BaseModel, problems: list[str], tool_call_id: str) -> Comm
     """
 
     if determination := DETERMINATION.search(getattr(proposal, "rationale", "") or ""):
-        problems = [*problems, f'describe what the regulation says instead of concluding: "{determination.group()}"']
+        problems = [*problems, (f'"{determination.group()}" states a determination. Attribute the outcome to the rule '
+                                f'that decided it instead, e.g. "R1 found the 1904.7 recording criteria met" or "R2 found '
+                                f'the event reportable under 1904.39(a)(2)", and avoid "must", "is recordable" and '
+                                f'"is reportable" anywhere in the rationale')]
     if problems:
         return respond({"status": "rejected", "problems": problems}, tool_call_id)
     accepted = proposal.model_dump(mode="json")
@@ -146,7 +181,8 @@ def propose_classification(
         proposal: The outcome, column and day count exactly as the rules returned them, a rationale, and its chunk ids.
     """
 
-    problems = proposal_review.review_classification(proposal, state["decisions"],set(state["retrieved"]))
+    problems = proposal_review.review_classification(proposal, state["decisions"], set(state["retrieved"]))
+    problems += proposal_review.rule_citation_problems(proposal, state["decisions"], state["retrieved"])
     return propose(proposal, problems, tool_call_id)
 
 
@@ -165,7 +201,8 @@ def propose_reporting_determination(
         proposal: The outcome, clock, deadline and exclusion exactly as R2 returned them, a rationale, and its chunk ids.
     """
 
-    problems = proposal_review.review_reporting(proposal, state["decisions"],set(state["retrieved"]))
+    problems = proposal_review.review_reporting(proposal, state["decisions"], set(state["retrieved"]))
+    problems += proposal_review.rule_citation_problems(proposal, state["decisions"], state["retrieved"])
     return propose(proposal, problems, tool_call_id)
 
 
@@ -212,8 +249,9 @@ def submit_review(
 
 # the tools to BIND to each participant's model (spec section 9)
 TOOLSETS = {
-    "recordability": [get_incident_extraction, search_knowledge_base, evaluate_rule, propose_classification],
-    "reportability": [get_incident_extraction, search_knowledge_base, evaluate_rule, propose_reporting_determination],
+    "recordability": [get_incident_extraction, search_knowledge_base, read_provision, evaluate_rule, propose_classification],
+    "reportability": [get_incident_extraction, search_knowledge_base, read_provision, evaluate_rule,
+                      propose_reporting_determination],
     "hazard_control": [search_knowledge_base, find_similar_incidents, propose_hazard_control],
     "reviewer": [search_knowledge_base, submit_review],
 }

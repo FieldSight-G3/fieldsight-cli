@@ -39,8 +39,12 @@ class PricingConfig(BaseModel):
     def from_settings(cls) -> PricingConfig:
         """ the reasoning and fast tier models, at the prices config holds for them """
 
-        return cls(prices={base_model(settings.bedrock_model_id): settings.reasoning_price,
-                           base_model(settings.bedrock_fast_model_id): settings.fast_price})
+        prices = {base_model(settings.bedrock_model_id): settings.reasoning_price,
+                  base_model(settings.bedrock_fast_model_id): settings.fast_price}
+        if settings.multimodal_price is not None:
+            # the photo model, when it's its own (FIELDSIGHT_BEDROCK_MULTIMODAL_MODEL_ID); unpriced, the meter refuses it
+            prices[base_model(settings.bedrock_multimodal_model_id)] = settings.multimodal_price
+        return cls(prices=prices)
 
     def price(self, model_id: str) -> ModelPrice:
         base = base_model(model_id)

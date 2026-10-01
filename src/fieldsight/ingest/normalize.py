@@ -26,6 +26,9 @@ FORM_SOURCES: dict[str, tuple[str, ...]] = {
     "death": ("date of death",),
 }
 
+# the fields that describe one kind of event only, and that event
+EVENT_DETAILS = {"admission_reason": "inpatient_hospitalization", "amputation_detail": "amputation"}
+
 # a supervisor note is typed text, not OCR, so what's read from it is exact
 NARRATIVE_CONFIDENCE = 1.0
 
@@ -60,6 +63,10 @@ def attach_provenance(packet: dict) -> NormalizedIncident:
     """ each value's confidence and source from the extraction, never the model; a value with no source is dropped """
 
     values = packet["draft"].model_dump(exclude={"incident_id", "confidences", "sources"})
+    # each detail belongs to one event type; a model fills an enum it was told to leave null, so the code decides
+    for detail, event in EVENT_DETAILS.items():
+        if values.get("event_type") != event:
+            values[detail] = None
     confidences: dict[str, float] = {}
     sources: dict[str, str] = {}
     for name, value in values.items():

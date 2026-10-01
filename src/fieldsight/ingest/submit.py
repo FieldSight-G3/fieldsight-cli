@@ -9,6 +9,8 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
+from botocore.exceptions import BotoCoreError, ClientError
+
 from ..errors import ExtractionError
 from ..schemas.rule_input import R5Inputs
 from ..types.artifacts import ArtifactFailure, IngestedPacket, PhotoCorroboration
@@ -16,8 +18,9 @@ from ..types.guardrails import ARTIFACT_NAME
 from .artifacts.packet import crack_packet
 from .artifacts.redact import redact
 from .artifacts.report import ingestion_report
-from .corroborate import MAX_IMAGE_BYTES, corroborate, too_large
+from .corroborate import corroborate
 from .normalize import normalize_chain
+from .paragraphs import paragraphs
 
 log = logging.getLogger(__name__)
 
@@ -41,18 +44,23 @@ def packet_artifacts(folder: Path) -> tuple[list[Path], list[ArtifactFailure]]:
 
 
 def corroborate_photos(photos: list[Path], narrative: str | None) -> tuple[list[PhotoCorroboration], list[ArtifactFailure]]:
-    """ each photo's verdict against the redacted narrative; one that's too large or can't be judged is skipped and logged """
+    """ each photo's verdict against the redacted narrative; one that can't be judged is skipped and logged
+
+        That includes the photo model being unreachable or refusing the call, and a file that isn't a readable image:
+        the incident proceeds, its photo check is unevaluated, and the ingestion report names the gap (section 13).
+    """
 
     verdicts, failures = [], []
     for photo in photos:
-        if too_large(photo):
-            failures.append(ArtifactFailure(artifact=photo.name,
-                                            reason=f"photo too large for the model (over {MAX_IMAGE_BYTES / 1024 / 1024:.2f} MB)"))
-            continue
         try:
             verdicts.append(corroborate(photo, narrative))
         except ExtractionError as error:
             failures.append(ArtifactFailure(artifact=photo.name, reason=str(error)))
+        except ClientError as error:
+            code = error.response.get("Error", {}).get("Code", "ClientError")
+            failures.append(ArtifactFailure(artifact=photo.name, reason=f"the photo model couldn't be called ({code})"))
+        except (BotoCoreError, OSError) as error:
+            failures.append(ArtifactFailure(artifact=photo.name, reason=f"the photo couldn't be judged ({type(error).__name__})"))
     for failure in failures:
         log.warning("skipped photo %s: %s", failure["artifact"], failure["reason"])
     return verdicts, failures
@@ -72,7 +80,8 @@ def ingest_packet(supported: list[Path], skipped: list[ArtifactFailure], *, scre
     fields = [field for key, field in zip(keys, extraction["fields"]) if key in screened]
     kept_notes = [name for name in notes if name in screened]
 
-    redacted = redact(fields, "\n\n".join(notes[name] for name in kept_notes) or None)
+    # a note as the screen passed it, its attacked paragraphs withheld; never the original text
+    redacted = redact(fields, "\n\n".join(screened[name] for name in kept_notes) or None)
     incident = normalize_chain().invoke({"fields": redacted["fields"], "narrative": redacted["narrative"],
                                          "narrative_artifact": ", ".join(kept_notes)})
     photos, photo_failures = corroborate_photos([path for path in supported if path.suffix.lower() in PHOTO_SUFFIXES],
@@ -80,4 +89,6 @@ def ingest_packet(supported: list[Path], skipped: list[ArtifactFailure], *, scre
     report = ingestion_report({"artifacts": [path.name for path in supported], "fields": extraction["fields"],
                                "failures": skipped + extraction["failures"] + photo_failures}, FLOOR)
     return IngestedPacket(incident=incident, narrative=redacted["narrative"], report=report,
-                          withheld=[source for source in cracked if source not in screened], photos=photos)
+                          withheld=[source for source in cracked if source not in screened]
+                          + [f"{name} (attacked paragraphs)" for name in kept_notes
+                             if len(paragraphs(screened[name])) < len(paragraphs(notes[name]))], photos=photos)

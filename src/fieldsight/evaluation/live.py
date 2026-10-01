@@ -6,15 +6,18 @@
     the report never claims more coverage than it has.
 """
 
+import json
 import time
 from dataclasses import dataclass, field
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from ..harness.bounds import SessionUsage
+from ..checkpoint import thread_id
+from ..harness.guardrails.common import DISCLOSURE
 from ..harness.run import wiring
-from ..repository import IncidentRepository
+from ..repository import IncidentRepository, RunRepository, SessionRepository
 from ..types.run import TurnRun
 from . import judge
 from .deterministic import TRIGGERS
@@ -71,11 +74,18 @@ class LiveResult:
 
 
 class Incidents:
-    """ the golden set's incident ids as rows in this database: each packet submitted once per run """
+    """ the golden set's incident ids as rows in this database: each packet submitted once per run, and each case
+        given its own copy of its packet's incident, so no two cases share threads, a session or a queue row
 
-    def __init__(self, analyst_id: UUID) -> None:
+        cache, when given, keeps packet -> submitted incident across runs (--reuse-packets): a packet whose files
+        haven't changed, and whose incident is still in this database, isn't submitted again.
+    """
+
+    def __init__(self, analyst_id: UUID, cache: Path | None = None) -> None:
         self.analyst_id = analyst_id
         self.submitted: dict[str, str] = {}
+        self.cache = cache
+        self.cached: dict[str, dict] = json.loads(cache.read_text(encoding="utf-8")) if cache and cache.exists() else {}
 
     def packet(self, case: dict[str, Any]) -> Path | None:
         setup = case.get("setup") or {}
@@ -88,43 +98,74 @@ class Incidents:
             return ROOT / "packets" / f"inc-{incident.rsplit('-', 1)[1]}"
         return None
 
+    def packets(self, case: dict[str, Any]) -> list[Path]:
+        """ every packet the case submits: its own incident's, and any a submit turn sends """
+
+        own = self.packet(case)
+        return ([own] if own else []) + [ROOT / turn["path"] for turn in turns(case) if turn.get("command") == "submit"]
+
     def submit(self, folder: Path) -> str:
         key = str(folder.resolve())
-        if key not in self.submitted:
-            result = wiring.submit(folder, analyst_id=self.analyst_id)
-            if result["refusal"]:
-                raise RuntimeError(f"submit of {folder.name} was refused: {result['refusal']}")
-            self.submitted[key] = result["incident_id"]
+        if key in self.submitted:
+            return self.submitted[key]
+        signature = _signature(folder)
+        cached = self.cached.get(key)
+        if cached and cached["signature"] == signature and IncidentRepository().get(UUID(cached["incident_id"])):
+            self.submitted[key] = cached["incident_id"]
+            return cached["incident_id"]
+        result = wiring.submit(folder, analyst_id=self.analyst_id)
+        if result["refusal"]:
+            raise RuntimeError(f"submit of {folder.name} was refused: {result['refusal']}")
+        self.submitted[key] = result["incident_id"]
+        if self.cache:
+            self.cached[key] = {"signature": signature, "incident_id": result["incident_id"]}
+            self.cache.write_text(json.dumps(self.cached, indent=2), encoding="utf-8")
         return self.submitted[key]
 
+    def private_copy(self, incident_id: str, overrides: dict[str, Any] | None = None) -> str:
+        """ a new incident row with the submitted one's facts and the case's overrides; the submitted row is never edited """
+
+        overrides = overrides or {}
+        incidents = IncidentRepository()
+        record = incidents.get(UUID(incident_id))
+        fields = dict(record.normalized_fields)
+        fields["confidences"] = {**(fields.get("confidences") or {}), **(overrides.get("extraction_overrides") or {})}
+        fields |= dict.fromkeys(overrides.get("field_removals") or [])
+        fields |= overrides.get("value_overrides") or {}
+        copy = incidents.create(record.establishment, fields, record.narrative, owner_analyst_id=self.analyst_id,
+                                photo_verdicts=record.photo_verdicts)
+        # the copy stands for the same packet submitted again, so it carries the submit's screening result
+        submitted = RunRepository().latest(UUID(incident_id), ("submit",))
+        if submitted:
+            RunRepository().create(uuid4(), "submit", incident_id=copy, escalation_triggers=submitted.get("escalation_triggers"))
+        return str(copy)
+
     def resolve(self, case: dict[str, Any]) -> str | None:
-        """ the case's incident: its packet as submitted, or a copy of it with the case's setup overrides applied """
+        """ the case's own incident: a private copy of its packet's, with the case's setup overrides applied """
 
         folder = self.packet(case)
         if folder is None:
             return CONTEXT_INCIDENT
-        incident_id = self.submit(folder)
         setup = case.get("setup") or {}
-        overrides = {key: setup.get(key) for key in ("extraction_overrides", "field_removals", "value_overrides")}
-        if not any(overrides.values()):
-            return incident_id
-        # never edit the submitted row: the case gets its own copy, so cases sharing a packet stay independent
-        incidents = IncidentRepository()
-        record = incidents.get(UUID(incident_id))
-        fields = dict(record.normalized_fields)
-        fields["confidences"] = {**(fields.get("confidences") or {}), **(overrides["extraction_overrides"] or {})}
-        fields |= dict.fromkeys(overrides["field_removals"] or [])
-        fields |= overrides["value_overrides"] or {}
-        copy = incidents.create(record.establishment, fields, record.narrative, owner_analyst_id=self.analyst_id,
-                                photo_verdicts=record.photo_verdicts)
-        return str(copy)
+        return self.private_copy(self.submit(folder), {key: setup.get(key) for key in
+                                                       ("extraction_overrides", "field_removals", "value_overrides")})
+
+
+def _signature(folder: Path) -> list:
+    """ what a packet is made of: each file's name, size and modification time """
+
+    return sorted([path.name, path.stat().st_size, int(path.stat().st_mtime)] for path in folder.iterdir() if path.is_file())
 
 
 def _text(run: TurnRun) -> str:
-    """ everything the analyst reads from the turn: the answer and every dossier rationale """
+    """ everything the analyst reads from the turn: the answer, every dossier rationale, and the disclosure the CLI
+        prints after every command """
 
     legs = (run.dossier or {}).values()
-    return "\n".join([run.answer or ""] + [(leg.get("proposal") or {}).get("rationale", "") for leg in legs])
+    parts = [run.answer or ""] + [(leg.get("proposal") or {}).get("rationale", "") for leg in legs]
+    if DISCLOSURE not in parts[0]:
+        parts.append(DISCLOSURE)
+    return "\n".join(parts)
 
 
 def _sources(run: TurnRun) -> list[dict]:
@@ -260,20 +301,26 @@ def _ground(text: str, chunk_ids: list[str], cited: dict, result: TurnResult) ->
                 continue
             chunk_id = chunk_ids[number - 1]
             body = (cited.get(chunk_id) or {}).get("text") or chunk_text(chunk_id)
-            result.grounded.append({"claim": claim, "chunk_id": chunk_id, **judge.groundedness(claim, body).model_dump()})
+            verdict = judge.groundedness(claim, body)
+            result.grounded.append({"claim": claim, "chunk_id": chunk_id, **(verdict.model_dump() if verdict else
+                                    {"verdict": "unjudged", "reason": judge.UNJUDGED})})
 
 
-def run_case(case: dict[str, Any], incidents: Incidents, *, variant: dict | None = None, judge_grounding: bool = True) -> LiveResult:
-    """ one case's turns in one session; a variant replaces the case's expectations with its own """
+def run_case(case: dict[str, Any], incidents: Incidents, *, variant: dict | None = None, judge_grounding: bool = True,
+             incident_id: str | None = None) -> LiveResult:
+    """ one case's turns in one session; a variant replaces the case's expectations with its own
+
+        incident_id is the case's incident when the caller already resolved it (the parallel runner does, up front)
+    """
 
     live = LiveResult(case["id"], case.get("category", ""), variant and variant.get("name"))
-    try:
-        incident_id = incidents.resolve(case)
-    except Exception as error:  # noqa: BLE001 - a packet that won't submit fails its case, never the whole run
-        live.error = f"setup: {type(error).__name__}: {error}"
-        return live
+    if incident_id is None:
+        try:
+            incident_id = incidents.resolve(case)
+        except Exception as error:  # noqa: BLE001 - a packet that won't submit fails its case, never the whole run
+            live.error = f"setup: {type(error).__name__}: {error}"
+            return live
 
-    usage: SessionUsage | None = None
     records: list[dict | None] = []
     for turn in turns(case):
         command = turn["command"]
@@ -283,7 +330,10 @@ def run_case(case: dict[str, Any], incidents: Incidents, *, variant: dict | None
         live.turns.append(result)
         try:
             if command == "submit":
-                incident_id = incidents.submit(ROOT / turn["path"])
+                # submitted during setup; the case keeps its own copy, unless the turn sends a different packet
+                folder = ROOT / turn["path"]
+                if incidents.packet(case) is None or folder.resolve() != incidents.packet(case).resolve():
+                    incident_id = incidents.private_copy(incidents.submit(folder))
                 result.unchecked = sorted(expected)
                 records.append(None)
                 continue
@@ -295,12 +345,12 @@ def run_case(case: dict[str, Any], incidents: Incidents, *, variant: dict | None
             raw = {"command": command, "incident_id": incident_id, "question": turn.get("query")}
             raw = {key: value for key, value in raw.items() if value is not None}
             queue_before = wiring.pending_review(incident_id, analyst_id=incidents.analyst_id) if incident_id else None
-            spent = usage.cost_usd if usage else 0
-            run = wiring.turn(raw, analyst_id=incidents.analyst_id, usage=usage)
-            usage = run.usage
+            # the session's spend is kept in Postgres across commands; this turn's is what it added
+            session = thread_id(incidents.analyst_id, incident_id, "coordinator")
+            spent = Decimal(str(SessionRepository().session_cost(session)))
+            run = wiring.turn(raw, analyst_id=incidents.analyst_id)
             record = wiring.latest_run(incident_id, analyst_id=incidents.analyst_id, commands=(command,)) if incident_id else None
             queue_after = wiring.pending_review(incident_id, analyst_id=incidents.analyst_id) if incident_id else None
-            # the session's spend carries across its turns; this turn's is the difference
             result.cost_usd = float(run.usage.cost_usd - spent) if run.usage else 0.0
             check_turn(expected, run, record, records, _snapshot(queue_before), _snapshot(queue_after), result)
             if judge_grounding:

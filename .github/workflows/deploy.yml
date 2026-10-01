@@ -3,7 +3,7 @@ name: Deploy ECS and AgentCore Runtime
 # Run when code is pushed to test, or start it manually.
 on:
   push:
-    branches: [test]
+    branches: [main]
   workflow_dispatch:
 
 env:

@@ -40,7 +40,11 @@ def test_tool_calls_the_cap_cut_off_are_answered_before_the_thread_runs_again(mo
     reviewer.invoke({"task": "first review", "rounds": 0, "proposal": None}, thread)
     reviewer.invoke({"task": "second review", "rounds": 0, "proposal": None}, thread)
 
+    # the stored thread answers the call the cap stopped, so it stays valid for Bedrock
+    stored = reviewer.get_state(thread).values["messages"]
+    at = next(index for index, message in enumerate(stored) if isinstance(message, AIMessage) and message.tool_calls)
+    assert isinstance(stored[at + 1], ToolMessage) and stored[at + 1].tool_call_id == "t1"
+    assert stored[at + 1].content == specialists.NOT_RUN
+    # and the next run sends only itself: no earlier run's call, answered or not, reaches the model
     sent = model.sent[1]
-    at = next(index for index, message in enumerate(sent) if isinstance(message, AIMessage) and message.tool_calls)
-    assert isinstance(sent[at + 1], ToolMessage) and sent[at + 1].tool_call_id == "t1"
-    assert sent[at + 1].content == specialists.NOT_RUN
+    assert not any(isinstance(message, (AIMessage, ToolMessage)) for message in sent)

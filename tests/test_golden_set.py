@@ -9,12 +9,18 @@ from uuid import uuid4
 import pytest
 
 from fieldsight.evaluation.deterministic import run_case, run_pairs
-from fieldsight.evaluation.golden import load_cases, set_problems
+from fieldsight.evaluation.golden import (
+    ESCALATION,
+    GOLDEN,
+    load_all,
+    load_cases,
+    set_problems,
+)
 from fieldsight.evaluation.live import TurnResult, check_turn
 from fieldsight.types.escalation import EscalationDecision, EscalationPolicy
 from fieldsight.types.run import TurnRun
 
-CASES = load_cases()
+CASES = load_all()
 
 KNOWN = {
     "escalation-03a": "the case assumes a 7-day near-boundary margin on the 180-day cap (assumed_config); the "
@@ -24,7 +30,7 @@ KNOWN = {
 
 
 def test_the_set_meets_section_14():
-    assert set_problems(CASES) == []
+    assert set_problems(load_cases(GOLDEN), load_cases(ESCALATION)) == []
 
 
 def test_paired_threshold_cases_come_out_differently():

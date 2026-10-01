@@ -1,10 +1,12 @@
 """ stages 1 to 3, before any worker runs: input validation, the Prompt Attacks filter, the readiness gate """
 
+
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import ValidationError
 
 from ...aws import clients
 from ...aws.guardrails import prompt_attack_detected, screen
+from ...ingest.paragraphs import paragraphs
 from ...prompts import PROMPTS
 from ...rules.confidence import confidence_floor
 from ...rules.engine import create_invocation
@@ -19,7 +21,8 @@ from .common import emit, refuse
 REQUIRED_FIELDS = ("work_related", "new_case", "incident_at", "event_type")
 
 # what each label leads to; the readiness check can turn run_workflow into route_to_analyst, never the reverse
-ROUTES: dict[str, Route] = {"policy_question": "answer_from_retrieval", "classify": "run_workflow", "action": "refuse", "out_of_scope": "refuse"}
+ROUTES: dict[str, Route] = {"policy_question": "answer_from_retrieval", "classify": "run_workflow",
+                            "follow_up": "answer_from_record", "action": "refuse", "out_of_scope": "refuse"}
 
 
 def classify(question: str) -> ReadinessLabel:
@@ -51,20 +54,45 @@ def screen_texts(request: dict, cracked: dict[str, str], *, correlation_id: str)
     """ stage 2: the Prompt Attacks filter on the analyst's question and every string cracked out of an artifact
 
         returns the texts that passed, prompt_attack_detected for EscalationSignals, the refusal when the question
-        itself was attacked (an attacked artifact string is only withheld), and the events
+        itself was attacked, and the events. An artifact is screened paragraph by paragraph and only an attacked
+        paragraph is withheld, so an injection planted beside real facts doesn't take those facts with it; the
+        artifact still counts as attacked, so the turn still escalates.
     """
 
     events: list[GuardrailEvent] = []
-    texts = {**({"analyst": request["question"]} if "question" in request else {}), **cracked}
-    results = {source: screen(text) for source, text in texts.items() if text.strip()}
-    attacked = [source for source, result in results.items() if prompt_attack_detected(result)]
-    for source in attacked:
-        emit(events, correlation_id, "prompt_attack", "prompt_attack", "refused" if source == "analyst" else "withheld", source)
+    passed: dict[str, str] = {}
+    attacked: list[str] = []
+
+    question = request.get("question")
+    if question is not None and question.strip():
+        result = screen(question)
+        if prompt_attack_detected(result):
+            attacked.append("analyst")
+            emit(events, correlation_id, "prompt_attack", "prompt_attack", "refused", "analyst")
+        else:
+            # as the guardrail returned it: its sensitive-information filter has masked any PII
+            passed["analyst"] = result["text"]
+    elif question is not None:
+        passed["analyst"] = question
+
+    for source, text in cracked.items():
+        if not text.strip():
+            passed[source] = text
+            continue
+        blocks, kept = paragraphs(text), []
+        for number, paragraph in enumerate(blocks, 1):
+            result = screen(paragraph)
+            if prompt_attack_detected(result):
+                emit(events, correlation_id, "prompt_attack", "prompt_attack", "withheld", f"{source} paragraph {number}")
+            else:
+                kept.append(result["text"])
+        if len(kept) < len(blocks):
+            attacked.append(source)
+        if kept:
+            passed[source] = "\n\n".join(kept)
+
     refusal = refuse("prompt_attack", "The question was blocked by the Prompt Attacks filter.") if "analyst" in attacked else None
-    # what passed, as the guardrail returned it: its sensitive-information filter has masked any PII
-    return {"texts": {source: results[source]["text"] if source in results else text
-                      for source, text in texts.items() if source not in attacked},
-            "prompt_attack_detected": bool(attacked), "refusal": refusal, "events": events}
+    return {"texts": passed, "prompt_attack_detected": bool(attacked), "refusal": refusal, "events": events}
 
 
 def screen_review(request: ReviewRequest) -> ReviewRequest:
