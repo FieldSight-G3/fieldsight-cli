@@ -1,4 +1,5 @@
-"""A turn's model spend lands in its session usage, and a turn stopped by the ceiling still leaves a run record."""
+"""A turn's model spend lands in its session usage and carries to the next command, and a turn stopped by the ceiling
+still leaves a run record."""
 
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -89,6 +90,24 @@ def test_the_turns_model_spend_is_carried_in_its_session_usage(granted):
     assert bedrock.calls == 2
     assert run.usage is not None and run.usage.cost_usd == Decimal("0.01040")
     assert run.refusal is None
+
+
+def test_the_session_ceiling_accumulates_across_commands(granted):
+    analyst, incident_id = granted
+    bedrock = FakeBedrock()
+    # one call fits the ceiling; the next command's first call would pass it, counting what the first command spent
+    limits = BoundsConfig(session_cost_ceiling_usd=Decimal("0.006"))
+    request = {"command": "analyze", "incident_id": str(incident_id)}
+
+    first = turn(request, analyst_id=analyst, workflow=graph_calling_the_model(bedrock, calls=1),
+                 answerer=no_answer, pricing=PRICING, limits=limits)
+    second = turn(request, analyst_id=analyst, workflow=graph_calling_the_model(bedrock, calls=1),
+                  answerer=no_answer, pricing=PRICING, limits=limits)
+
+    assert first.refusal is None and first.usage.cost_usd == Decimal("0.00520")
+    assert bedrock.calls == 1
+    assert second.refusal is not None and "session_cost_usd" in second.refusal["message"]
+    assert second.usage.cost_usd == Decimal("0.00520")
 
 
 def test_a_turn_stopped_by_the_ceiling_is_recorded_and_names_it(granted):

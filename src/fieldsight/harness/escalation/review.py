@@ -18,7 +18,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from fieldsight.errors import FieldSightError
+from fieldsight.harness.idempotency import idempotency_key
 from fieldsight.logging_context import with_correlation_id
+
+from .pending import PendingReview
+from .snapshot import CitationReference
 
 # determination-shaped phrases a narrative edit may reword around but never introduce or change
 _DETERMINATION = re.compile(
@@ -61,37 +65,6 @@ def introduced_determinations(original_payload: Mapping[str, Any], narrative: st
 
 ReviewAction = Literal["approve", "edit_then_approve", "reject"]
 ChunkSource = Callable[[str], str | None]
-
-
-class CitationReference(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    document_id: str = Field(min_length=1)
-    chunk_id: str = Field(min_length=1)
-
-
-class ReviewSnapshot(BaseModel):
-    """The dossier as submitted, frozen onto the review queue row if the case escalates."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    submitting_analyst_id: UUID
-    dossier: dict[str, Any]
-    citations: dict[str, CitationReference]
-
-    @classmethod
-    def of(cls, submitting_analyst_id: UUID | str, dossier: dict[str, Any] | None) -> ReviewSnapshot:
-        """The dossier the Reviewer saw, with every cited chunk mapped to its source document, keyed by chunk id.
-
-        An empty dossier is valid: a case routed straight to a human still records who submitted it.
-        """
-        dossier = dict(dossier or {})
-        citations = {
-            chunk_id: CitationReference(document_id=hit["doc_id"], chunk_id=chunk_id)
-            for leg in dossier.values()
-            for chunk_id, hit in (leg.get("cited") or {}).items()
-        }
-        return cls(submitting_analyst_id=UUID(str(submitting_analyst_id)), dossier=dossier, citations=citations)
 
 
 class CitationRepoint(BaseModel):
@@ -171,18 +144,6 @@ class ReviewDecision(BaseModel):
     reason: str | None
 
 
-class PendingReview(BaseModel):
-    """Trusted queue metadata and a snapshot captured when the case was queued."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    queue_id: UUID
-    incident_id: UUID
-    submitting_analyst_id: UUID
-    original_payload: dict[str, Any]
-    original_citations: dict[str, CitationReference]
-
-
 class ReviewConflict(FieldSightError):
     """The queue item is missing or has already received a decision."""
 
@@ -212,8 +173,9 @@ class ReviewStore(Protocol):
         """True only if the reviewer holds a grant over the incident's establishment."""
         ...
 
-    def record_if_pending(self, decision: ReviewDecision) -> bool:
-        """Atomically save the decision and status only while status is pending."""
+    def record_if_pending(self, decision: ReviewDecision, *, execution_key: UUID | None = None) -> bool:
+        """Atomically save the decision and status only while status is pending; an approval with an execution key
+        also runs the write after approval in the same transaction, applied once per key."""
         ...
 
 
@@ -274,6 +236,8 @@ def submit_review(request: ReviewRequest, *, queue_id: UUID, verified_reviewer_i
         original_citations=pending.original_citations,
         source_for_chunk=source_for_chunk,
     )
-    if not store.record_if_pending(decision):
+    # the write after approval (section 9's execution) is keyed by the harness, so a retry with the same key applies once
+    execution_key = idempotency_key(str(queue_id), "execution", decision.model_dump(mode="json", exclude={"decided_at"}))
+    if not store.record_if_pending(decision, execution_key=execution_key):
         raise ReviewConflict("Queue item received another decision")
     return decision

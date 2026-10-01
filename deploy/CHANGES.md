@@ -4,6 +4,20 @@ Changes in the code that affect a deployed piece: the ECS tool API, the AgentCor
 
 The ECS task definition (`vars.AWS_TASK_DEF_ARN`) and the AgentCore Runtime's environment live in AWS, not in this repo: `deploy.yml` only swaps their image, and `script/update_agent_runtime.py` sends every other Runtime setting back unchanged. So an environment variable they need has to be added in AWS.
 
+## 2026-09-30: `incidents.execution_key` column (migration `e1a3c5b7d9f2`)
+
+The write after approval now exists: when a reviewer approves (approve or edit then approve), the incident is closed (`status = 'closed'`) in the same transaction that records the decision, under the harness's idempotency key, so a retried write applies once. A reject closes nothing.
+
+- **Affects:** the database, and the CLI's `review` command.
+- **Do:** `alembic upgrade head` against RDS before deploying; it also applies `d8f0b2c4e6a7` below. Without the column, every approval fails.
+
+## 2026-09-30: `sessions.cost_usd` column (migration `d8f0b2c4e6a7`)
+
+The per-incident cost ceiling now accumulates across commands: `analyze` and `ask` read the session's spend from the analyst's Coordinator session row before the turn, and add the turn's spend after it. Before, every command started the ceiling at $0.
+
+- **Affects:** the database, and both images (the CLI and the AgentCore Runtime run the same `wiring.turn`).
+- **Do:** `alembic upgrade head` against RDS **before** deploying. Without the column, every `analyze` and `ask` fails reading the session's spend. Existing sessions start at $0.
+
 ## 2026-09-30: one price source for the turn meter and the run record
 
 The turn meter priced model calls from its own table (DeepSeek and Titan, plus `FIELDSIGHT_PRICING_JSON`), which had no price for the configured Nova models, so every metered model call failed with `UnpricedModel`. It now uses the same `FIELDSIGHT_REASONING_PRICE_*` and `FIELDSIGHT_FAST_PRICE_*` settings the run record uses.

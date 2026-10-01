@@ -11,7 +11,8 @@ EMPLOYEE_NAME_LABEL = re.compile(r"\bfull name\b")
 
 SSN = re.compile(r"(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)")
 EMAIL = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
-PHONE = re.compile(r"(?<!\d)(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}(?!\d)")
+# a phone number in text never touches a letter or a hyphen; an id (a chunk id, a hash) always does
+PHONE = re.compile(r"(?<![\w-])(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}(?![\w-])")
 
 
 def is_pii_label(label: str) -> bool:

@@ -1,6 +1,6 @@
-from typing import Literal
-
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from .agents import Worker
 
 
 class Rejection(BaseModel):
@@ -8,7 +8,7 @@ class Rejection(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    worker: Literal["recordability", "reportability", "hazard_control"] = Field(
+    worker: Worker = Field(
         description="The worker whose leg holds the claim"
     )
     claim: str = Field(

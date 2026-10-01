@@ -130,3 +130,16 @@ def test_a_turn_without_a_grant_is_denied_before_anything_is_read_or_written(gra
     runs = RunRepository()
     with runs.engine.connect() as connection:
         assert connection.execute(runs.table.select().where(runs.table.c.incident_id == incident_id)).first() is None
+
+
+def test_a_malformed_incident_id_is_denied_so_no_turn_runs_without_a_session(granted):
+    analyst, _ = granted
+
+    def never(*_):
+        raise AssertionError("nothing may run, or spend, for an id that names no incident")
+
+    with pytest.raises(ToolDenied) as denied:
+        turn({"command": "ask", "incident_id": "INC-2026-0412", "question": "What counts as first aid?"},
+             analyst_id=analyst, workflow=never, answerer=never)
+
+    assert denied.value.code == "unauthenticated"

@@ -5,7 +5,7 @@ import threading
 
 from langgraph.errors import GraphRecursionError
 
-from ...checkpoint import Participant, postgres_checkpointer, thread_id
+from ...checkpoint import postgres_checkpointer, thread_id
 from ...config import settings
 from ...prompts import PROMPTS
 from ...schemas.review import ReviewVerdict
@@ -33,7 +33,7 @@ def reviewer_node(state: dict) -> dict:
 
     config = {
         # one thread per (analyst, incident, participant), so the Reviewer's state never merges with a worker's
-        "configurable": {"thread_id": thread_id(state["analyst_id"], state["incident"]["incident_id"], Participant.REVIEWER)},
+        "configurable": {"thread_id": thread_id(state["analyst_id"], state["incident"]["incident_id"], "reviewer")},
         "recursion_limit": settings.bounds.max_graph_recursion_depth,
     }
 
@@ -43,7 +43,7 @@ def reviewer_node(state: dict) -> dict:
         result = reviewer.invoke(
             {"task": json.dumps(state["dossier"]), "rounds": 0, "proposal": None}, config)
         verdict = ReviewVerdict.model_validate(result["proposal"]) if result["proposal"] else None
-        tools, calls = record("reviewer", result["messages"][seen:])
+        tools, calls = record("reviewer", result["messages"][seen:], config["configurable"]["thread_id"])
     except GraphRecursionError:
         # the independent hard cap: no verdict, which the route treats as not approved
         verdict, tools, calls = None, [], []

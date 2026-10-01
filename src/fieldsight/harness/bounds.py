@@ -15,7 +15,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-AgentName = Literal["coordinator", "recordability", "reportability", "hazard_control", "reviewer"]
+from ..schemas.agents import AgentName
+
 LegKind = Literal["model", "tool", "retrieval", "graph", "reviewer"]
 BoundName = Literal[
     "session_cost_usd", "turn_wall_clock_seconds", "agent_tokens_per_call",

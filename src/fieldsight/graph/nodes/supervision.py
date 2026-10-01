@@ -5,10 +5,11 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.errors import GraphRecursionError
 
 from ...aws import clients
+from ...checkpoint import thread_id
 from ...config import settings
 from ...errors import PlanError
 from ...prompts import GOALS, PROMPTS
-from ...schemas.plan import DispatchPlan
+from ...schemas.agents import DispatchPlan
 from ...schemas.run_records import ModelCall
 from ...types.dossier import DossierLeg
 from ..specialists import get_specialists
@@ -95,7 +96,7 @@ def _run_specialist(name: str, state: dict) -> dict:
         cited={chunk_id: result["retrieved"][chunk_id] for chunk_id in proposal["chunk_ids"]} if proposal else {},
     )
 
-    tools, calls = record(name, result["messages"])
+    tools, calls = record(name, result["messages"], thread_id(state["analyst_id"], state["incident"]["incident_id"], name))
     return {"dossier": {name: leg}, "tool_invocations": tools, "model_calls": calls}
 
 

@@ -2,8 +2,7 @@
 
 import atexit
 import threading
-from enum import StrEnum
-from typing import Any
+from typing import Any, get_args
 from uuid import UUID
 
 from langgraph.checkpoint.postgres import PostgresSaver
@@ -15,6 +14,7 @@ from sqlalchemy.engine import URL, make_url
 from fieldsight.aws import clients
 from fieldsight.config import settings
 from fieldsight.repository import SessionRepository
+from fieldsight.schemas.agents import AgentName
 from fieldsight.schemas.review import ReviewVerdict
 from fieldsight.schemas.run_records import ModelCall, RuleInvocation, ToolInvocation
 
@@ -23,37 +23,28 @@ POOL_MAX_SIZE = 4
 POSTGRES_PORT = 5432
 
 
-class Participant(StrEnum):
-    """ every graph participant that keeps its own checkpointer thread (sections 5 and 10) """
-
-    COORDINATOR = "coordinator"
-    RECORDABILITY = "recordability"
-    REPORTABILITY = "reportability"
-    HAZARD_CONTROL = "hazard_control"
-    REVIEWER = "reviewer"
-
-
-def thread_id(analyst_id: UUID | str, incident_id: UUID | str, participant: Participant | str) -> str:
-    """ the stable thread for one participant on one incident for one analyst, so a later turn resumes it """
+def thread_id(analyst_id: UUID | str, incident_id: UUID | str, participant: AgentName) -> str:
+    """ the stable thread for one participant on one incident for one analyst, so a later turn resumes it;
+        every agent keeps its own checkpointer thread (sections 5 and 10) """
 
     # an unknown participant is a ValueError, never a stray thread
-    role = Participant(participant)
+    if participant not in get_args(AgentName):
+        raise ValueError(f"unknown participant: {participant!r}")
     parts = (str(analyst_id), str(incident_id))
     for part in parts:
         # ':' separates the parts; the Gateway's thread header also refuses whitespace and non-ASCII
         if not part or ":" in part or not part.isascii() or any(char.isspace() for char in part):
             raise ValueError(f"invalid thread id component: {part!r}")
-    return f"{parts[0]}:{parts[1]}:{role}"
+    return f"{parts[0]}:{parts[1]}:{participant}"
 
 
 def open_thread(
-    analyst_id: UUID, incident_id: UUID, participant: Participant | str, sessions: SessionRepository | None = None
+    analyst_id: UUID, incident_id: UUID, participant: AgentName, sessions: SessionRepository | None = None
 ) -> dict:
     """ the run config for one participant's thread, registered in sessions the first time and reused after """
 
-    role = Participant(participant)
-    thread = thread_id(analyst_id, incident_id, role)
-    (sessions or SessionRepository()).get_or_create(thread, analyst_id, incident_id, role.value)
+    thread = thread_id(analyst_id, incident_id, participant)
+    (sessions or SessionRepository()).get_or_create(thread, analyst_id, incident_id, participant)
     return {"configurable": {"thread_id": thread}}
 
 

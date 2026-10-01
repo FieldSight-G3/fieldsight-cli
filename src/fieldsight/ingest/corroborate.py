@@ -8,7 +8,6 @@ import base64
 from pathlib import Path
 
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.runnables import Runnable, RunnableLambda
 
 from ..aws import clients
 from ..errors import ExtractionError
@@ -45,9 +44,3 @@ def corroborate(photo: Path, narrative: str | None) -> PhotoCorroboration:
             problem = "no verdict was returned"
         messages.append(HumanMessage(f"That verdict was invalid: {problem}. Return one that matches the PhotoVerdict schema."))
     raise ExtractionError(f"no valid corroboration verdict for {photo.name} after one retry")
-
-
-def corroborate_chain() -> Runnable[dict, PhotoCorroboration]:
-    """ {"photo": Path, "narrative": redacted narrative} in, the photo's verdict out; .batch() runs a packet's photos """
-
-    return RunnableLambda(lambda packet: corroborate(packet["photo"], packet["narrative"]))

@@ -4,7 +4,8 @@ import re
 from decimal import Decimal
 from typing import Any
 
-from ..harness.escalation.review import PendingReview, ReviewDecision
+from ..harness.escalation.pending import PendingReview
+from ..harness.escalation.review import ReviewDecision
 from ..harness.guardrails.common import CITATION
 from ..types.artifacts import SubmitResult
 from ..types.guardrails import Refusal

@@ -18,6 +18,14 @@ def test_redact_text_masks_ssn_email_and_phone():
     assert redact_text("Days away: 176, returned 2026-08-21.") == "Days away: 176, returned 2026-08-21."
 
 
+def test_ids_are_not_phone_numbers():
+    # a chunk id and a hash carry digit runs next to letters and hyphens; masking them would break the citation
+    for identifier in ("CFR-1904-0123456abcde", "a1234567890bcdef", "LOI-PACK-5551234567ab"):
+        assert redact_text(identifier) == identifier
+    for phone in ("571-555-0142", "(571) 555-0142", "+1 571 555 0142", "call 5715550142."):
+        assert "[REDACTED_PHONE]" in redact_text(phone)
+
+
 def test_it_is_the_ingest_redactor_not_a_second_one():
     assert redaction.scrub_text is scrub_text
     assert redact_text(LEAKY) == scrub_text(LEAKY, set(), "text")[0]

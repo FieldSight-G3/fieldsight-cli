@@ -7,9 +7,10 @@ from ...rules.engine import evaluate_incident
 from ...types.escalation import EscalationPolicy, EscalationSignals
 from ...types.run import TurnRun
 from ..bounds import SessionUsage, TurnUsage, start_turn
-from ..escalation.review import ReviewSnapshot
+from ..escalation.snapshot import ReviewSnapshot
 from ..escalation.triggers import evaluate_escalation
 from ..guardrails.turn_check import check_turn
+from ..metering.meter import ModelCall as MeteredCall
 from .answer import Answerer, answer_question
 from .incident import load_record, normalized, photo_contradicts
 from .record import save_run
@@ -17,13 +18,15 @@ from .workflow import Workflow
 
 
 def run_turn(raw: dict, *, workflow: Workflow, answerer: Answerer, cracked: dict[str, str] | None = None,
-             usage: SessionUsage | None = None, analyst_id: UUID | str | None = None) -> TurnRun:
+             usage: SessionUsage | None = None, analyst_id: UUID | str | None = None,
+             metered: list[MeteredCall] | None = None) -> TurnRun:
     """ every command goes through here, and every turn leaves a run record, refused or not
 
         usage is the session's from its last turn, so the cost ceiling accumulates; the TurnRun carries it on.
         The budget itself is the turn meter's (harness/metering), which the caller wraps the turn in.
         analyst_id is the verified analyst from the session, never a request field; a turn that escalates needs it,
         because the review queue row records who submitted the dossier.
+        metered is the turn meter's list of priced calls, still filling as the turn runs; the run record keeps it.
     """
 
     correlation_id = uuid4()
@@ -77,5 +80,6 @@ def run_turn(raw: dict, *, workflow: Workflow, answerer: Answerer, cracked: dict
         snapshot = ReviewSnapshot.of(analyst_id, run.get("dossier"))
     run_id = save_run(correlation_id, command, incident, results=results, decision=decision,
                       rule_invocations=invocations, workers=workers, workflow=result, review_snapshot=snapshot,
-                      dossier=run.get("dossier"))
+                      dossier=run.get("dossier"), metered=metered)
+    
     return TurnRun(run_id=run_id, correlation_id=correlation_id, command=command, escalation=decision, usage=usage, **run)

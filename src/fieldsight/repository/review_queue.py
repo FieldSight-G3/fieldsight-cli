@@ -9,13 +9,14 @@ from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import MetaData, Table, insert, select, update
+from sqlalchemy import MetaData, Table, insert, or_, select, update
 from sqlalchemy.exc import OperationalError
 
 from fieldsight.harness.bounds import BoundsConfig
+from fieldsight.harness.escalation.pending import PendingReview
 from fieldsight.harness.escalation.review import (
     CitationReference,
-    PendingReview,
+    ReviewConflict,
     ReviewDecision,
     ReviewWriteFailed,
 )
@@ -35,6 +36,8 @@ class ReviewQueueRecord(BaseModel):
 class ReviewQueueRepository(_Repository):
     def __init__(self, dsn: str | None = None) -> None:
         super().__init__("review_queue", dsn)
+        # the write after approval closes the incident in the decision's transaction
+        self.incidents = Table("incidents", MetaData(), autoload_with=self.engine)
 
     def create(self, incident_id: UUID, triggers: dict[str, Any]) -> UUID:
         statement = insert(self.table).values(
@@ -103,7 +106,11 @@ class ReviewQueueRepository(_Repository):
         with self.engine.connect() as connection:
             return connection.execute(statement).scalar_one_or_none() is not None
 
-    def record_if_pending(self, decision: ReviewDecision, *, limits: BoundsConfig | None = None) -> bool:
+    def record_if_pending(self, decision: ReviewDecision, *, execution_key: UUID | None = None,
+                          limits: BoundsConfig | None = None) -> bool:
+        """Record the decision only while the item is pending. An approval with an execution key also runs the write
+        after approval in the same transaction: the incident is closed under that key, and a retry with the same key
+        applies once. An incident already closed under another key is a conflict, and the decision isn't recorded."""
         limits = limits or BoundsConfig.from_environment()
         payload = decision.model_dump(mode="json")
         statement = (
@@ -113,13 +120,27 @@ class ReviewQueueRepository(_Repository):
             .returning(self.table.c.queue_id)
         )
         recorded = select(self.table.c.decision).where(self.table.c.queue_id == decision.queue_id)
+        incidents = self.incidents
+        execute = (
+            update(incidents)
+            .where(incidents.c.incident_id == decision.incident_id,
+                   or_(incidents.c.execution_key.is_(None), incidents.c.execution_key == execution_key))
+            .values(status="closed", execution_key=execution_key)
+            .returning(incidents.c.incident_id)
+        )
         for attempt in range(limits.db_write_max_attempts):
             try:
                 with self.engine.begin() as connection:
                     # a dropped connection can hide a commit; the same decision already stored is a success, not a conflict
                     if attempt and connection.execute(recorded).scalar_one_or_none() == payload:
                         return True
-                    return connection.execute(statement).scalar_one_or_none() is not None
+                    if connection.execute(statement).scalar_one_or_none() is None:
+                        return False
+                    executes = decision.status == "approved" and execution_key is not None
+                    if executes and connection.execute(execute).scalar_one_or_none() is None:
+                        # raising inside the transaction rolls the decision back with it
+                        raise ReviewConflict(f"Incident {decision.incident_id} was already closed by another approval")
+                    return True
             except OperationalError as error:
                 if attempt + 1 == limits.db_write_max_attempts:
                     raise ReviewWriteFailed(f"Review decision not saved after {limits.db_write_max_attempts} attempts") from error
