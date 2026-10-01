@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from fieldsight.harness.bounds import BoundsConfig
 from fieldsight.harness.escalation.review import (
     CitationReference,
+    ReviewConflict,
     ReviewDecision,
     ReviewSnapshot,
     ReviewWriteFailed,
@@ -44,9 +45,9 @@ def analysts():
         connection.execute(delete(table).where(table.c.analyst_id.in_(ids)))
 
 
-def _queue_review(submitter_id: UUID) -> tuple[UUID, UUID]:
+def _queue_review(submitter_id: UUID, incident_id: UUID | None = None) -> tuple[UUID, UUID]:
     incidents = IncidentRepository()
-    incident_id = incidents.create("Substation 7", {"date_of_injury": "2026-02-01"})
+    incident_id = incident_id or incidents.create("Substation 7", {"date_of_injury": "2026-02-01"})
     incidents.save_analysis(
         incident_id=incident_id,
         correlation_id=uuid4(),
@@ -59,6 +60,14 @@ def _queue_review(submitter_id: UUID) -> tuple[UUID, UUID]:
     queue = ReviewQueueRepository()
     [pending] = [r for r in queue.list_pending() if r.incident_id == incident_id]
     return pending.queue_id, incident_id
+
+
+def _incident(incident_id: UUID) -> tuple[str, UUID | None]:
+    """ the incident's status and the key of the write after approval that closed it, if any """
+    incidents = IncidentRepository()
+    statement = select(incidents.table.c.status, incidents.table.c.execution_key).where(incidents.table.c.incident_id == incident_id)
+    with incidents.engine.connect() as connection:
+        return tuple(connection.execute(statement).one())
 
 
 def _decision(queue_id: UUID, incident_id: UUID, reviewer_id: UUID, *, action="approve", reason=None) -> ReviewDecision:
@@ -276,6 +285,31 @@ def test_retry_after_another_decision_landed_is_a_conflict(analysts):
 
     assert queue.record_if_pending(_decision(queue_id, incident_id, reviewer, action="reject", reason="Late"), limits=NO_WAIT) is False
     assert _row(queue_id)["decision"] == first.model_dump(mode="json")
+
+
+def test_an_approval_closes_the_incident_once_per_key(analysts):
+    submitter, reviewer = analysts
+    queue_id, incident_id = _queue_review(submitter)
+    queue = ReviewQueueRepository()
+    # the first attempt commits, then the connection drops; the retry with the same key applies nothing twice
+    queue.engine = FlakyEngine(queue.engine, ["after_commit"])
+    key = uuid4()
+
+    assert queue.record_if_pending(_decision(queue_id, incident_id, reviewer), execution_key=key, limits=NO_WAIT) is True
+    assert _incident(incident_id) == ("closed", key)
+
+
+def test_a_second_approval_under_another_key_is_refused(analysts):
+    submitter, reviewer = analysts
+    first_queue, incident_id = _queue_review(submitter)
+    first_key = uuid4()
+    ReviewQueueRepository().record_if_pending(_decision(first_queue, incident_id, reviewer), execution_key=first_key)
+    second_queue, _ = _queue_review(submitter, incident_id)
+
+    with pytest.raises(ReviewConflict):
+        ReviewQueueRepository().record_if_pending(_decision(second_queue, incident_id, reviewer), execution_key=uuid4())
+    assert _incident(incident_id) == ("closed", first_key)
+    assert _row(second_queue)["status"] == "pending"
 
 
 def test_exhausted_retries_fail_clearly_and_leave_the_row_pending(analysts):

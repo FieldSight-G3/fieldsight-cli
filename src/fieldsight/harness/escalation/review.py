@@ -18,6 +18,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from fieldsight.errors import FieldSightError
+from fieldsight.harness.idempotency import idempotency_key
 from fieldsight.logging_context import with_correlation_id
 
 # determination-shaped phrases a narrative edit may reword around but never introduce or change
@@ -212,8 +213,9 @@ class ReviewStore(Protocol):
         """True only if the reviewer holds a grant over the incident's establishment."""
         ...
 
-    def record_if_pending(self, decision: ReviewDecision) -> bool:
-        """Atomically save the decision and status only while status is pending."""
+    def record_if_pending(self, decision: ReviewDecision, *, execution_key: UUID | None = None) -> bool:
+        """Atomically save the decision and status only while status is pending; an approval with an execution key
+        also runs the write after approval in the same transaction, applied once per key."""
         ...
 
 
@@ -274,6 +276,8 @@ def submit_review(request: ReviewRequest, *, queue_id: UUID, verified_reviewer_i
         original_citations=pending.original_citations,
         source_for_chunk=source_for_chunk,
     )
-    if not store.record_if_pending(decision):
+    # the write after approval (section 9's execution) is keyed by the harness, so a retry with the same key applies once
+    execution_key = idempotency_key(str(queue_id), "execution", decision.model_dump(mode="json", exclude={"decided_at"}))
+    if not store.record_if_pending(decision, execution_key=execution_key):
         raise ReviewConflict("Queue item received another decision")
     return decision

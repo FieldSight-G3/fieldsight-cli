@@ -18,6 +18,7 @@ from fieldsight.harness.escalation.review import (
     document_for_chunk,
     submit_review,
 )
+from fieldsight.harness.idempotency import idempotency_key
 
 QUEUE = UUID("00000000-0000-0000-0000-000000000004")
 CASE = UUID("00000000-0000-0000-0000-000000000003")
@@ -36,6 +37,7 @@ class FakeReviewStore:
             original_citations={"ref-1": CitationReference(document_id="CFR-1904", chunk_id="old")},
         )
         self.saved: ReviewDecision | None = None
+        self.execution_key: UUID | None = None
         self.can_save = True
         self.entitled = {REVIEWER, SUBMITTER}
 
@@ -45,10 +47,11 @@ class FakeReviewStore:
     def reviewer_entitled(self, reviewer_id: UUID, incident_id: UUID) -> bool:
         return reviewer_id in self.entitled and incident_id == CASE
 
-    def record_if_pending(self, decision: ReviewDecision) -> bool:
+    def record_if_pending(self, decision: ReviewDecision, *, execution_key: UUID | None = None) -> bool:
         if (not self.can_save or self.pending is None or decision.queue_id != self.pending.queue_id or decision.incident_id != self.pending.incident_id):
             return False
         self.saved = decision
+        self.execution_key = execution_key
         self.pending = None
         return True
 
@@ -64,6 +67,16 @@ class ReviewFlowTests(unittest.TestCase):
         self.assertIs(store.saved, decision)
         with self.assertRaises(ReviewConflict):
             submit_review(ReviewRequest(action="reject", reason="wrong"), queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store)
+
+    def test_the_write_after_approval_is_keyed_by_the_harness(self) -> None:
+        keys = []
+        for decided_at in (DECIDED_AT, datetime(2026, 9, 27, 12, 5, tzinfo=UTC)):
+            store = FakeReviewStore()
+            decision = submit_review(ReviewRequest(action="approve"), queue_id=QUEUE, verified_reviewer_id=REVIEWER, store=store, decided_at=decided_at)
+            keys.append(store.execution_key)
+        expected = idempotency_key(str(QUEUE), "execution", decision.model_dump(mode="json", exclude={"decided_at"}))
+        # the same decision on the same queue item always carries the same key, whenever it was made
+        self.assertEqual(keys, [expected, expected])
 
     def test_rejection_is_recorded_and_self_review_cannot_write(self) -> None:
         store = FakeReviewStore()
