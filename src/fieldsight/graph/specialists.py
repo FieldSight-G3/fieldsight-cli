@@ -1,7 +1,7 @@
 """ factory to create the specialist agents (graphs): the Recordability, Reportability and Hazard Control Workers """
 
 import operator
-from typing import Annotated, TypedDict
+from typing import Annotated, TypedDict, get_args
 
 from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
 from langchain_core.tools import BaseTool
@@ -13,12 +13,13 @@ from langgraph.prebuilt import ToolNode
 from ..aws import clients
 from ..config import settings
 from ..prompts import PROMPTS
+from ..schemas.agents import Worker
 from ..tools.tools import TOOLSETS
 
 MAX_SPECIALIST_TOOL_ROUNDS = settings.bounds.max_specialist_tool_rounds
 
 # the workers get_specialists builds; each one's brief is PROMPTS[name] and its tools TOOLSETS[name]
-WORKERS = ("recordability", "reportability", "hazard_control")
+WORKERS = get_args(Worker)
 
 
 class SpecialistState(TypedDict):

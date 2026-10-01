@@ -2,7 +2,7 @@ from uuid import UUID
 
 from langgraph.graph import END, START, StateGraph
 
-from ..checkpoint import Participant, open_thread, postgres_checkpointer
+from ..checkpoint import open_thread, postgres_checkpointer
 from ..config import settings
 from ..harness.run.workflow import Workflow
 from ..repository import IncidentRepository
@@ -70,8 +70,8 @@ def graph_workflow(analyst_id: UUID) -> Workflow:
 
     def workflow(incident: NormalizedIncident, question: str | None, correlation_id: str) -> WorkflowResult:
         incident_id = UUID(incident.incident_id)
-        open_thread(analyst_id, incident_id, Participant.REVIEWER)
-        config = open_thread(analyst_id, incident_id, Participant.COORDINATOR)
+        open_thread(analyst_id, incident_id, "reviewer")
+        config = open_thread(analyst_id, incident_id, "coordinator")
         config["recursion_limit"] = settings.bounds.max_graph_recursion_depth
         graph = build_graph(postgres_checkpointer())
 

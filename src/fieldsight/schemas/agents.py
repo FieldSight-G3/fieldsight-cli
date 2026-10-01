@@ -1,8 +1,12 @@
+""" the agents, named once: the workers the Coordinator dispatches, every agent in the graph, and the Coordinator's plan """
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 Worker = Literal["recordability", "reportability", "hazard_control"]
+# every agent with its own token limit and checkpointer thread; the nested Worker flattens into the five names
+AgentName = Literal["coordinator", Worker, "reviewer"]
 
 class Dispatch(BaseModel):
     """ One worker the coordinator runs, and why. """

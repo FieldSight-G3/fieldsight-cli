@@ -8,7 +8,7 @@ from ...aws import clients
 from ...config import settings
 from ...errors import PlanError
 from ...prompts import GOALS, PROMPTS
-from ...schemas.plan import DispatchPlan
+from ...schemas.agents import DispatchPlan
 from ...schemas.run_records import ModelCall
 from ...types.dossier import DossierLeg
 from ..specialists import get_specialists
