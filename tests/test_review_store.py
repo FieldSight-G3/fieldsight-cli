@@ -13,6 +13,7 @@ from fieldsight.harness.bounds import BoundsConfig
 from fieldsight.harness.escalation.review import (
     CitationReference,
     ReviewDecision,
+    ReviewSnapshot,
     ReviewWriteFailed,
 )
 from fieldsight.repository import IncidentRepository, ReviewQueueRepository
@@ -46,16 +47,14 @@ def analysts():
 def _queue_review(submitter_id: UUID) -> tuple[UUID, UUID]:
     incidents = IncidentRepository()
     incident_id = incidents.create("Substation 7", {"date_of_injury": "2026-02-01"})
-    incidents.save_analysis_for_review(
+    incidents.save_analysis(
         incident_id=incident_id,
         correlation_id=uuid4(),
         outcome={"recordable": True},
         deciding_rule="R1",
         rule_invocations=[],
         escalation_triggers={"confidence_floor": True},
-        submitting_analyst_id=submitter_id,
-        dossier_snapshot=DOSSIER,
-        citations=CITATIONS,
+        review=ReviewSnapshot(submitting_analyst_id=submitter_id, dossier=DOSSIER, citations=CITATIONS),
     )
     queue = ReviewQueueRepository()
     [pending] = [r for r in queue.list_pending() if r.incident_id == incident_id]
@@ -99,7 +98,7 @@ def test_get_pending_returns_snapshot_written_at_queue_time(analysts):
 def test_snapshot_is_independent_of_later_incident_outcome(analysts):
     submitter, _ = analysts
     queue_id, incident_id = _queue_review(submitter)
-    IncidentRepository().save_analysis(incident_id, uuid4(), {"recordable": False}, "R5", [], {}, requires_review=False)
+    IncidentRepository().save_analysis(incident_id, uuid4(), {"recordable": False}, "R5", [], {})
 
     pending = ReviewQueueRepository().get_pending(queue_id)
 
@@ -189,21 +188,19 @@ def test_database_refuses_self_review(analysts):
     assert _row(queue_id)["status"] == "pending"
 
 
-def test_save_analysis_for_review_rolls_back_for_missing_incident(analysts):
+def test_save_analysis_with_review_rolls_back_for_missing_incident(analysts):
     submitter, _ = analysts
     missing = uuid4()
 
     with pytest.raises(LookupError):
-        IncidentRepository().save_analysis_for_review(
+        IncidentRepository().save_analysis(
             incident_id=missing,
             correlation_id=uuid4(),
             outcome={},
             deciding_rule="R1",
             rule_invocations=[],
             escalation_triggers={},
-            submitting_analyst_id=submitter,
-            dossier_snapshot=DOSSIER,
-            citations=CITATIONS,
+            review=ReviewSnapshot(submitting_analyst_id=submitter, dossier=DOSSIER, citations=CITATIONS),
         )
     queue = ReviewQueueRepository()
     with queue.engine.connect() as connection:
