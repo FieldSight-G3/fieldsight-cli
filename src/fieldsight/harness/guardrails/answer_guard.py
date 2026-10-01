@@ -9,14 +9,22 @@ from ...schemas.incidents import NormalizedIncident
 from ...schemas.retrieval import DraftAnswer
 from ...schemas.run_records import RuleInvocation
 from ...types.guardrails import GuardrailEvent
-from .common import DETERMINATION, DISCLOSURE, citation_problems, emit, latest, refuse
+from .common import (
+    DETERMINATION,
+    DISCLOSURE,
+    citation_problems,
+    claims,
+    emit,
+    latest,
+    refuse,
+)
 
 MAX_REGENERATIONS = 2
 
 # threshold outcomes only the rules engine may produce, by the rule that produces them
 THRESHOLDS = {
-    "R1": re.compile(r"\b(?:is|was|are|be) (?:not )?recordable\b", re.IGNORECASE),
-    "R2": re.compile(r"\b(?:is|was|are|be) (?:not )?reportable\b|\breporting deadline\b", re.IGNORECASE),
+    "R1": re.compile(r"\b(?:is|was|are|be) (?:not )?(?:an? )?recordable\b", re.IGNORECASE),
+    "R2": re.compile(r"\b(?:is|was|are|be) (?:not )?(?:an? )?reportable\b|\breporting deadline\b", re.IGNORECASE),
     "R3": re.compile(r"\bbeyond first aid\b|\b(?:is|was) (?:only )?first aid\b", re.IGNORECASE),
     "R4": re.compile(r"\bcolumn [GHIJ]\b|\bday count\b", re.IGNORECASE),
 }
@@ -78,6 +86,13 @@ def guard_answer(generate: Callable[[list[str]], DraftAnswer], *,
             objections.append(f'Describe what the regulation says instead of concluding: "{determination.group()}"')
 
         if not objections:
+            break
+        # the last draft's only problem is sentences it didn't cite: remove them, as the objection asked, when a
+        # cited claim is left; removing a claim can't add a threshold or a determination
+        if attempt == MAX_REGENERATIONS and len(objections) == len(uncited) and len(uncited) < len(claims(draft.answer)):
+            draft = draft.model_copy(update={"answer": " ".join(c for c in claims(draft.answer) if c not in uncited)})
+            for claim in uncited:
+                emit(events, correlation_id, "output", "uncited_claim", "removed", claim[:200])
             break
         if attempt == MAX_REGENERATIONS:
             emit(events, correlation_id, "output", "unfixed_output", "refused", "; ".join(objections)[:200])

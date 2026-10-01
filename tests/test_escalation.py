@@ -131,7 +131,7 @@ class EscalationTests(unittest.TestCase):
                 self.assertTrue(result.checks["fatality"].fired)
 
     def test_log_180d_margin_uses_raw_day_count(self) -> None:
-        for away_days, expected in ((179, True), (178, False), (182, False)):
+        for away_days, expected in ((176, True), (173, True), (172, False), (187, True), (188, False)):
             with self.subTest(days=away_days):
                 result = decision(days_away=away_days)
                 self.assertEqual(result.checks["near_boundary"].fired, expected)

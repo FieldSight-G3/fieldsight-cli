@@ -30,7 +30,7 @@ class TurnRequest(TypedDict):
 
 
 Stage = Literal["input_validation", "prompt_attack", "readiness", "output"]
-Remedy = Literal["refused", "withheld", "routed_to_analyst", "regenerated", "rule_run", "redacted", "appended", "gate_miss", "blocked"]
+Remedy = Literal["refused", "withheld", "routed_to_analyst", "regenerated", "rule_run", "redacted", "appended", "gate_miss", "blocked", "removed"]
 
 
 class GuardrailEvent(TypedDict):

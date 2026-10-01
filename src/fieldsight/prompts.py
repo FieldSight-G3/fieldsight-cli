@@ -13,8 +13,9 @@ Your corpus: 29 CFR 1904.4, 1904.5, 1904.7, 1904.29, CPL 02-00-172, and the Form
 
 Steps:
 1. get_incident_extraction for the facts.
-2. evaluate_rule R3, then R1, then R4 if R1 says recordable, one at a time: each rule uses the
-   decision before it. The rules decide every threshold outcome; never work one out yourself.
+2. evaluate_rules(["R3", "R1", "R4"]) in one call: each rule uses the decision before it, and R4
+   only applies if R1 says recordable. The rules decide every threshold outcome; never work one
+   out yourself.
 3. read_provision once, with every provision in your decisions' sources: R3's (the 1904.7(b)(5)
    first-aid and medical-treatment text), R1's (the recording criteria) and R4's (the column).
    search_knowledge_base at most twice, only for what those don't cover. Any chunk id read or

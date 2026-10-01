@@ -22,11 +22,8 @@ from fieldsight.types.run import TurnRun
 
 CASES = load_all()
 
-KNOWN = {
-    "escalation-03a": "the case assumes a 7-day near-boundary margin on the 180-day cap (assumed_config); the "
-                      "configured log_180d_margin_days is 1 (docs/architecture.md), so 176 days doesn't fire. "
-                      "The team decides which one changes.",
-}
+# cases expected to fail the deterministic tier, each with why; none today
+KNOWN: dict[str, str] = {}
 
 
 def test_the_set_meets_section_14():

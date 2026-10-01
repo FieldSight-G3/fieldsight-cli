@@ -20,7 +20,7 @@ A reference document, not an essay. Fill every section.
 | session cost ceiling | | USD | |
 | near-boundary margin — 24h clock | 1.0 (`reporting_24h_margin_hours`) | hours | Measured on incident → in-patient admission, amputation or loss of eye. Both timestamps come from packet text, often rounded to the hour, so a one-hour error can decide whether a 1904.39 report is due; escalates at 23–25 h inclusive |
 | near-boundary margin — 30-day fatality window | 1.0 (`fatality_30d_margin_days`) | days | Measured on incident → death. Dates are often recorded without a time or time zone, so ±1 day covers that imprecision; escalates at 29–31 days inclusive |
-| near-boundary margin — 180-day cap | 1 (`log_180d_margin_days`) | days | Measured on days away + restricted days for recordable cases. Whole-day counts, and the day-count convention (is the return day counted?) can move the total by one; escalates at 179–181 days inclusive |
+| near-boundary margin — 180-day cap | 7 (`log_180d_margin_days`) | days | Measured on days away + restricted days for recordable cases. The total rests on a return-to-work date that packets often state loosely, so it can be off by days, not just by the day-count convention; escalates at 173–187 days inclusive |
 | near-boundary margin — 0.60 floor | 0.02 (`confidence_margin_absolute`) | confidence (absolute) | Measured on the extracted field whose confidence is closest to 0.60; escalates at 0.58–0.62 inclusive. A starting value, not yet tuned against extraction data |
 | similarity refusal threshold | TBD (`script/tune_threshold.py`) | score | see evaluation report |
 | chunk size / overlap | 1800 / 300 | chars | ~One provision per chunk; tables kept whole |

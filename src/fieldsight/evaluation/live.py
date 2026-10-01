@@ -184,8 +184,12 @@ def _decisions(record: dict | None) -> dict[str, dict]:
 
 
 def check_turn(expected: dict[str, Any], run: TurnRun, record: dict | None, earlier: list[dict | None],
-               queue_before: Any, queue_after: Any, result: TurnResult) -> None:
-    """ every expectation this runner knows, as passed or failed; the rest listed as unchecked """
+               queue_before: Any, queue_after: Any, result: TurnResult, question: str | None = None) -> None:
+    """ every expectation this runner knows, as passed or failed; the rest listed as unchecked
+
+        question is the turn's query: a refusal names what it searched for by quoting it, and the analyst's own
+        words are never the system saying a forbidden phrase
+    """
 
     ok, bad = result.passed.append, result.failed.append
     result.text = _text(run)
@@ -205,8 +209,9 @@ def check_turn(expected: dict[str, Any], run: TurnRun, record: dict | None, earl
     elif outcome in ANSWERING or expected.get("must_not_refuse"):
         (ok if not refused else bad)(f"answered (refusal: {run.retrieval_refusal or (run.refusal or {}).get('reason')})")
 
+    said = text.replace(question.lower(), "") if question else text
     for phrase in expected.get("must_not_include") or []:
-        (bad if phrase.lower() in text else ok)(f'never says "{phrase}"')
+        (bad if phrase.lower() in said else ok)(f'never says "{phrase}"')
 
     found = _sources(run)
     for source in expected.get("sources") or []:
@@ -352,7 +357,8 @@ def run_case(case: dict[str, Any], incidents: Incidents, *, variant: dict | None
             record = wiring.latest_run(incident_id, analyst_id=incidents.analyst_id, commands=(command,)) if incident_id else None
             queue_after = wiring.pending_review(incident_id, analyst_id=incidents.analyst_id) if incident_id else None
             result.cost_usd = float(run.usage.cost_usd - spent) if run.usage else 0.0
-            check_turn(expected, run, record, records, _snapshot(queue_before), _snapshot(queue_after), result)
+            check_turn(expected, run, record, records, _snapshot(queue_before), _snapshot(queue_after), result,
+                       turn.get("query"))
             if judge_grounding:
                 ground(run, result)
             records.append(record)

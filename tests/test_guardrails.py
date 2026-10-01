@@ -121,6 +121,22 @@ def test_an_uncited_claim_is_regenerated_and_the_disclosure_appended():
     assert result["citations_supported"]
 
 
+def test_uncited_claims_left_after_the_last_regeneration_are_removed_not_refused():
+    generate, calls = drafts(*["Section 1904.7 covers days away [1]. So this falls under it."] * 3)
+
+    result = guard(generate)
+
+    assert len(calls) == 3 and result["refusal"] is None
+    assert result["text"].startswith("Section 1904.7 covers days away [1].") and "So this" not in result["text"]
+    assert [e["remedy"] for e in result["events"] if e["failure"] == "uncited_claim"] == ["removed"]
+
+
+def test_an_answer_with_no_cited_claim_is_still_refused():
+    generate, _ = drafts(*["Section 1904.7 covers days away."] * 3)
+
+    assert guard(generate)["refusal"]["reason"] == "output_blocked"
+
+
 def test_an_unattributed_threshold_runs_the_rules_then_regenerates():
     generate, calls = drafts("The case goes in column H [1].", "The case goes in column H [1].")
 

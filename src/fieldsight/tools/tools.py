@@ -148,6 +148,35 @@ def evaluate_rule(
     return respond({"decision": decision}, tool_call_id, decisions={decision["rule_id"]: decision})
 
 
+@tool(parse_docstring=True)
+def evaluate_rules(
+    rule_ids: list[str],
+    state: Annotated[dict, InjectedState],
+    tool_call_id: Annotated[str, InjectedToolCallId],
+) -> Command | dict:
+    """ Run several deterministic rules over this incident's extracted facts, in the order given, in one call.
+
+    Each rule sees the decisions of the rules before it, so ["R3", "R1", "R4"] runs R1 on R3's decision and R4 on
+    R1's. The rules, not you, decide every threshold outcome. insufficient_data names the missing field.
+
+    Args:
+        rule_ids: rules in order. R3 medical treatment beyond first aid, R1 recordability, R4 the 300-Log column, R2 the reporting clock.
+    """
+
+    # one round instead of one per rule: a worker's tool rounds are capped, and the proposal needs the ones left
+    decisions = dict(state["decisions"])
+    results: dict[str, dict] = {}
+    for rule_id in rule_ids:
+        try:
+            decision = run_rule(rule_id, state["incident"], decisions)
+        except RuleError as error:
+            results[rule_id] = {"error": str(error)}
+            continue
+        decisions[decision["rule_id"]] = results[rule_id] = decision
+    return respond({"decisions": results}, tool_call_id,
+                   decisions={rule_id: decision for rule_id, decision in results.items() if "error" not in decision})
+
+
 def propose(proposal: BaseModel, problems: list[str], tool_call_id: str) -> Command:
     """ the verdict goes back to the model; an accepted proposal also goes into state, which ends the loop
 
@@ -249,7 +278,8 @@ def submit_review(
 
 # the tools to BIND to each participant's model (spec section 9)
 TOOLSETS = {
-    "recordability": [get_incident_extraction, search_knowledge_base, read_provision, evaluate_rule, propose_classification],
+    "recordability": [get_incident_extraction, search_knowledge_base, read_provision, evaluate_rule, evaluate_rules,
+                      propose_classification],
     "reportability": [get_incident_extraction, search_knowledge_base, read_provision, evaluate_rule,
                       propose_reporting_determination],
     "hazard_control": [search_knowledge_base, find_similar_incidents, propose_hazard_control],
