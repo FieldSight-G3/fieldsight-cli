@@ -1,10 +1,8 @@
 """ a finished agent's transcript as run-record entries: one ModelCall per reply, one ToolInvocation per tool call """
 
-import hashlib
-
 from langchain_core.messages import AIMessage, AnyMessage, ToolMessage
 
-from ..harness.idempotency import canonicalize
+from ..harness.idempotency import idempotency_key
 from ..harness.metering.pricing import PricingConfig
 from ..schemas.run_records import ModelCall, ToolInvocation
 
@@ -25,8 +23,12 @@ def model_call(agent: str, reply: AIMessage) -> ModelCall:
         cost_usd=PRICING.cost(meta["model_name"], tokens_in, tokens_out),
     )
 
-def record(agent: str, messages: list[AnyMessage]) -> tuple[list[ToolInvocation], list[ModelCall]]:
-    """ tool calls are paired with their results by tool_call_id """
+def record(agent: str, messages: list[AnyMessage], session_id: str) -> tuple[list[ToolInvocation], list[ModelCall]]:
+    """ tool calls are paired with their results by tool_call_id; session_id is the agent's checkpointer thread
+
+        each call's args_hash is the harness's idempotency key (section 9), so the same call in the same session
+        always records the same key
+    """
 
     results = {m.tool_call_id: m.content for m in messages if isinstance(m, ToolMessage)}
     tools, calls = [], []
@@ -39,7 +41,7 @@ def record(agent: str, messages: list[AnyMessage]) -> tuple[list[ToolInvocation]
             outcome = results.get(call["id"])
             tools.append(ToolInvocation(
                 agent=agent, tool=call["name"], args=call["args"],
-                args_hash=hashlib.sha256(canonicalize(call["args"]).encode()).hexdigest(),
+                args_hash=str(idempotency_key(session_id, call["name"], call["args"])),
                 outcome=None if outcome is None else str(outcome),
             ))
     return tools, calls

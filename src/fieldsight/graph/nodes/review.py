@@ -43,7 +43,7 @@ def reviewer_node(state: dict) -> dict:
         result = reviewer.invoke(
             {"task": json.dumps(state["dossier"]), "rounds": 0, "proposal": None}, config)
         verdict = ReviewVerdict.model_validate(result["proposal"]) if result["proposal"] else None
-        tools, calls = record("reviewer", result["messages"][seen:])
+        tools, calls = record("reviewer", result["messages"][seen:], config["configurable"]["thread_id"])
     except GraphRecursionError:
         # the independent hard cap: no verdict, which the route treats as not approved
         verdict, tools, calls = None, [], []

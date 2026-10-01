@@ -14,6 +14,8 @@ INCIDENT = NormalizedIncident(
     event_type="other", admission_reason=None, amputation_detail=None, treatments=["sutures"], death=False,
     days_away=3, restricted_days=0, job_transfer=False, loss_of_consciousness=False, significant_diagnosis=False,
     confidences={"days_away": 0.95}).model_dump(mode="json")
+# the analyst whose thread the worker's tool calls are keyed to
+ANALYST = "analyst-1"
 
 
 def calls(*requests) -> AIMessage:
@@ -30,7 +32,7 @@ def test_leg_carries_the_proposal_and_only_what_it_rests_on(script):
         AIMessage("Proposed."),
     ])
 
-    leg = recordability_specialist_node({"incident": INCIDENT})["dossier"]["recordability"]
+    leg = recordability_specialist_node({"analyst_id": ANALYST, "incident": INCIDENT})["dossier"]["recordability"]
 
     assert leg["task"] == GOALS["recordability"]
     assert leg["proposal"]["log_column"] == "H"
@@ -44,7 +46,7 @@ def test_a_narrowed_task_is_recorded_and_no_proposal_cites_nothing(script):
     script([AIMessage("Nothing to propose.")])
 
     leg = recordability_specialist_node(
-        {"incident": INCIDENT, "tasks": {"recordability": "Check the day count against the 180-day cap."}}
+        {"analyst_id": ANALYST, "incident": INCIDENT, "tasks": {"recordability": "Check the day count against the 180-day cap."}}
     )["dossier"]["recordability"]
 
     assert leg["task"] == "Check the day count against the 180-day cap."
