@@ -43,6 +43,7 @@ class SpecialistState(TypedDict):
     gateway: dict | None    # this turn's Gateway reads (aws/gateway_reads); None when no Gateway is configured
     messages: Annotated[list[AnyMessage], add_messages]
     rounds: int
+    run_start: int          # where this run's messages begin on a reused thread; earlier runs stay stored, unsent
 
     # what the tools found, written by the tools themselves
     decisions: Annotated[dict[str, dict], operator.or_]     # keyed by rule id; the rules are deterministic, so a re-run just repeats
@@ -72,9 +73,13 @@ def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer:
 
     # node for prompting the model: it investigates with its tools, then proposes its finding through its propose tool
     def agent(state: SpecialistState) -> dict:
-        # the brief goes in fresh on every call, never into the thread: a reused thread (the Reviewer's) would
-        # otherwise keep the brief it was first run with, and a changed prompt would never reach it
-        history = [message for message in state.get("messages") or [] if not isinstance(message, SystemMessage)]
+        messages = list(state.get("messages") or [])
+        # a reused thread (the Reviewer's) keeps every earlier run, but the model sees only this one: replaying them
+        # all grew each call past 30K tokens, and the task already holds everything this run judges
+        start = len(messages) if not state.get("rounds") else state.get("run_start", 0)
+        # the brief goes in fresh on every call, never into the thread: a reused thread would otherwise keep the
+        # brief it was first run with, and a changed prompt would never reach it
+        history = [message for message in messages[start:] if not isinstance(message, SystemMessage)]
         seed: list = []
         # every run starts with its task, after closing any tool calls a reused thread's last run left unanswered
         if not state.get("rounds"):
@@ -86,7 +91,7 @@ def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer:
             history += seed
 
         reply = model.invoke([SystemMessage(brief)] + history)
-        return {"messages": seed + [reply], "rounds": state.get("rounds", 0) + 1}
+        return {"messages": seed + [reply], "rounds": state.get("rounds", 0) + 1, "run_start": start}
 
     # tool node
     def run_tools(state: SpecialistState, config) -> dict:

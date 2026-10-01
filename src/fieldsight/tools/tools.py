@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from ..aws.gateway_reads import GATEWAY_UNAVAILABLE
 from ..errors import RetrievalError, RuleError
+from ..harness.guardrails.common import DETERMINATION
 from ..retrieval.corpus import meta, search
 from ..rules import proposal_review
 from ..rules.engine import evaluate_rule as run_rule
@@ -116,8 +117,14 @@ def evaluate_rule(
 
 
 def propose(proposal: BaseModel, problems: list[str], tool_call_id: str) -> Command:
-    """ the verdict goes back to the model; an accepted proposal also goes into state, which ends the loop """
+    """ the verdict goes back to the model; an accepted proposal also goes into state, which ends the loop
 
+        A rationale that states a determination is refused here, where the worker can still rephrase it, rather
+        than at stage 4, which would withhold the whole leg (the same check, harness/guardrails/dossier_guard).
+    """
+
+    if determination := DETERMINATION.search(getattr(proposal, "rationale", "") or ""):
+        problems = [*problems, f'describe what the regulation says instead of concluding: "{determination.group()}"']
     if problems:
         return respond({"status": "rejected", "problems": problems}, tool_call_id)
     accepted = proposal.model_dump(mode="json")

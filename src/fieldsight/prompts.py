@@ -31,7 +31,9 @@ When your task says your proposal was rejected, your rule decisions and cited ch
 don't evaluate the rules again; make at most two searches for what the rejection names, then propose.
 If get_incident_extraction says it is unavailable, the rules still read the incident: go on with them.
 If a rule returns insufficient_data, propose insufficient_data with the field it named.
-Describe what the regulation says; the analyst makes the determination."""
+Describe what the regulation says; the analyst makes the determination. Attribute each outcome to its
+rule, e.g. "R1 found the 1904.7 recording criteria met", never "the incident is recordable" or
+"must be recorded"."""
 
 
 _REPORTABILITY_GOAL = "Is this incident reportable to OSHA, on what clock, and does an exclusion apply?"
@@ -55,7 +57,9 @@ Steps:
 Never search for a chunk id; cite the ids your searches already returned.
 If get_incident_extraction says it is unavailable, R2 still reads the incident: go on with it.
 If R2 returns insufficient_data, propose insufficient_data with the field it named.
-Describe what the regulation says; the analyst makes the determination."""
+Describe what the regulation says; the analyst makes the determination. Attribute each outcome to its
+rule, e.g. "R1 found the 1904.7 recording criteria met", never "the incident is recordable" or
+"must be recorded"."""
 
 
 _HAZARD_CONTROL_GOAL = "What control does the regulation require for this work on or near energized equipment?"
@@ -79,7 +83,9 @@ incident ids it returned that support the control. A precedent never replaces th
 
 Never search for a chunk id; cite the ids your searches already returned.
 If paragraph (l) grounds no control, propose insufficient_data.
-Describe what the regulation says; the analyst makes the determination."""
+Describe what the regulation says; the analyst makes the determination. Attribute each outcome to its
+rule, e.g. "R1 found the 1904.7 recording criteria met", never "the incident is recordable" or
+"must be recorded"."""
 
 
 _REVIEWER_PROMPT = """\
@@ -98,7 +104,8 @@ A leg passes only if it has a proposal and its rationale is:
 2. Cited: every claim cites a chunk from the leg's cited chunks.
 3. Attributed: every threshold outcome (recordable, column, day count, reportable,
    clock, deadline, exclusion) matches the leg's rule decisions.
-4. Descriptive: no legal conclusions on the firm's behalf, e.g. "you must report this".
+4. Descriptive: no legal conclusions on the firm's behalf, e.g. "you must report this", "the incident
+   is recordable" or "must be recorded". "R1 found the recording criteria met" is descriptive.
 
 Use search_knowledge_base only to check for a provision a leg should have cited, at most
 three searches. Never say a provision or paragraph doesn't exist unless your own search for it
