@@ -55,11 +55,10 @@ Grouped by section 10's parts: guardrails, escalation, bounds, and the run that 
 | `guardrails/dossier_guard.py` | `guard_dossier` (stage 4 on the dossier, run by the graph's eligibility_check) and `LEG_REVIEWS`. |
 | `guardrails/common.py` | `emit`, `refuse`, `citation_problems`, `latest`, `DISCLOSURE` and the `DETERMINATION` patterns. |
 | `escalation/triggers.py` | `evaluate_escalation` (the OR-ed review triggers) and the near-boundary observations it records. |
-| `escalation/review.py` | `decide_review` (the side-effect-free check of a human approve, edit then approve, or reject), and `submit_review` with the `ReviewStore` protocol that records one decision on a pending queue item. |
+| `escalation/review.py` | `ReviewSnapshot` (the dossier as submitted, frozen onto the queue row when a turn escalates), `decide_review` (the side-effect-free check of a human approve, edit then approve, or reject), and `submit_review` with the `ReviewStore` protocol that records one decision on a pending queue item. |
 | `bounds.py` | `BoundsConfig`, `preflight` (check-and-stop before each leg), `record_usage` and `start_turn`. |
 | `bounds_runtime.py` | `TurnBudget`: one turn's thread-safe budget shared by concurrent legs, reserving tool batches all-or-nothing, and `BoundStopped`. |
 | `idempotency.py` | `idempotency_key` (a `uuid5` of session, tool and arguments) and `canonicalize` (mapping keys and sets order-independent, equal numbers normalized, NaN and non-string keys refused). |
-| `analysis.py` | `analyze_incident` and `ReviewSnapshot`: the rules and escalation on a stored incident, queued with its snapshot; called by the graph's eligibility node. Overlaps `run/`; see Not implemented. |
 
 Paths are relative to `src/fieldsight/harness/`. The shapes (`TurnRequest`, `GuardrailEvent`, `Refusal`) are in `types/guardrails.py`, the escalation shapes (`EscalationPolicy`, `EscalationSignals`, `EscalationDecision`) in `types/escalation.py`, `WorkflowResult` and `TurnRun` in `types/run.py`, and the classifier's `ReadinessClassification` is in `schemas/readiness.py`.
 
@@ -90,7 +89,6 @@ Paths are relative to `src/fieldsight/harness/`. The shapes (`TurnRequest`, `Gua
 
 ## Not implemented
 
-- Two save paths: the graph's eligibility node calls `analyze_incident`, which writes a run record and queue row inside the graph, and `run_turn` writes its own after the graph. Wiring the node into `run_turn` must pick one, or every analyze leaves two run records.
 - Guardrail events are returned in `TurnRun` and logged, not persisted: `run_records` has no column for them (GF-53).
 - `SessionUsage` is returned in `TurnRun`, not persisted, so the session cost ceiling resets between commands until it has a table.
 - Nothing uses `idempotency_key` yet: the tool dispatcher needs to compute it from each tool call's `args` and the session's thread id, and skip or replay a call whose key it has already seen.
