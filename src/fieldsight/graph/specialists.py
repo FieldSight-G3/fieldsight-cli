@@ -21,6 +21,9 @@ MAX_SPECIALIST_TOOL_ROUNDS = settings.bounds.max_specialist_tool_rounds
 # the workers get_specialists builds; each one's brief is PROMPTS[name] and its tools TOOLSETS[name]
 WORKERS = get_args(Worker)
 
+WIND_DOWN = ("Two tool rounds are left. Stop searching: call your propose tool (or submit_review) now with what you "
+             "already have, citing chunks your searches returned. A run that ends without one fails.")
+
 
 class SpecialistState(TypedDict):
     """ a worker's private state. Deliberately tiny so each worker only has what it needs, and two running in parallel never mix transcripts """
@@ -28,6 +31,7 @@ class SpecialistState(TypedDict):
     # input
     task: str
     incident: dict
+    gateway: dict | None    # this turn's Gateway reads (aws/gateway_reads); None when no Gateway is configured
     messages: Annotated[list[AnyMessage], add_messages]
     rounds: int
 
@@ -46,14 +50,20 @@ def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer:
 
     # node for prompting the model: it investigates with its tools, then proposes its finding through its propose tool
     def agent(state: SpecialistState) -> dict:
-        history = list(state.get("messages") or [])
+        # the brief goes in fresh on every call, never into the thread: a reused thread (the Reviewer's) would
+        # otherwise keep the brief it was first run with, and a changed prompt would never reach it
+        history = [message for message in state.get("messages") or [] if not isinstance(message, SystemMessage)]
         seed: list = []
-        # every run starts with its task; a thread that's reused (the Reviewer's) already has the brief
+        # every run starts with its task
         if not state.get("rounds"):
-            seed = ([] if history else [SystemMessage(brief)]) + [HumanMessage(state["task"])]
+            seed = [HumanMessage(state["task"])]
+            history += seed
+        # the cap drops the last round's tool calls, so warn while two rounds can still run: one to propose, one to fix it
+        elif state["rounds"] == MAX_SPECIALIST_TOOL_ROUNDS - 3:
+            seed = [HumanMessage(WIND_DOWN)]
             history += seed
 
-        reply = model.invoke(history)
+        reply = model.invoke([SystemMessage(brief)] + history)
         return {"messages": seed + [reply], "rounds": state.get("rounds", 0) + 1}
 
     # tool node

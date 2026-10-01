@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -109,6 +110,10 @@ class HazardControlProposal(Proposal):
         default=None,
         pattern=r"^(1910\.269\(l\)\(([1-9]|1[0-2])\)(\([a-z0-9]+\))*|Table R-[3-9])$",
         description="The provision the control rests on, e.g. 1910.269(l)(3)(i) or Table R-3; the first chunk_id carries it"
+    )
+    precedents: list[UUID] = Field(
+        default_factory=list,
+        description="Optional: incident ids find_similar_incidents returned this run that support the control"
     )
 
     @model_validator(mode="after")

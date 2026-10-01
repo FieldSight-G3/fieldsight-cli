@@ -11,8 +11,10 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
+from ...aws.gateway_reads import GatewayReads, gateway_configured, read_through_gateway
 from ...config import settings
 from ...graph.graph import graph_workflow
+from ...ingest.embedding import embed_narrative
 from ...ingest.submit import ingest_packet, packet_artifacts
 from ...repository import (
     IncidentRepository,
@@ -80,12 +82,14 @@ def rag_answerer(chain: Any = None) -> Answerer:
 
 def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = None, usage: SessionUsage | None = None,
          workflow: Workflow | None = None, answerer: Answerer | None = None, limits: BoundsConfig | None = None,
-         pricing: PricingConfig | None = None) -> TurnRun:
+         pricing: PricingConfig | None = None, gateway: GatewayReads | None = None) -> TurnRun:
     """ one command as the verified analyst; raises ToolDenied before anything is read if they hold no grant
 
         Every model call is metered against the session's cost ceiling and the turn's wall clock. The returned
         TurnRun's usage carries the session's spend, including this turn's, for the next turn to start from.
         workflow defaults to the Coordinator's graph for this analyst; tests pass a stand-in.
+        gateway is what the AgentCore Runtime read through the Gateway with its invoker's proof; without it, a turn on
+        the real graph reads the Gateway itself with a proof this process signs (the CLI, as the analyst's own role).
     """
 
     analyst = UUID(str(analyst_id))
@@ -96,12 +100,14 @@ def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = 
         incident = None
     if incident is not None:
         require_grant(analyst, incident)
+        if gateway is None and workflow is None and gateway_configured():
+            gateway = analyst_gateway_reads(analyst, incident)
     limits = limits or settings.bounds
     start = SessionUsage(session_id=usage.session_id if usage else str(incident or analyst),
                          incident_id=usage.incident_id if usage else incident or UUID(int=0),
                          cost_usd=usage.cost_usd if usage else Decimal(0), turn=TurnUsage(turn_id=str(uuid4())))
     with metered(start, limits, pricing) as meter:
-        result = run_turn(raw, workflow=harness_workflow(workflow or graph_workflow(analyst)), answerer=answerer or rag_answerer(),
+        result = run_turn(raw, workflow=harness_workflow(workflow or graph_workflow(analyst, gateway)), answerer=answerer or rag_answerer(),
                           cracked=cracked, usage=usage, analyst_id=analyst)
     for call in meter.calls:
         logger.info("model call priced", extra={"model_id": call.model_id, "input_tokens": call.input_tokens,
@@ -113,6 +119,15 @@ def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = 
     if meter.stopped is not None and result.refusal is None:
         update["refusal"] = refuse("bound_reached", f"This session's {meter.stopped.reason_code} limit ({meter.stopped.limit}) is spent.")
     return result.model_copy(update=update) if update else result
+
+
+def analyst_gateway_reads(analyst_id: UUID, incident_id: UUID) -> GatewayReads:
+    """ the Gateway reads for a turn this process runs as the analyst: a fresh proof on a new thread, used at once """
+
+    from ...security.iam_caller_proof import issue_proof
+
+    thread = f"cli-{uuid4()}"
+    return read_through_gateway(analyst_id, incident_id, thread_id=thread, caller_proof=issue_proof(thread, settings.aws_region))
 
 
 def latest_run(incident_id: UUID | str, *, analyst_id: UUID | str,
@@ -177,7 +192,9 @@ def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None 
     incident_id = IncidentRepository().create(establishment, packet["incident"].model_dump(mode="json", exclude={"incident_id"}),
                                               packet["narrative"], owner_analyst_id=analyst,
                                               # no judged photo means the photo trigger is unevaluated, not clear
-                                              photo_verdicts={"items": packet["photos"]} if packet["photos"] else None)
+                                              photo_verdicts={"items": packet["photos"]} if packet["photos"] else None,
+                                              # what find_similar_incidents searches with for this incident
+                                              embedding=embed_narrative(packet["narrative"]))
     RunRepository().create(correlation_id, "submit", incident_id=incident_id)
     return SubmitResult(incident_id=str(incident_id), establishment=establishment, report=packet["report"],
                         withheld=packet["withheld"], photos=packet["photos"], refusal=None)

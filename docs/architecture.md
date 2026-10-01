@@ -16,7 +16,7 @@ A reference document, not an essay. Fill every section.
 | max graph recursion depth | | steps | |
 | max reviewer iterations | | iterations | |
 | max retrieved chunks / tokens | `RETRIEVAL_MAX_CHUNKS` per search, max 3 hops | chunks | Bounds context size |
-| per-turn wall clock / per-call HTTP timeout | TBD / 5 connect, 30 read, 4 attempts | s | Adaptive retry absorbs throttling |
+| per-turn wall clock / per-call HTTP timeout | 300 (`max_turn_wall_clock_seconds`) / 5 connect, 30 read, 4 attempts | s | Measured: a turn with one Reviewer rejection and re-dispatch took 110–170 s (worker, Reviewer, worker again, Reviewer again), so 120 cut it off before the second verdict; 300 leaves room for that cycle on a slow Bedrock day. Adaptive retry absorbs throttling |
 | session cost ceiling | | USD | |
 | near-boundary margin — 24h clock | 1.0 (`reporting_24h_margin_hours`) | hours | Measured on incident → in-patient admission, amputation or loss of eye. Both timestamps come from packet text, often rounded to the hour, so a one-hour error can decide whether a 1904.39 report is due; escalates at 23–25 h inclusive |
 | near-boundary margin — 30-day fatality window | 1.0 (`fatality_30d_margin_days`) | days | Measured on incident → death. Dates are often recorded without a time or time zone, so ±1 day covers that imprecision; escalates at 29–31 days inclusive |

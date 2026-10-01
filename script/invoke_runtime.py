@@ -18,7 +18,7 @@ from botocore.config import Config
 from fieldsight.security.iam_caller_proof import issue_proof
 
 # a full analyze turn runs for minutes; never retry, since a retry would resend a proof that has since expired
-INVOKE = Config(read_timeout=300, retries={"total_max_attempts": 1})
+INVOKE = Config(read_timeout=360, retries={"total_max_attempts": 1})
 
 
 def invoke(runtime_arn: str, payload: dict, session_id: str, region: str) -> dict:

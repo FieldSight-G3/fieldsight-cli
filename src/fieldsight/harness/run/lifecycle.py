@@ -52,7 +52,7 @@ def run_turn(raw: dict, *, workflow: Workflow, answerer: Answerer, cracked: dict
         workers = result.workers_dispatched
         # a leg stage 4 still blocks when the caps run out is refused, not shown; blocked keeps what was wrong with it
         dossier = {worker: leg for worker, leg in result.dossier.items() if worker not in result.blocked}
-        run |= {"dossier": dossier, "blocked": result.blocked, "events": run["events"] + result.events}
+        run |= {"dossier": dossier, "blocked": result.blocked, "unavailable": result.unavailable, "events": run["events"] + result.events}
         signals |= {"reviewer_approved": result.reviewer_approved, "reviewer_iterations": result.reviewer_iterations,
                     "citations_supported": result.citations_supported, "retrieval_scores": result.retrieval_scores}
 

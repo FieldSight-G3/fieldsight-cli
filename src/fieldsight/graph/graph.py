@@ -2,6 +2,7 @@ from uuid import UUID
 
 from langgraph.graph import END, START, StateGraph
 
+from ..aws.gateway_reads import GatewayReads
 from ..checkpoint import open_thread, postgres_checkpointer
 from ..config import settings
 from ..harness.run.workflow import Workflow
@@ -65,8 +66,11 @@ def build_graph(checkpointer=None):
 TURN_LISTS = ("plans", "reviews", "tool_invocations", "model_calls")
 
 
-def graph_workflow(analyst_id: UUID) -> Workflow:
-    """ the Coordinator's graph as run_turn's workflow, for one analyst; each call is one turn on the Coordinator's thread """
+def graph_workflow(analyst_id: UUID, gateway: GatewayReads | None = None) -> Workflow:
+    """ the Coordinator's graph as run_turn's workflow, for one analyst; each call is one turn on the Coordinator's thread
+
+        gateway is what the turn read through the AgentCore Gateway; None when no Gateway is configured.
+    """
 
     def workflow(incident: NormalizedIncident, question: str | None, correlation_id: str) -> WorkflowResult:
         incident_id = UUID(incident.incident_id)
@@ -80,6 +84,7 @@ def graph_workflow(analyst_id: UUID) -> Workflow:
         seen = {key: len(before.get(key, [])) for key in TURN_LISTS}
         state = graph.invoke({"analyst_id": str(analyst_id), "incident": incident.model_dump(mode="json"),
                               "narrative": IncidentRepository().get(incident_id).narrative,
+                              "gateway": gateway.model_dump(mode="json") if gateway else None,
                               "correlation_id": correlation_id, "review_iterations": 0}, config)
         turn = {key: state.get(key, [])[seen[key]:] for key in TURN_LISTS}
 
@@ -97,6 +102,7 @@ def graph_workflow(analyst_id: UUID) -> Workflow:
             tool_invocations=turn["tool_invocations"],
             model_calls=turn["model_calls"],
             reviewer_verdicts=reviews,
+            unavailable=gateway.unavailable if gateway else {},
         )
 
     return workflow

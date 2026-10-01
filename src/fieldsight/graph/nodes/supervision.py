@@ -67,10 +67,20 @@ def _run_specialist(name: str, state: dict) -> dict:
 
     # the Coordinator narrows the goal when it re-dispatches
     task = state.get("tasks", {}).get(name) or GOALS[name]
+    decisions, retrieved = {}, {}
+    earlier = (state.get("dossier") or {}).get(name)
+    if state.get("review_iterations") and earlier and earlier["proposal"]:
+        # a re-dispatch revises its rejected proposal instead of starting over: the rules are deterministic on the
+        # same incident, and the cited chunks were retrieved this turn, so both carry into the second attempt
+        decisions, retrieved = dict(earlier["decisions"]), dict(earlier["cited"])
+        problems = [f"- {r.claim}: {r.problem}" for r in state["reviews"][-1].rejections if r.worker == name]
+        task = (f"{GOALS[name]}\n\nYour proposal was rejected:\n{json.dumps(earlier['proposal'])}\n\n"
+                "The Reviewer's problems with it:\n" + "\n".join(problems) +
+                f"\n\nFix only these, then propose again: {task}\nYour rule decisions and cited chunks still stand.")
     try:
         result = get_specialists()[name].invoke(
-            {"task": task, "incident": state["incident"], "messages": [], "rounds": 0,
-             "decisions": {}, "retrieved": {}, "proposal": None},
+            {"task": task, "incident": state["incident"], "gateway": state.get("gateway"), "messages": [], "rounds": 0,
+             "decisions": decisions, "retrieved": retrieved, "proposal": None},
             {"recursion_limit": settings.bounds.max_graph_recursion_depth},
         )
     except GraphRecursionError:

@@ -150,10 +150,16 @@ class SeedSummary(BaseModel):
     analysts_added: int
     grants_added: int
     incidents_added: int
+    incidents_embedded: int = 0
 
 def seed_demo() -> SeedSummary:
+    """ the seed rows, then an embedding for every narrative without one, so find_similar_incidents can return them """
+
+    from fieldsight.ingest.embedding import embed_missing
+
     added = SeedRepository().seed(analysts(), grants(), historical_incidents())
-    return SeedSummary(analysts_added=added["analysts"], grants_added=added["grants"], incidents_added=added["incidents"])
+    return SeedSummary(analysts_added=added["analysts"], grants_added=added["grants"], incidents_added=added["incidents"],
+                       incidents_embedded=embed_missing())
 
 def main() -> None:
     print(seed_demo().model_dump_json(indent=2))

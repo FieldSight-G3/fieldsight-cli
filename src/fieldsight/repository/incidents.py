@@ -30,16 +30,30 @@ class IncidentRepository(_Repository):
     def __init__(self, dsn: str | None = None) -> None:
         super().__init__("incidents", dsn)
 
-    def create(self, establishment: str, normalized_fields: dict[str, Any], narrative: str | None = None, owner_analyst_id: UUID | None = None, photo_verdicts: dict[str, Any] | None = None) -> UUID:
+    def create(self, establishment: str, normalized_fields: dict[str, Any], narrative: str | None = None, owner_analyst_id: UUID | None = None, photo_verdicts: dict[str, Any] | None = None, embedding: list[float] | None = None) -> UUID:
         statement = insert(self.table).values(
             establishment=establishment,
             normalized_fields=normalized_fields,
             narrative=narrative,
             owner_analyst_id=owner_analyst_id,
-            photo_verdicts=photo_verdicts
+            photo_verdicts=photo_verdicts,
+            embedding=embedding
         ).returning(self.table.c.incident_id)
         with self.engine.begin() as connection:
             return connection.execute(statement).scalar_one()
+
+    def narratives_without_embedding(self) -> list[tuple[UUID, str]]:
+        """ the incidents find_similar_incidents can't search yet: a narrative and no embedding """
+
+        statement = (select(self.table.c.incident_id, self.table.c.narrative)
+                     .where(self.table.c.embedding.is_(None), self.table.c.narrative.is_not(None)))
+        with self.engine.connect() as connection:
+            return [(row.incident_id, row.narrative) for row in connection.execute(statement)]
+
+    def set_embeddings(self, embeddings: dict[UUID, list[float]]) -> None:
+        with self.engine.begin() as connection:
+            for incident_id, embedding in embeddings.items():
+                connection.execute(update(self.table).where(self.table.c.incident_id == incident_id).values(embedding=embedding))
 
     def get(self, incident_id: UUID) -> IncidentRecord | None:
         return self._get("incident_id", incident_id, IncidentRecord)
