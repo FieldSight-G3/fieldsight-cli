@@ -18,7 +18,9 @@ def answer_question(question: str, answerer: Answerer, *, incident: NormalizedIn
 
     grounded = [answerer(question, [])]
     if grounded[0].refusal_reason:
-        return {"answer": grounded[0].answer, "sources": [], "refusal": None, "rule_invocations": rule_invocations, "events": []}
+        # the refusal text is the answer the analyst reads; the reason is kept so the turn can be told apart from one
+        return {"answer": grounded[0].answer, "sources": [], "refusal": None, "retrieval_refusal": grounded[0].refusal_reason,
+                "rule_invocations": rule_invocations, "events": []}
 
     # every chunk retrieved this turn, across regenerations; guard_answer reads it after each draft
     retrieved: set[str] = set()
@@ -33,4 +35,5 @@ def answer_question(question: str, answerer: Answerer, *, incident: NormalizedIn
     guarded = guard_answer(generate, incident=incident, retrieved=retrieved, rule_invocations=rule_invocations,
                            names=set(), correlation_id=correlation_id)
     return {"answer": guarded["text"], "sources": grounded[-1].sources if guarded["text"] else [],
-            "refusal": guarded["refusal"], "rule_invocations": guarded["rule_invocations"], "events": guarded["events"]}
+            "refusal": guarded["refusal"], "retrieval_refusal": None, "rule_invocations": guarded["rule_invocations"],
+            "events": guarded["events"]}

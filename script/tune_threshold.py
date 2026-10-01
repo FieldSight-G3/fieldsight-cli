@@ -4,14 +4,11 @@
     then set FIELDSIGHT_RETRIEVAL_SCORE_THRESHOLD to the printed value and record it in docs/evaluation-report.md
 """
 
-import json
 from itertools import pairwise
-from pathlib import Path
 
+from fieldsight.evaluation.golden import GOLDEN, load_cases
 from fieldsight.retrieval.corpus import search
 from fieldsight.retrieval.references import pick_filter
-
-GOLDEN = Path(__file__).resolve().parents[1] / "evals" / "golden"
 
 # categories the score alone must refuse or answer; the rest (determination probes, adversarial,
 # multi-turn) are handled by the harness, so they don't tune it
@@ -22,8 +19,10 @@ ANSWER = {"single_document", "multi_hop", "threshold", "incident_backed", "near_
 def golden_cases() -> list[dict]:
     """ single-query golden cases the score decides """
 
-    cases = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(GOLDEN.glob("*.json"))]
-    return [case for case in cases if "query" in case and case["category"] in REFUSE | ANSWER]
+    # a single ask turn with no incident: the question alone decides whether it clears the threshold
+    cases = [{**case, "query": case["turns"][0]["query"]} for case in load_cases()
+             if len(case.get("turns") or []) == 1 and case["turns"][0].get("command") == "ask" and not case.get("incident_id")]
+    return [case for case in cases if case["category"] in REFUSE | ANSWER]
 
 
 def top_score(query: str) -> float:

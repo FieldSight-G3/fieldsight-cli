@@ -127,7 +127,14 @@ def analyst_gateway_reads(analyst_id: UUID, incident_id: UUID) -> GatewayReads:
     from ...security.iam_caller_proof import issue_proof
 
     thread = f"cli-{uuid4()}"
-    return read_through_gateway(analyst_id, incident_id, thread_id=thread, caller_proof=issue_proof(thread, settings.aws_region))
+    try:
+        proof = issue_proof(thread, settings.aws_region)
+    except (RuntimeError, ValueError) as error:
+        # credentials that can't sign an analyst proof: the Gateway tools are gone this turn, and the turn continues
+        logger.warning("gateway reads skipped: %s", type(error).__name__)
+        reason = "This process can't sign an analyst caller proof, so the Gateway can't be called as the analyst"
+        return GatewayReads(unavailable=dict.fromkeys(("get_incident_extraction", "find_similar_incidents"), reason))
+    return read_through_gateway(analyst_id, incident_id, thread_id=thread, caller_proof=proof)
 
 
 def latest_run(incident_id: UUID | str, *, analyst_id: UUID | str,

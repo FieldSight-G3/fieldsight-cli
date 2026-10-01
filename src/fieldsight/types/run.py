@@ -5,7 +5,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..harness.bounds import SessionUsage
-from ..schemas.retrieval import Citation
+from ..schemas.retrieval import Citation, RefusalReason
 from ..schemas.review import ReviewVerdict
 from ..schemas.run_records import ModelCall, RuleInvocation, ToolInvocation
 from .dossier import Dossier
@@ -49,6 +49,7 @@ class TurnRun(BaseModel):
     refusal: Refusal | None = None
     problems: list[str] = Field(default_factory=list)  # why readiness stopped a classify turn
     answer: str | None = None
+    retrieval_refusal: RefusalReason | None = None  # the answer is the retrieval chain's refusal, for this reason
     sources: list[Citation] = Field(default_factory=list)
     dossier: Dossier | None = None
     blocked: dict[str, list[str]] = Field(default_factory=dict)

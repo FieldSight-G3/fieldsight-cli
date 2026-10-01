@@ -71,8 +71,10 @@ jobs:
         run: pip install -e ".[dev]"
       - name: Run migrations
         run: alembic upgrade head
+      - name: Golden set, CI tier (deterministic; §14)
+        run: pytest -v tests/test_golden_set.py
       - name: Run unit tests
-        run: pytest -v 
+        run: pytest -v --ignore=tests/test_golden_set.py
 
   secret-scan:
     runs-on: ubuntu-latest

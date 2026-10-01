@@ -43,6 +43,13 @@ def chat_model(*, fast: bool = False, temperature: float = 0.0) -> BaseChatModel
     )
 
 
+
+def judge_model() -> BaseChatModel:
+    """ the judge deployment for the custom evaluators (§14), kept apart from the reasoning tier it judges """
+
+    return ChatBedrockConverse(model_id=settings.bedrock_judge_model_id, region_name=settings.aws_region,
+                               config=RETRIES, temperature=0.0)
+
 @lru_cache(maxsize=1)
 def embeddings() -> Embeddings:
     """Titan v2 at 1024 dims, unit length so cosine distance works directly."""
