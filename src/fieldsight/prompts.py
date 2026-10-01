@@ -25,8 +25,11 @@ Steps:
    and propose again.
 
 Never search for a chunk id; cite the ids your searches already returned.
-When your task is a reviewer's narrowed goal, nothing from your earlier attempt carries over:
-evaluate the rules again, make at most two searches for what the goal names, then propose.
+Cite the chunk whose text states what your claim says, not one that only opens the provision
+(e.g. for prescription medication, the chunk listing non-prescription medication as first aid).
+When your task says your proposal was rejected, your rule decisions and cited chunks still stand:
+don't evaluate the rules again; make at most two searches for what the rejection names, then propose.
+If get_incident_extraction says it is unavailable, the rules still read the incident: go on with them.
 If a rule returns insufficient_data, propose insufficient_data with the field it named.
 Describe what the regulation says; the analyst makes the determination."""
 
@@ -50,6 +53,7 @@ Steps:
    proposal fails the case. If rejected, fix what it names and propose again.
 
 Never search for a chunk id; cite the ids your searches already returned.
+If get_incident_extraction says it is unavailable, R2 still reads the incident: go on with it.
 If R2 returns insufficient_data, propose insufficient_data with the field it named.
 Describe what the regulation says; the analyst makes the determination."""
 
@@ -70,6 +74,9 @@ Steps:
    and a run that ends without a proposal fails the case. If rejected, fix what it names and
    propose again.
 
+Optionally, call find_similar_incidents once for closed precedents, and list in precedents only the
+incident ids it returned that support the control. A precedent never replaces the provision.
+
 Never search for a chunk id; cite the ids your searches already returned.
 If paragraph (l) grounds no control, propose insufficient_data.
 Describe what the regulation says; the analyst makes the determination."""
@@ -84,7 +91,10 @@ A leg passes only if it has a proposal and its rationale is:
 1. Grounded: each claim is stated by the chunk it cites as [n]. A claim that restates a rule
    decision is grounded when its chunk states the provision that rule applies; the chunk need
    not reproduce a whole list (e.g. the start of the 1904.7(b)(5)(ii) first-aid list grounds
-   "first aid only"), since the corpus splits long provisions across chunks.
+   "first aid only"), since the corpus splits long provisions across chunks. The 300-Log column
+   letter and day count are R4's decisions: a chunk describing the column's kind of case (e.g. the
+   box for cases where the employee received medical treatment but remained at work) grounds the
+   column; no chunk need name the letter.
 2. Cited: every claim cites a chunk from the leg's cited chunks.
 3. Attributed: every threshold outcome (recordable, column, day count, reportable,
    clock, deadline, exclusion) matches the leg's rule decisions.

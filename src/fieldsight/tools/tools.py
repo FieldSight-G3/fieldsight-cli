@@ -9,6 +9,7 @@ from langgraph.prebuilt import InjectedState
 from langgraph.types import Command
 from pydantic import BaseModel
 
+from ..aws.gateway_reads import GATEWAY_UNAVAILABLE
 from ..errors import RetrievalError, RuleError
 from ..retrieval.corpus import meta, search
 from ..rules import proposal_review
@@ -36,7 +37,29 @@ def get_incident_extraction(state: Annotated[dict, InjectedState]) -> dict:
         A field is null when it couldn't be read. Call this first: every rule runs over these facts.
     """
 
-    return {"fields": {key: value for key, value in state["incident"].items() if key != "incident_id"}}
+    gateway = state.get("gateway")
+    if gateway is None:
+        # no Gateway configured (local development): the harness's own copy of the same record
+        return {"fields": {key: value for key, value in state["incident"].items() if key != "incident_id"}}
+    # read through the AgentCore Gateway as the analyst at turn start (aws/gateway_reads)
+    if gateway.get("extraction") is None:
+        return {"unavailable": gateway["unavailable"].get("get_incident_extraction", GATEWAY_UNAVAILABLE)}
+    fields = gateway["extraction"]["normalized_fields"]
+    return {"fields": {key: value for key, value in fields.items() if key != "incident_id"}}
+
+
+@tool
+def find_similar_incidents(state: Annotated[dict, InjectedState]) -> dict:
+    """ Closed incidents most like this one, from establishments the analyst may see: each one's outcome, deciding
+        rule, similarity score and narrative. Optional precedent only; it never decides a control.
+    """
+
+    gateway = state.get("gateway")
+    if gateway is None:
+        return {"unavailable": "find_similar_incidents is read through the AgentCore Gateway, which isn't configured"}
+    if gateway.get("similar") is None:
+        return {"unavailable": gateway["unavailable"].get("find_similar_incidents", GATEWAY_UNAVAILABLE)}
+    return {"items": gateway["similar"]}
 
 
 @tool(parse_docstring=True)
@@ -153,10 +176,13 @@ def propose_hazard_control(
     Returns accepted, or the problems to fix before proposing again.
 
     Args:
-        proposal: The outcome, control type, provision, a rationale, and its chunk ids with the provision's chunk first.
+        proposal: The outcome, control type, provision, a rationale, its chunk ids with the provision's chunk first, and any precedents.
     """
 
     problems = proposal_review.review_hazard_control(proposal, set(state["retrieved"]))
+    found = {item["incident_id"] for item in (state.get("gateway") or {}).get("similar") or []}
+    problems += [f"precedent {precedent} wasn't returned by find_similar_incidents this run"
+                 for precedent in map(str, proposal.precedents) if precedent not in found]
     return propose(proposal, problems, tool_call_id)
 
 
@@ -181,6 +207,6 @@ def submit_review(
 TOOLSETS = {
     "recordability": [get_incident_extraction, search_knowledge_base, evaluate_rule, propose_classification],
     "reportability": [get_incident_extraction, search_knowledge_base, evaluate_rule, propose_reporting_determination],
-    "hazard_control": [search_knowledge_base, propose_hazard_control],
+    "hazard_control": [search_knowledge_base, find_similar_incidents, propose_hazard_control],
     "reviewer": [search_knowledge_base, submit_review],
 }

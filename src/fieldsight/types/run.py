@@ -34,6 +34,7 @@ class WorkflowResult(BaseModel):
     tool_invocations: list[ToolInvocation] = Field(default_factory=list)
     model_calls: list[ModelCall] = Field(default_factory=list)
     reviewer_verdicts: list[ReviewVerdict | None] = Field(default_factory=list)
+    unavailable: dict[str, str] = Field(default_factory=dict)  # Gateway tools gone this turn -> why, for the analyst
 
 
 class TurnRun(BaseModel):
@@ -51,6 +52,7 @@ class TurnRun(BaseModel):
     sources: list[Citation] = Field(default_factory=list)
     dossier: Dossier | None = None
     blocked: dict[str, list[str]] = Field(default_factory=dict)
+    unavailable: dict[str, str] = Field(default_factory=dict)  # Gateway tools gone this turn -> why
     escalation: EscalationDecision | None = None
     events: list[GuardrailEvent] = Field(default_factory=list)
     usage: SessionUsage | None = None

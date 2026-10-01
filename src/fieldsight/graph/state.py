@@ -14,6 +14,7 @@ class WorkflowState(TypedDict):
     analyst_id: str
     incident: dict                   
     narrative: str | None       
+    gateway: dict | None             # this turn's Gateway reads, served by the workers' Gateway tools
 
     plans: Annotated[list[dict], operator.add]
     tasks: Annotated[dict[str, str], operator.or_]   
