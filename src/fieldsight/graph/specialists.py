@@ -3,7 +3,13 @@
 import operator
 from typing import Annotated, TypedDict, get_args
 
-from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    AnyMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
@@ -20,6 +26,9 @@ MAX_SPECIALIST_TOOL_ROUNDS = settings.bounds.max_specialist_tool_rounds
 
 # the workers get_specialists builds; each one's brief is PROMPTS[name] and its tools TOOLSETS[name]
 WORKERS = get_args(Worker)
+
+# the result a tool call gets when its run stopped before it ran
+NOT_RUN = "Not run: the previous run stopped before this tool call ran."
 
 WIND_DOWN = ("Two tool rounds are left. Stop searching: call your propose tool (or submit_review) now with what you "
              "already have, citing chunks your searches returned. A run that ends without one fails.")
@@ -43,6 +52,19 @@ class SpecialistState(TypedDict):
     proposal: dict | None
 
 
+def unanswered(history: list[AnyMessage]) -> list[ToolMessage]:
+    """ a "not run" result for each tool call a reused thread ends on
+
+        The round cap or the recursion limit can stop a run after the model asked for tools and before they ran.
+        Bedrock refuses a toolUse with no toolResult after it, so the thread's next run would fail without these.
+    """
+
+    last = history[-1] if history else None
+    if not (isinstance(last, AIMessage) and last.tool_calls):
+        return []
+    return [ToolMessage(NOT_RUN, tool_call_id=call["id"]) for call in last.tool_calls]
+
+
 def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer: BaseCheckpointSaver | None = None):
     """ each specialist is just its own graph. this is a factory function that can build multiple types of specialists """
 
@@ -54,9 +76,9 @@ def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer:
         # otherwise keep the brief it was first run with, and a changed prompt would never reach it
         history = [message for message in state.get("messages") or [] if not isinstance(message, SystemMessage)]
         seed: list = []
-        # every run starts with its task
+        # every run starts with its task, after closing any tool calls a reused thread's last run left unanswered
         if not state.get("rounds"):
-            seed = [HumanMessage(state["task"])]
+            seed = unanswered(history) + [HumanMessage(state["task"])]
             history += seed
         # the cap drops the last round's tool calls, so warn while two rounds can still run: one to propose, one to fix it
         elif state["rounds"] == MAX_SPECIALIST_TOOL_ROUNDS - 3:

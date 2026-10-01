@@ -47,8 +47,8 @@ ingestion_report --> processed, extracted, below floor, failures           artif
 | `artifacts/redact.py` | `redact`: removes PII from the fields and narrative and returns the removed spans. |
 | `artifacts/report.py` | `ingestion_report`. |
 | `normalize.py` | `normalize_chain`: the one structured-output call to a `NormalizedIncident`; each field's confidence and source artifact come from the Textract fields (`FORM_SOURCES`), never the model. |
-| `corroborate.py` | `corroborate` / `corroborate_chain`: one photo judged against the redacted narrative by the reasoning tier (multimodal), returning a `PhotoVerdict` (corroborates, contradicts or inconclusive); `too_large` checks Bedrock's image limit first. |
-| `submit.py` | `packet_artifacts` (skip and log unsupported files) and `ingest_packet` (crack, screen, redact, normalize, report); the screen is passed in, and `harness/run/wiring.submit` composes and saves it. |
+| `corroborate.py` | `corroborate`: one photo judged against the redacted narrative by the reasoning tier (multimodal), returning a `PhotoVerdict` (corroborates, contradicts or inconclusive); `too_large` checks Bedrock's image limit first. |
+| `submit.py` | `packet_artifacts` (skip and log unsupported files) and `ingest_packet` (crack, screen, redact, normalize, corroborate photos, report); the screen is passed in, and `harness/run/wiring.submit` composes and saves it. |
 | `corpus/sources.py` | `corpus_docs`, `letters`, and each doc's local PDF path and S3 key. |
 | `corpus/cracking.py` | `crack_corpus`: all corpus Textract jobs started in parallel, then awaited. |
 | `corpus/layout.py` | Layout and table blocks as page markdown, with tables kept column-aligned. |

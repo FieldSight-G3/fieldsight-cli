@@ -44,6 +44,7 @@ from ..metering.meter import metered
 from ..metering.pricing import PricingConfig
 from .answer import Answerer
 from .lifecycle import run_turn
+from .record import metered_calls
 from .workflow import Workflow
 
 logger = logging.getLogger(__name__)
@@ -115,7 +116,7 @@ def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = 
     with metered(start, limits, pricing) as meter:
         try:
             result = run_turn(raw, workflow=harness_workflow(workflow or graph_workflow(analyst, gateway)), answerer=answerer or rag_answerer(),
-                              cracked=cracked, usage=start, analyst_id=analyst)
+                              cracked=cracked, usage=start, analyst_id=analyst, metered=meter.calls)
         finally:
             # even a turn that fails partway spent what it spent
             if session:
@@ -198,7 +199,7 @@ def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None 
         return screen_texts(validated["request"], cracked, correlation_id=str(correlation_id))["texts"]
 
     start = SessionUsage(session_id=str(analyst), incident_id=UUID(int=0), turn=TurnUsage(turn_id=str(correlation_id)))
-    with metered(start, limits or settings.bounds, pricing):
+    with metered(start, limits or settings.bounds, pricing) as meter:
         packet = ingest_packet(supported, skipped, screen=screen)
     incident_id = IncidentRepository().create(establishment, packet["incident"].model_dump(mode="json", exclude={"incident_id"}),
                                               packet["narrative"], owner_analyst_id=analyst,
@@ -206,6 +207,7 @@ def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None 
                                               photo_verdicts={"items": packet["photos"]} if packet["photos"] else None,
                                               # what find_similar_incidents searches with for this incident
                                               embedding=embed_narrative(packet["narrative"]))
-    RunRepository().create(correlation_id, "submit", incident_id=incident_id)
+    # the normalizer's and the photo checks' calls, priced by the meter
+    RunRepository().create(correlation_id, "submit", incident_id=incident_id, model_calls=metered_calls("submit", meter.calls))
     return SubmitResult(incident_id=str(incident_id), establishment=establishment, report=packet["report"],
                         withheld=packet["withheld"], photos=packet["photos"], refusal=None)
