@@ -78,4 +78,5 @@ def run_turn(raw: dict, *, workflow: Workflow, answerer: Answerer, cracked: dict
     run_id = save_run(correlation_id, command, incident, results=results, decision=decision,
                       rule_invocations=invocations, workers=workers, workflow=result, review_snapshot=snapshot,
                       dossier=run.get("dossier"))
+    
     return TurnRun(run_id=run_id, correlation_id=correlation_id, command=command, escalation=decision, usage=usage, **run)

@@ -50,7 +50,7 @@ def note() -> str:
 def bedrock(monkeypatch):
     """ stands in for Bedrock: the Prompt Attacks filter blocks the text that carries an instruction to the model """
 
-    monkeypatch.setattr(turn_check, "screen", lambda text: BLOCKED if "INSTRUCTION FOR THE AI" in text else CLEAN)
+    monkeypatch.setattr(turn_check, "screen", lambda text: BLOCKED if "INSTRUCTION FOR THE AI" in text else {**CLEAN, "text": text})
     monkeypatch.setattr(turn_check, "classify", lambda question: "classify")
 
 

@@ -12,6 +12,7 @@ from ...schemas.incidents import NormalizedIncident
 from ...schemas.readiness import ReadinessClassification, ReadinessLabel
 from ...schemas.rule_input import R5Inputs
 from ...types.guardrails import TURN_REQUEST, GuardrailEvent, Route
+from ..escalation.review import ReviewRequest
 from .common import emit, refuse
 
 # the fields every classify turn needs before a worker is dispatched
@@ -55,12 +56,27 @@ def screen_texts(request: dict, cracked: dict[str, str], *, correlation_id: str)
 
     events: list[GuardrailEvent] = []
     texts = {**({"analyst": request["question"]} if "question" in request else {}), **cracked}
-    attacked = [source for source, text in texts.items() if text.strip() and prompt_attack_detected(screen(text))]
+    results = {source: screen(text) for source, text in texts.items() if text.strip()}
+    attacked = [source for source, result in results.items() if prompt_attack_detected(result)]
     for source in attacked:
         emit(events, correlation_id, "prompt_attack", "prompt_attack", "refused" if source == "analyst" else "withheld", source)
     refusal = refuse("prompt_attack", "The question was blocked by the Prompt Attacks filter.") if "analyst" in attacked else None
-    return {"texts": {source: text for source, text in texts.items() if source not in attacked},
+    # what passed, as the guardrail returned it: its sensitive-information filter has masked any PII
+    return {"texts": {source: results[source]["text"] if source in results else text
+                      for source, text in texts.items() if source not in attacked},
             "prompt_attack_detected": bool(attacked), "refusal": refusal, "events": events}
+
+
+def screen_review(request: ReviewRequest) -> ReviewRequest:
+    """ a reviewer's free text (the edited narrative, the note, the reason) through the guardrail before it's stored """
+
+    def guarded(text: str | None) -> str | None:
+        return screen(text)["text"] if text and text.strip() else text
+
+    edit = request.edit
+    if edit is not None:
+        edit = edit.model_copy(update={"narrative": guarded(edit.narrative), "note": guarded(edit.note)})
+    return request.model_copy(update={"edit": edit, "reason": guarded(request.reason)})
 
 
 def check_turn(raw: dict, *, incident: NormalizedIncident | None, cracked: dict[str, str], correlation_id: str) -> dict:
@@ -87,6 +103,9 @@ def check_turn(raw: dict, *, incident: NormalizedIncident | None, cracked: dict[
     turn |= {"prompt_attack_detected": screened["prompt_attack_detected"], "texts": screened["texts"]}
     if screened["refusal"]:
         return {**turn, "refusal": screened["refusal"]}
+    if "analyst" in screened["texts"]:
+        # the rest of the turn sees the question as the guardrail returned it, never the raw input
+        request = turn["request"] = {**request, "question": screened["texts"]["analyst"]}
     if request["command"] == "submit":
         # submit ingests; readiness is decided when the incident is analyzed
         return {**turn, "route": None}

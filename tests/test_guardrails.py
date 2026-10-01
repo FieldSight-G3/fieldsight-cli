@@ -30,7 +30,7 @@ CLEAN = {"action": "NONE", "assessments": []}
 def stub(monkeypatch):
     """ no Bedrock: the guardrail blocks any text containing "ignore", and the classifier returns the given label """
 
-    monkeypatch.setattr(turn_check, "screen", lambda text: BLOCKED if "ignore" in text.lower() else CLEAN)
+    monkeypatch.setattr(turn_check, "screen", lambda text: BLOCKED if "ignore" in text.lower() else {**CLEAN, "text": text})
 
     def label(value):
         monkeypatch.setattr(turn_check, "classify", lambda question: value)

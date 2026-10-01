@@ -37,7 +37,7 @@ from ..escalation.review import (
     submit_review,
 )
 from ..guardrails.common import refuse
-from ..guardrails.turn_check import screen_texts, validate_request
+from ..guardrails.turn_check import screen_review, screen_texts, validate_request
 from ..metering.meter import metered
 from ..metering.pricing import PricingConfig
 from .answer import Answerer
@@ -160,8 +160,8 @@ def record_review(incident_id: UUID | str, request: ReviewRequest, *, analyst_id
     queue_id = queue.pending_queue_id(UUID(str(incident_id)))
     if queue_id is None:
         raise ReviewConflict(f"No pending review for {incident_id}")
-    return submit_review(request, queue_id=queue_id, verified_reviewer_id=UUID(str(analyst_id)), store=queue,
-                         source_for_chunk=document_for_chunk)
+    return submit_review(screen_review(request), queue_id=queue_id, verified_reviewer_id=UUID(str(analyst_id)),
+                         store=queue, source_for_chunk=document_for_chunk)
 
 
 def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None = None,
