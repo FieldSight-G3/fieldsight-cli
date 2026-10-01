@@ -6,8 +6,9 @@
 |---|---|
 | refusal_precision | 0.6666666666666666 |
 | refusal_recall | 1.0 |
-| groundedness | {'supported': 109, 'partially_supported': 18, 'not_supported': 52, 'unjudged': 0} |
+| groundedness | {'supported': 142, 'partially_supported': 10, 'not_supported': 27, 'unjudged': 0} |
 | statements_present | {'yes': 36, 'partly': 3, 'no': 5} |
+| groundedness note | dossier rule sentences re-judged with the two-source check (rule decisions + cited chunk) |
 | cost_usd | 1.7182 |
 | seconds | {'total': 3142.5, 'max_turn': 276.4} |
 

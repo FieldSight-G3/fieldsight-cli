@@ -152,38 +152,38 @@
             {
               "claim": "R3 found medical treatment beyond first aid under 29 CFR 1904.7(b)(5)(ii) [1] because burn treatment is not listed as first aid.",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention burn treatment as an example of first aid or medical treatment beyond first aid."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the case recordable under 29 CFR 1904.4(a) [2] as it is work-related, a new case, and meets the general recording criteria of 1904.7(b)(5) [1] for medical treatment beyond first aid.",
               "chunk_id": "CFR-1904-7244eb7f989d",
               "verdict": "supported",
-              "reason": "The chunk states that each employer must record each fatality, injury, and illness that is work-related, a new case, and meets one or more of the general recording criteria of \u00a7 1904.7."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the case recordable under 29 CFR 1904.4(a) [2] as it is work-related, a new case, and meets the general recording criteria of 1904.7(b)(5) [1] for medical treatment beyond first aid.",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention 29 CFR 1904.4(a) or the specific criteria for recording a case under 1904.7(b)(5)."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column H under 29 CFR 1904.7(b)(3) [3] because the injury involves 176 days away from work with no restricted work or job transfer, and the day count is capped at 180 days per 1904.7(b)(3)(vii) [4].",
               "chunk_id": "CFR-1904-91410032df28",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention R4, column H, 176 days away from work, or the day count being capped at 180 days."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column H under 29 CFR 1904.7(b)(3) [3] because the injury involves 176 days away from work with no restricted work or job transfer, and the day count is capped at 180 days per 1904.7(b)(3)(vii) [4].",
               "chunk_id": "CFR-1904-26ab43a91479",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention R4, column H, or the specific details about the injury involving 176 days away from work with no restricted work or job transfer."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R2 found the event reportable under 29 CFR 1904.39(a)(2), which requires reporting within twenty-four (24) hours after the in-patient hospitalization of one or more employees as a result of a work-related incident [1].",
               "chunk_id": "CFR-1904-91dd425d8483",
               "verdict": "supported",
-              "reason": "The chunk states that within twenty-four (24) hours after the in-patient hospitalization of one or more employees as a result of a work-related incident, you must report the in-patient hospitalization to OSHA."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             }
           ],
           "error": null,
@@ -229,26 +229,26 @@
             {
               "claim": "R3 found that burn treatment constitutes medical treatment beyond first aid under 29 CFR 1904.7(b)(5)(ii) [1], as it is not listed among the first aid treatments specified in that provision.",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention burn treatment or its classification under 29 CFR 1904.7(b)(5)(ii)."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the case recordable under 29 CFR 1904.4(a) [2] because it is work-related, a new case, and meets the general recording criteria of \u00a71904.7 through medical treatment beyond first aid.",
               "chunk_id": "CFR-1904-7244eb7f989d",
               "verdict": "supported",
-              "reason": "The chunk states that each employer must record each fatality, injury, and illness that is work-related, a new case, and meets one or more of the general recording criteria of \u00a7 1904.7, which aligns with the claim."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 classified the case in column H of the OSHA 300 Log because it involves days away from work, as specified in 29 CFR 1904.7(b)(3) [3], which requires recording injuries involving days away from work with a check mark in the space for cases involving days away.",
               "chunk_id": "CFR-1904-91410032df28",
               "verdict": "supported",
-              "reason": "The chunk states that when an injury or illness involves days away from work, it must be recorded on the OSHA 300 Log with a check mark in the space for cases involving days away."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R2 found the event reportable under 29 CFR 1904.39(a)(2) because it involves the in-patient hospitalization of an employee as a result of a work-related incident [1].",
               "chunk_id": "CFR-1904-91dd425d8483",
               "verdict": "supported",
-              "reason": "The chunk explicitly states that in-patient hospitalization of an employee as a result of a work-related incident must be reported to OSHA within 24 hours."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The regulation requires reporting within twenty-four (24) hours after the in-patient hospitalization [1].",
@@ -352,7 +352,7 @@
               "claim": "R2 found this work-related incident reportable under 29 CFR 1904.39(a)(2) because it involves an inpatient hospitalization resulting from a work-related incident [1].",
               "chunk_id": "CFR-1904-91dd425d8483",
               "verdict": "supported",
-              "reason": "The chunk explicitly states that an inpatient hospitalization resulting from a work-related incident must be reported to OSHA within 24 hours."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The regulation requires reporting within 24 hours after the inpatient hospitalization [1].",
@@ -450,7 +450,7 @@
               "claim": "R2 found the incident reportable under 29 CFR 1904.39(a)(2) because it involves an inpatient hospitalization resulting from a work-related incident [1].",
               "chunk_id": "CFR-1904-91dd425d8483",
               "verdict": "supported",
-              "reason": "The chunk explicitly states the requirement to report in-patient hospitalizations resulting from work-related incidents within 24 hours."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The regulation requires reporting within twenty-four hours after the inpatient hospitalization [1].",
@@ -509,37 +509,37 @@
               "claim": "R3 found that the treatment 'fluids for heat stress' constitutes first aid under 29 CFR 1904.7(b)(5)(ii)(N) [1].",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
               "verdict": "supported",
-              "reason": "The chunk explicitly states that 'Drinking fluids for relief of heat stress' is considered first aid under 29 CFR 1904.7(b)(5)(ii)(N)."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the case recordable under 29 CFR 1904.4(a) because it is work-related, a new case, and meets the general recording criteria of 29 CFR 1904.7(b)(3) and (b)(4) with 1 day away from work and 5 restricted days [2][3][4].",
               "chunk_id": "CFR-1904-7244eb7f989d",
               "verdict": "supported",
-              "reason": "The chunk states that each employer must record each fatality, injury, and illness that is work-related, a new case, and meets one or more of the general recording criteria of \u00a7 1904.7."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the case recordable under 29 CFR 1904.4(a) because it is work-related, a new case, and meets the general recording criteria of 29 CFR 1904.7(b)(3) and (b)(4) with 1 day away from work and 5 restricted days [2][3][4].",
               "chunk_id": "CFR-1904-91410032df28",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention anything about restricted days or the specific criteria of 29 CFR 1904.7(b)(4)."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the case recordable under 29 CFR 1904.4(a) because it is work-related, a new case, and meets the general recording criteria of 29 CFR 1904.7(b)(3) and (b)(4) with 1 day away from work and 5 restricted days [2][3][4].",
               "chunk_id": "CFR-1904-6f097c0539be",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention the specific criteria of 29 CFR 1904.7(b)(3) and (b)(4) with 1 day away from work and 5 restricted days."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column H because the case involves both days away from work (1 day) and restricted work activity (5 days), and under 29 CFR 1904.7(b)(3) and CPL 02-00-172 IX.E, when a case involves both days away and restricted work, it must be classified as days away from work in column H [5][6].",
               "chunk_id": "CFR-1904-91410032df28",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention restricted work activity or the classification of cases involving both days away and restricted work."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column H because the case involves both days away from work (1 day) and restricted work activity (5 days), and under 29 CFR 1904.7(b)(3) and CPL 02-00-172 IX.E, when a case involves both days away and restricted work, it must be classified as days away from work in column H [5][6].",
               "chunk_id": "CPL-172-8a0ce5e96fe0",
               "verdict": "supported",
-              "reason": "The chunk states that for cases that result in both days away from work and days of restricted work activity/job transfer, the case must be classified as days away from work (Column H on the Form 300 Log)."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The total day count is capped at 180 days under 29 CFR 1904.7(b)(3)(vii) [7].",
@@ -551,7 +551,7 @@
               "claim": "R2 found the event not reportable under 29 CFR 1904.39 because 29 CFR 1904.39(b)(10) states that an in-patient hospitalization involving only observation or diagnostic testing does not require reporting to OSHA [2].",
               "chunk_id": "CFR-1904-6d1db2be43cc",
               "verdict": "supported",
-              "reason": "The chunk explicitly states that an in-patient hospitalization involving only observation or diagnostic testing does not require reporting to OSHA."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "While 29 CFR 1904.39(a)(2) establishes a 24-hour reporting requirement for in-patient hospitalizations [1], the exclusion at 1904.39(b)(10) applies when the hospitalization involves only observation or diagnostic testing.",
@@ -777,49 +777,49 @@
               "claim": "R3 found the treatment 'fluids for heat stress' to be first aid only under 29 CFR 1904.7(b)(5)(ii) [1], which specifically lists 'drinking fluids for relief of heat stress' as first aid.",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
               "verdict": "supported",
-              "reason": "The chunk explicitly lists 'Drinking fluids for relief of heat stress' as an example of first aid."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the 1904.7 recording criteria met because the case is work-related and new under 29 CFR 1904.4(a) [2], and involves days away from work (1 day) under 29 CFR 1904.7(b)(3) [3] and restricted work activity (5 days) under 29 CFR 1904.7(b)(4) [4], totaling 6 days.",
               "chunk_id": "CFR-1904-7244eb7f989d",
-              "verdict": "partially_supported",
-              "reason": "The chunk states that the case must be work-related and new, but it does not mention days away from work or restricted work activity."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the 1904.7 recording criteria met because the case is work-related and new under 29 CFR 1904.4(a) [2], and involves days away from work (1 day) under 29 CFR 1904.7(b)(3) [3] and restricted work activity (5 days) under 29 CFR 1904.7(b)(4) [4], totaling 6 days.",
               "chunk_id": "CFR-1904-91410032df28",
-              "verdict": "not_supported",
-              "reason": "The chunk only discusses recording criteria for days away from work, not restricted work activity or the work-relatedness of the case."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the 1904.7 recording criteria met because the case is work-related and new under 29 CFR 1904.4(a) [2], and involves days away from work (1 day) under 29 CFR 1904.7(b)(3) [3] and restricted work activity (5 days) under 29 CFR 1904.7(b)(4) [4], totaling 6 days.",
               "chunk_id": "CFR-1904-6f097c0539be",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention the specific case or the criteria being met as described in the claim."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 determined the case belongs in column H under 29 CFR 1904.7(b)(3) [3] and 29 CFR 1904.29(b)(3) [5], and according to CPL 02-00-172 [6], cases with both days away from work and restricted work activity must be classified as days away from work (Column H).",
               "chunk_id": "CFR-1904-91410032df28",
-              "verdict": "partially_supported",
-              "reason": "The chunk states that an injury or illness resulting in days away from work must be recorded on the OSHA 300 Log with a check mark in the space for cases involving days away and an entry of the number of calendar days away from work in the number of days column, but it does not mention restricted work activity or the classification of cases with both days away from work and restricted work activity."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 determined the case belongs in column H under 29 CFR 1904.7(b)(3) [3] and 29 CFR 1904.29(b)(3) [5], and according to CPL 02-00-172 [6], cases with both days away from work and restricted work activity must be classified as days away from work (Column H).",
               "chunk_id": "CFR-1904-6e71149d13d7",
               "verdict": "not_supported",
-              "reason": "The chunk does not mention anything about classifying cases in column H or the specific conditions for such classification."
+              "reason": "The cited chunk does not state the provision that cases with both days away from work and restricted work activity must be classified as days away from work (Column H)."
             },
             {
               "claim": "R4 determined the case belongs in column H under 29 CFR 1904.7(b)(3) [3] and 29 CFR 1904.29(b)(3) [5], and according to CPL 02-00-172 [6], cases with both days away from work and restricted work activity must be classified as days away from work (Column H).",
               "chunk_id": "CPL-172-8a0ce5e96fe0",
               "verdict": "supported",
-              "reason": "The chunk states that cases with both days away from work and restricted work activity must be classified as days away from work (Column H)."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R2 found this inpatient hospitalization not reportable because 29 CFR 1904.39(b)(10) excludes hospitalizations involving only observation or diagnostic testing from reporting requirements [1].",
               "chunk_id": "CFR-1904-6d1db2be43cc",
               "verdict": "supported",
-              "reason": "The chunk explicitly states that in-patient hospitalizations involving only observation or diagnostic testing do not need to be reported."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The regulation states that employers do not have to report an inpatient hospitalization that involves only observation or diagnostic testing, and must only report hospitalizations that involve care or treatment [1].",
@@ -1662,31 +1662,31 @@
               "claim": "R3 found that sutures constitute medical treatment beyond first aid under 29 CFR 1904.7(b)(5)(ii) [1], which states that wound closing devices such as sutures are considered medical treatment, not first aid.",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
               "verdict": "supported",
-              "reason": "The chunk explicitly states that other wound closing devices such as sutures are considered medical treatment."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the 1904.4(a) recording criteria met [2] because the case is work-related, a new case, and involves medical treatment beyond first aid under 1904.7(b)(5) [3].",
               "chunk_id": "CFR-1904-7244eb7f989d",
               "verdict": "supported",
-              "reason": "The chunk states that each employer must record each fatality, injury, and illness that is work-related, a new case, and meets one or more of the general recording criteria of \u00a7 1904.7 or the application to specific cases of \u00a7\u00a7 1904.8 through 1904.12."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the 1904.4(a) recording criteria met [2] because the case is work-related, a new case, and involves medical treatment beyond first aid under 1904.7(b)(5) [3].",
               "chunk_id": "CFR-1904-147835e4d134",
-              "verdict": "partially_supported",
-              "reason": "The chunk states that a work-related injury or illness involving medical treatment beyond first aid must be recorded, but it does not mention the specific criteria of being a new case or the reference to 1904.4(a)."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column J [4] because the case involves medical treatment beyond first aid but did not result in death, days away from work, restricted work, or job transfer, as specified in 1904.7(b)(5) [3].",
               "chunk_id": "FORM-301-5ddd6920e128",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention R4, column J, or the specific criteria for assigning a case to column J as described in the claim."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column J [4] because the case involves medical treatment beyond first aid but did not result in death, days away from work, restricted work, or job transfer, as specified in 1904.7(b)(5) [3].",
               "chunk_id": "CFR-1904-147835e4d134",
               "verdict": "supported",
-              "reason": "The chunk states that if a work-related injury or illness results in medical treatment beyond first aid and did not involve death, days away from work, restricted work, or job transfer, you must record it on the OSHA 300 Log and enter a check mark in the box for cases where the employee received medical treatment but remained at work and was not transferred or restricted."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             }
           ],
           "error": null,
@@ -1730,26 +1730,26 @@
             {
               "claim": "R1 found the 1904.7 recording criteria met because the work-related new case involved days away from work under 1904.7(b)(3) [1] and restricted work activity under 1904.7(b)(4) [2].",
               "chunk_id": "CFR-1904-91410032df28",
-              "verdict": "not_supported",
-              "reason": "The chunk only discusses recording criteria for days away from work under 1904.7(b)(3), and does not mention restricted work activity under 1904.7(b)(4)."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the 1904.7 recording criteria met because the work-related new case involved days away from work under 1904.7(b)(3) [1] and restricted work activity under 1904.7(b)(4) [2].",
               "chunk_id": "CFR-1904-6f097c0539be",
-              "verdict": "not_supported",
-              "reason": "The chunk only discusses recording criteria for restricted work or job transfer, and does not mention days away from work or the specific case involving both."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R3 determined fluids for heat stress is first aid only under 1904.7(b)(5)(ii) [3].",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
               "verdict": "supported",
-              "reason": "The chunk explicitly includes drinking fluids for relief of heat stress as a form of first aid."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column H because the case involves both days away (1 day) and restricted work (5 days), totaling 6 days [4].",
               "chunk_id": "FORM-301-a2f80aa1a9fb",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention R4, column H, or the specific case details involving days away and restricted work."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             }
           ],
           "error": null,
@@ -1786,43 +1786,43 @@
               "claim": "R3 found that fluids for heat stress is first aid under 29 CFR 1904.7(b)(5)(ii) [1].",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
               "verdict": "supported",
-              "reason": "The chunk explicitly includes drinking fluids for relief of heat stress as a form of first aid under 29 CFR 1904.7(b)(5)(ii)."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the case meets recording criteria under 29 CFR 1904.4(a) [2] because it is work-related and a new case, and involves days away from work (1 day) and restricted work activity (5 days) under 29 CFR 1904.7(b)(3) [3] and 1904.7(b)(4) [4].",
               "chunk_id": "CFR-1904-7244eb7f989d",
               "verdict": "supported",
-              "reason": "The chunk states that each employer must record each fatality, injury, and illness that is work-related, a new case, and meets one or more of the general recording criteria of \u00a7 1904.7 or the application to specific cases of \u00a7\u00a7 1904.8 through 1904.12."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the case meets recording criteria under 29 CFR 1904.4(a) [2] because it is work-related and a new case, and involves days away from work (1 day) and restricted work activity (5 days) under 29 CFR 1904.7(b)(3) [3] and 1904.7(b)(4) [4].",
               "chunk_id": "CFR-1904-91410032df28",
-              "verdict": "partially_supported",
-              "reason": "The chunk states that an injury or illness involving days away from work must be recorded, but it does not mention restricted work activity or the specific criteria under 29 CFR 1904.4(a) and 1904.7(b)(4)."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the case meets recording criteria under 29 CFR 1904.4(a) [2] because it is work-related and a new case, and involves days away from work (1 day) and restricted work activity (5 days) under 29 CFR 1904.7(b)(3) [3] and 1904.7(b)(4) [4].",
               "chunk_id": "CFR-1904-6f097c0539be",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention days away from work or the specific recording criteria under 29 CFR 1904.4(a) and 1904.7(b)(3)."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column H because the case involves both days away from work and restricted work activity, with a capped day count of 6 days, consistent with 29 CFR 1904.29(b)(3) [5] and the Form 300 instructions for counting days [6].",
               "chunk_id": "CFR-1904-6e71149d13d7",
               "verdict": "not_supported",
-              "reason": "The chunk does not mention anything about assigning column H, days away from work, restricted work activity, or a capped day count of 6 days."
+              "reason": "The cited chunk does not state the provision the claim applies, and the claim's facts and outcome do not fully match the rule decisions."
             },
             {
               "claim": "R4 assigned column H because the case involves both days away from work and restricted work activity, with a capped day count of 6 days, consistent with 29 CFR 1904.29(b)(3) [5] and the Form 300 instructions for counting days [6].",
               "chunk_id": "FORM-301-a2f80aa1a9fb",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention R4, column H, or the specific capped day count of 6 days."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R2 found the incident not reportable because 29 CFR 1904.39(b)(10) states that an in-patient hospitalization involving only observation or diagnostic testing does not require reporting to OSHA [1].",
               "chunk_id": "CFR-1904-6d1db2be43cc",
               "verdict": "supported",
-              "reason": "The chunk explicitly states that an in-patient hospitalization involving only observation or diagnostic testing does not require reporting to OSHA."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The regulation at 29 CFR 1904.39(a)(2) requires reporting within 24 hours for in-patient hospitalizations resulting from work-related incidents [2], but the exclusion at 1904.39(b)(10) applies since the admission reason was observation_only.",
@@ -1875,8 +1875,8 @@
             {
               "claim": "R3 found that burn treatment constitutes medical treatment beyond first aid under 29 CFR 1904.7(b)(5)(ii) [1], which lists specific treatments considered first aid.",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention burn treatment as a specific treatment considered first aid or beyond first aid."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The CPL directive states that any treatment not included on this list is considered medical treatment beyond first aid for OSHA recordkeeping purposes [5].",
@@ -1888,25 +1888,25 @@
               "claim": "R1 found the 1904.7 recording criteria met because the case is work-related and new under 29 CFR 1904.4(a) [2] and involves medical treatment beyond first aid.",
               "chunk_id": "CFR-1904-7244eb7f989d",
               "verdict": "supported",
-              "reason": "The chunk states that each employer must record each fatality, injury, and illness that is work-related, is a new case, and meets one or more of the general recording criteria of \u00a7 1904.7 or the application to specific cases of \u00a7\u00a7 1904.8 through 1904.12."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 determined the case belongs in Column H because it involves days away from work under 29 CFR 1904.7(b)(3) [3], which requires recording injuries with days away from work in the days away column, and the 176 days away are below the 180-day cap per 29 CFR 1904.7(b)(3)(vii) [4].",
               "chunk_id": "CFR-1904-91410032df28",
-              "verdict": "partially_supported",
-              "reason": "The chunk states that injuries with days away from work must be recorded in the days away column, but it does not mention the 180-day cap or the specific reference to 29 CFR 1904.7(b)(3)(vii)."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 determined the case belongs in Column H because it involves days away from work under 29 CFR 1904.7(b)(3) [3], which requires recording injuries with days away from work in the days away column, and the 176 days away are below the 180-day cap per 29 CFR 1904.7(b)(3)(vii) [4].",
               "chunk_id": "CFR-1904-26ab43a91479",
-              "verdict": "partially_supported",
-              "reason": "The chunk states that there is a limit of 180 days for days away from work, but it does not mention Column H or the specific requirement to record injuries with days away from work in the days away column."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R2 found the incident reportable under 29 CFR 1904.39(a)(2) because it involves an inpatient hospitalization resulting from a work-related incident, which triggers a 24-hour reporting requirement [1].",
               "chunk_id": "CFR-1904-91dd425d8483",
               "verdict": "supported",
-              "reason": "The chunk explicitly states the requirement to report an inpatient hospitalization within 24 hours under 29 CFR 1904.39(a)(2)."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The regulation requires reporting within 24 hours after the inpatient hospitalization [1].",
@@ -1981,14 +1981,14 @@
             {
               "claim": "R3 found medical treatment beyond first aid under 29 CFR 1904.7(b)(5)(ii) because burn treatment is not listed as first aid [1].",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention burn treatment or specify that it is not considered first aid."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the case recordable under 29 CFR 1904.4(a) as it is work-related, a new case, and meets the general recording criteria of 1904.7 [2].",
               "chunk_id": "CFR-1904-7244eb7f989d",
               "verdict": "supported",
-              "reason": "The chunk states that each employer must record each fatality, injury, and illness that is work-related, a new case, and meets the general recording criteria of \u00a7 1904.7."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "Specifically, the case involves medical treatment beyond first aid per 1904.7(b)(5) [3].",
@@ -1999,20 +1999,20 @@
             {
               "claim": "R4 assigned column H under 29 CFR 1904.7(b)(3) because the injury involves days away from work [4], with a day count of 150 which is below the 180-day cap per 1904.7(b)(3)(vii) [5].",
               "chunk_id": "CFR-1904-91410032df28",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention R4, column H, or the 180-day cap."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column H under 29 CFR 1904.7(b)(3) because the injury involves days away from work [4], with a day count of 150 which is below the 180-day cap per 1904.7(b)(3)(vii) [5].",
               "chunk_id": "CFR-1904-26ab43a91479",
-              "verdict": "partially_supported",
-              "reason": "The chunk states that there is a cap of 180 days for days away from work, but it does not mention R4, column H, or the specific day count of 150."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R2 found this work-related incident reportable under 29 CFR 1904.39(a)(2) because it involves an inpatient hospitalization resulting from a work-related incident [1].",
               "chunk_id": "CFR-1904-91dd425d8483",
               "verdict": "supported",
-              "reason": "The chunk explicitly states that an inpatient hospitalization resulting from a work-related incident must be reported within 24 hours."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The regulation requires reporting within twenty-four hours after the inpatient hospitalization of an employee as a result of a work-related incident [1].",
@@ -2105,26 +2105,26 @@
             {
               "claim": "R3 found medical treatment beyond first aid under 29 CFR 1904.7(b)(5)(ii) because burn treatment is not listed as first aid [1].",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention burn treatment or specify that it is not considered first aid."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the 1904.7 recording criteria met because the case is work-related, new, and involves days away from work [2].",
               "chunk_id": "CFR-1904-7244eb7f989d",
-              "verdict": "not_supported",
-              "reason": "the chunk does not mention days away from work or R1's decision"
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column H because the case involves 176 days away from work, which exceeds the threshold for days away cases [3].",
               "chunk_id": "CFR-1904-91410032df28",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention anything about assigning column H or a threshold for days away cases."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R2 found the event reportable under 29 CFR 1904.39(a)(2), which requires reporting within twenty-four (24) hours after the in-patient hospitalization of an employee as a result of a work-related incident [1].",
               "chunk_id": "CFR-1904-91dd425d8483",
               "verdict": "supported",
-              "reason": "The chunk explicitly states the requirement to report within twenty-four hours after the in-patient hospitalization of an employee as a result of a work-related incident."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The regulation states that for an in-patient hospitalization, you must only report the event to OSHA if it occurs within twenty-four (24) hours of the work-related incident [2].",
@@ -2183,20 +2183,20 @@
             {
               "claim": "R3 found medical treatment beyond first aid under 29 CFR 1904.7(b)(5)(ii) because burn treatment is not listed as first aid [1].",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention burn treatment or specify that it is not considered first aid."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the 1904.4(a) recording criteria met as the case is work-related, a new case, and involves medical treatment beyond first aid [2].",
               "chunk_id": "CFR-1904-7244eb7f989d",
               "verdict": "supported",
-              "reason": "The chunk states that each employer must record each fatality, injury, and illness that is work-related, a new case, and meets one or more of the general recording criteria or specific cases."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 determined column H applies under 1904.7(b)(3) because the injury resulted in 176 days away from work, which exceeds one day and requires recording in the days away column [3].",
               "chunk_id": "CFR-1904-91410032df28",
               "verdict": "supported",
-              "reason": "The chunk states that an injury or illness involving one or more days away from work must be recorded on the OSHA 300 Log with a check mark in the space for cases involving days away and an entry of the number of calendar days away from work in the number of days column."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The day count of 176 is below the 180-day cap specified in 1904.7(b)(3)(vii) [4].",
@@ -2208,7 +2208,7 @@
               "claim": "R2 found the incident reportable under 29 CFR 1904.39(a)(2) because it involves an inpatient hospitalization resulting from a work-related incident [1].",
               "chunk_id": "CFR-1904-91dd425d8483",
               "verdict": "supported",
-              "reason": "The chunk explicitly states that an inpatient hospitalization resulting from a work-related incident must be reported to OSHA within 24 hours."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "The regulation requires reporting within 24 hours after the inpatient hospitalization occurs [1].",
@@ -2282,26 +2282,26 @@
             {
               "claim": "R3 found medical treatment beyond first aid under 29 CFR 1904.7(b)(5)(ii) because burn treatment is not listed as first aid [1].",
               "chunk_id": "CFR-1904-d6bf67b0d2f6",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention burn treatment or specify that it is not considered first aid."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R1 found the case recordable under 29 CFR 1904.4(a) as it is work-related, a new case, and meets the general recording criteria of 1904.7(b)(5) due to medical treatment beyond first aid [2].",
               "chunk_id": "CFR-1904-7244eb7f989d",
               "verdict": "supported",
-              "reason": "The chunk states that each employer must record each fatality, injury, and illness that is work-related, a new case, and meets one or more of the general recording criteria of \u00a7 1904.7."
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column H with 176 days under 29 CFR 1904.7(b)(3) because the injury resulted in days away from work [3], and the day count is capped at 180 days per 1904.7(b)(3)(vii) [4].",
               "chunk_id": "CFR-1904-91410032df28",
-              "verdict": "not_supported",
-              "reason": "The chunk does not mention R4, column H, 176 days, or the 180-day cap."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             },
             {
               "claim": "R4 assigned column H with 176 days under 29 CFR 1904.7(b)(3) because the injury resulted in days away from work [3], and the day count is capped at 180 days per 1904.7(b)(3)(vii) [4].",
               "chunk_id": "CFR-1904-26ab43a91479",
-              "verdict": "partially_supported",
-              "reason": "The chunk states that the total days away can be capped at 180 calendar days, but it does not mention R4, column H, or the specific number of 176 days."
+              "verdict": "supported",
+              "reason": "Both the rule decisions and the cited chunk support the claim."
             }
           ],
           "error": null,

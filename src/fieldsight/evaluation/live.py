@@ -294,10 +294,11 @@ def ground(run: TurnRun, result: TurnResult) -> None:
         _ground(run.answer, [source.chunk_id for source in run.sources], {}, result)
     for leg in (run.dossier or {}).values():
         proposal = leg.get("proposal") or {}
-        _ground(proposal.get("rationale", ""), proposal.get("chunk_ids") or [], leg.get("cited") or {}, result)
+        _ground(proposal.get("rationale", ""), proposal.get("chunk_ids") or [], leg.get("cited") or {}, result,
+                leg.get("decisions"))
 
 
-def _ground(text: str, chunk_ids: list[str], cited: dict, result: TurnResult) -> None:
+def _ground(text: str, chunk_ids: list[str], cited: dict, result: TurnResult, decisions: dict | None = None) -> None:
     for claim, numbers in judge.cited_claims(text):
         for number in numbers:
             if not 1 <= number <= len(chunk_ids):
@@ -306,7 +307,7 @@ def _ground(text: str, chunk_ids: list[str], cited: dict, result: TurnResult) ->
                 continue
             chunk_id = chunk_ids[number - 1]
             body = (cited.get(chunk_id) or {}).get("text") or chunk_text(chunk_id)
-            verdict = judge.groundedness(claim, body)
+            verdict = judge.groundedness(claim, body, decisions)
             result.grounded.append({"claim": claim, "chunk_id": chunk_id, **(verdict.model_dump() if verdict else
                                     {"verdict": "unjudged", "reason": judge.UNJUDGED})})
 
