@@ -34,6 +34,20 @@ from langchain_core.documents import Document
 
 from fieldsight.config import settings
 
+# clean_db truncates the core tables before every test, so the suite refuses any database that isn't on this machine:
+# a .env pointed at RDS for the deployed CLI would otherwise wipe the shared incidents, runs and review queue
+LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1", "postgres"}
+
+
+def pytest_configure(config):
+    from sqlalchemy.engine import make_url
+
+    host = make_url(settings.database_url).host
+    if host not in LOCAL_HOSTS:
+        raise pytest.UsageError(
+            f"Refusing to run tests against {host}: the test fixture empties the database. Set FIELDSIGHT_DATABASE_URL "
+            "to a local Postgres for this run, e.g. postgresql+psycopg://fieldsight:fieldsight_dev@localhost:5434/fieldsight")
+
 
 @pytest.fixture(autouse=True)
 def clean_db():

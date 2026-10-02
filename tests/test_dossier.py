@@ -49,6 +49,33 @@ def test_a_narrowed_task_is_recorded_and_no_proposal_cites_nothing(script):
         {"analyst_id": ANALYST, "incident": INCIDENT, "tasks": {"recordability": "Check the day count against the 180-day cap."}}
     )["dossier"]["recordability"]
 
-    assert leg["task"] == "Check the day count against the 180-day cap."
+    # the leg records the goal and the Reviewer's narrowing; the narrowing reached the worker in its system message
+    assert leg["task"].endswith("The Reviewer narrowed your goal: Check the day count against the 180-day cap.")
     assert leg["proposal"] is None
     assert leg["cited"] == {}
+
+
+def test_a_re_dispatch_after_no_proposal_keeps_the_rule_decisions(script):
+    script([AIMessage("Nothing to propose.")])
+    r3 = {"rule_id": "R3", "outcome": "beyond_first_aid", "inputs": {"treatments": ["sutures"]},
+          "sources": ["29 CFR 1904.7(b)(5)(ii)"], "missing_field": None, "deadline": None, "log_column": None,
+          "day_count": None, "exclusion": None}
+    failed = {"task": GOALS["recordability"], "proposal": None, "decisions": {"R3": r3}, "cited": {}}
+
+    leg = recordability_specialist_node(
+        {"analyst_id": ANALYST, "incident": INCIDENT, "review_iterations": 1, "dossier": {"recordability": failed}}
+    )["dossier"]["recordability"]
+
+    # the rules are deterministic on the same incident, so the second attempt starts from the first one's decisions
+    assert leg["decisions"]["R3"]["outcome"] == "beyond_first_aid"
+    assert "Your rule decisions still stand" in leg["task"]
+
+
+def test_a_first_dispatch_with_the_default_goal_gets_no_reviewer_feedback(script):
+    script([AIMessage("Nothing to propose.")])
+
+    leg = recordability_specialist_node(
+        {"analyst_id": ANALYST, "incident": INCIDENT, "tasks": dict(GOALS)})["dossier"]["recordability"]
+
+    # the Coordinator puts the default goals in tasks on a new turn; that is not a narrowing
+    assert leg["task"] == GOALS["recordability"]

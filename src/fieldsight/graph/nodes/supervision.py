@@ -84,7 +84,9 @@ def _run_specialist(name: str, state: dict) -> dict:
     """ invoke one worker sub-graph and map its result back as its leg of the dossier; its transcript stays behind """
 
     # the Coordinator narrows the goal when it re-dispatches
+    # a first dispatch carries the default goal in tasks too; only a different goal is a Reviewer's narrowing
     narrowed = state.get("tasks", {}).get(name)
+    narrowed = narrowed if narrowed and narrowed != GOALS[name] else None
     feedback = f"The Reviewer narrowed your goal: {narrowed}" if narrowed else None
     decisions, retrieved = {}, {}
     earlier = (state.get("dossier") or {}).get(name)
@@ -97,6 +99,13 @@ def _run_specialist(name: str, state: dict) -> dict:
                     "The Reviewer's problems with it:\n" + "\n".join(problems) +
                     f"\n\nFix only these, then propose again: {narrowed or GOALS[name]}\n"
                     "Your rule decisions and cited chunks still stand.")
+    elif state.get("review_iterations") and earlier and earlier["decisions"]:
+        # the last attempt ended with no proposal, but its rule decisions are still right (the rules are
+        # deterministic on the same incident), so the re-dispatch starts from them instead of from scratch
+        decisions = dict(earlier["decisions"])
+        feedback = (f"{feedback}\n\n" if feedback else "") + (
+            "Your last attempt ended without an accepted proposal. Your rule decisions still stand: don't run the "
+            "rules again. Read their sources with read_provision, then propose, citing each chunk as [n].")
     # the user turn carries only the goal; the Reviewer's feedback goes in the worker's system message. As a user turn,
     # "your proposal was rejected, fix these" read as an injection to the Bedrock Prompt Attacks filter, which blocked
     # the re-dispatch's first call, so a rejected leg came back empty

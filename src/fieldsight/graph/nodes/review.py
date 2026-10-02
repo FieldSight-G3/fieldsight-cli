@@ -7,8 +7,8 @@ from langgraph.errors import GraphRecursionError
 
 from ...checkpoint import postgres_checkpointer, thread_id
 from ...config import settings
-from ...prompts import PROMPTS
-from ...schemas.review import ReviewVerdict
+from ...prompts import GOALS, PROMPTS
+from ...schemas.review import Rejection, ReviewVerdict
 from ...tools.tools import TOOLSETS
 from ..specialists import build_specialist
 from ..trace import record
@@ -28,6 +28,17 @@ def get_reviewer():
     return _REVIEWER
 
 
+def no_proposals(state: dict) -> ReviewVerdict | None:
+    """ a rejection of every dispatched leg when none of them has a proposal; None when there's something to review """
+
+    legs = state.get("dossier") or {}
+    if not legs or any(leg.get("proposal") for leg in legs.values()):
+        return None
+    return ReviewVerdict(approved=False, rejections=[
+        Rejection(worker=worker, claim="No proposal", problem="The worker ended without an accepted proposal.",
+                  narrowed_goal=GOALS[worker]) for worker in legs])
+
+
 def reviewer_node(state: dict) -> dict:
     """ judge the dossier only, never a worker's transcript, on the Reviewer's own thread """
 
@@ -36,6 +47,13 @@ def reviewer_node(state: dict) -> dict:
         "configurable": {"thread_id": thread_id(state["analyst_id"], state["incident"]["incident_id"], "reviewer")},
         "recursion_limit": settings.bounds.max_graph_recursion_depth,
     }
+
+    # nothing to judge: no dispatched leg has a proposal, so the verdict is a rejection without a model call. The
+    # Reviewer used to spend 25-40 s saying so. With one leg finished and another not, it still runs, so a finished
+    # leg is never released unreviewed
+    if (empty := no_proposals(state)) is not None:
+        return {"reviews": [empty], "review_iterations": state.get("review_iterations", 0) + 1,
+                "tasks": {r.worker: r.narrowed_goal for r in empty.rejections}, "tool_invocations": [], "model_calls": []}
 
     reviewer = get_reviewer()
     seen = len(reviewer.get_state(config).values.get("messages", []))

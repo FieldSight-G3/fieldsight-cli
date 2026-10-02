@@ -26,7 +26,9 @@ Steps:
    and a run that ends without a proposal fails the case. If rejected, fix what it names
    and propose again.
 
-Never search for a chunk id; cite the ids your searches already returned.
+Never search for a chunk id; cite the ids your searches already returned. List those ids in chunk_ids,
+and in the rationale cite each one as [n], its position in that list: [1] for the first id, [2] for the
+second. Write [1], never the id itself in brackets.
 Each rule decision lists the provisions it applied (its sources). After the rules, call read_provision
 once with all your decisions' sources (e.g. ["29 CFR 1904.7(b)(5)(ii)", "29 CFR 1904.4(a)"]), and cite what it returns
 in the sentence restating that decision: the regulation's own text, not commentary on it. Use
@@ -60,7 +62,9 @@ Steps:
    Don't keep searching for more: your tool rounds are capped, and a run that ends without a
    proposal fails the case. If rejected, fix what it names and propose again.
 
-Never search for a chunk id; cite the ids your searches already returned.
+Never search for a chunk id; cite the ids your searches already returned. List those ids in chunk_ids,
+and in the rationale cite each one as [n], its position in that list: [1] for the first id, [2] for the
+second. Write [1], never the id itself in brackets.
 After R2, call read_provision once with the provisions in its sources that fit this event (e.g.
 ["29 CFR 1904.39(a)(2)"]), and cite what it returns in the sentence restating R2's
 decision: the regulation's own text, not commentary on it.
@@ -90,7 +94,9 @@ Steps:
 Optionally, call find_similar_incidents once for closed precedents, and list in precedents only the
 incident ids it returned that support the control. A precedent never replaces the provision.
 
-Never search for a chunk id; cite the ids your searches already returned.
+Never search for a chunk id; cite the ids your searches already returned. List those ids in chunk_ids,
+and in the rationale cite each one as [n], its position in that list: [1] for the first id, [2] for the
+second. Write [1], never the id itself in brackets.
 If paragraph (l) grounds no control, propose insufficient_data.
 Describe what the regulation says; the analyst makes the determination. Attribute each outcome to its
 rule, e.g. "R1 found the 1904.7 recording criteria met", never "the incident is recordable" or

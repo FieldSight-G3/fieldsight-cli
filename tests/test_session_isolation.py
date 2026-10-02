@@ -80,8 +80,9 @@ def test_two_incidents_reviewed_concurrently_keep_separate_threads(reviewer):
         assert all(r["reviews"][0].approved for r in results)
         thread = {"configurable": {"thread_id": f"{analyst}:{incident}:reviewer"}}
         messages = review.get_reviewer().get_state(thread).values["messages"]
-        # every turn on this thread saw this incident's dossier and nothing else
-        assert [m.content for m in messages if isinstance(m, HumanMessage)] == [json.dumps(_dossier(incident))] * iterations
+        # every turn on this thread saw this incident's dossier (with the Coordinator's dispatch list) and nothing else
+        task = json.dumps({"dispatched": [], "dossier": _dossier(incident)})
+        assert [m.content for m in messages if isinstance(m, HumanMessage)] == [task] * iterations
 
 
 def _budget(incident: int, limits: BoundsConfig) -> TurnBudget:
