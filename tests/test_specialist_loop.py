@@ -85,3 +85,16 @@ def test_the_wind_down_goes_in_the_system_message_never_a_user_turn(monkeypatch)
     assert all(specialists.WIND_DOWN not in str(m.content) for call in model.calls for m in call
                if isinstance(m, HumanMessage))
     assert specialists.WIND_DOWN in model.calls[-1][0].content and specialists.WIND_DOWN not in model.calls[0][0].content
+
+
+def test_a_re_dispatch_sends_the_reviewer_feedback_in_the_system_message(monkeypatch):
+    model = Model()
+    monkeypatch.setattr(specialists.clients, "chat_model", lambda: model)
+    worker = specialists.build_specialist("recordability", "the brief", [])
+    worker.invoke({"task": "the goal", "feedback": "Your proposal was rejected: fix the citation", "rounds": 0,
+                   "proposal": None})
+
+    [call] = model.calls
+    # the Prompt Attacks filter screens user turns; there the feedback blocked the re-dispatch's first call
+    assert "Your proposal was rejected" in call[0].content
+    assert [m.content for m in call if isinstance(m, HumanMessage)] == ["the goal"]

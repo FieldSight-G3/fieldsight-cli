@@ -49,7 +49,9 @@ def draft(packet: NormalizeInput) -> NormalizedIncident:
             if record:
                 return record
             problem = "no record was returned"
-        messages.append(HumanMessage(f"That record was invalid: {problem}. Return one that matches the NormalizedIncident schema."))
+        # the reminder rides in the system message: as a user turn the Prompt Attacks filter can block it as an injection
+        messages[0] = SystemMessage(f"{PROMPTS['normalizer']}\n\nYour last record was invalid: {problem}. "
+                                    "Return one that matches the NormalizedIncident schema.")
     raise ExtractionError("normalize returned no valid record after one retry")
 
 

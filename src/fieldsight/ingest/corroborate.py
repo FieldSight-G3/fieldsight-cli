@@ -58,5 +58,7 @@ def corroborate(photo: Path, narrative: str | None) -> PhotoCorroboration:
             if verdict:
                 return PhotoCorroboration(artifact=photo.name, **verdict.model_dump())
             problem = "no verdict was returned"
-        messages.append(HumanMessage(f"That verdict was invalid: {problem}. Return one that matches the PhotoVerdict schema."))
+        # the reminder rides in the system message: as a user turn the Prompt Attacks filter can block it as an injection
+        messages[0] = SystemMessage(f"{PROMPTS['corroborator']}\n\nYour last verdict was invalid: {problem}. "
+                                    "Return one that matches the PhotoVerdict schema.")
     raise ExtractionError(f"no valid corroboration verdict for {photo.name} after one retry")

@@ -29,7 +29,9 @@ def _plan(state: dict) -> tuple[DispatchPlan, list[ModelCall]]:
         if out["parsed"]:
             return out["parsed"], calls
         problem = str(out["parsing_error"] or "no plan was returned")
-        messages.append(HumanMessage(f"That plan was invalid: {problem}. Return one that matches the DispatchPlan schema."))
+        # the reminder rides in the system message: as a user turn the Prompt Attacks filter can block it as an injection
+        messages[0] = SystemMessage(f"{PROMPTS['coordinator']}\n\nYour last plan was invalid: {problem}. "
+                                    "Return one that matches the DispatchPlan schema.")
     raise PlanError("the Coordinator returned no valid plan after one retry")
 
 
@@ -72,11 +74,18 @@ def route_after_coordinator(state: dict) -> list[str] | str:
     workers = [d["worker"] for d in state["plans"][-1]["dispatches"]]
     return workers or "eligibility_check"
     
+def recorded(task: str, feedback: str | None) -> str:
+    """ the leg's task as the run record shows it: the goal, and on a re-dispatch what the Reviewer sent back """
+
+    return f"{task}\n\n{feedback}" if feedback else task
+
+
 def _run_specialist(name: str, state: dict) -> dict:
     """ invoke one worker sub-graph and map its result back as its leg of the dossier; its transcript stays behind """
 
     # the Coordinator narrows the goal when it re-dispatches
-    task = state.get("tasks", {}).get(name) or GOALS[name]
+    narrowed = state.get("tasks", {}).get(name)
+    feedback = f"The Reviewer narrowed your goal: {narrowed}" if narrowed else None
     decisions, retrieved = {}, {}
     earlier = (state.get("dossier") or {}).get(name)
     if state.get("review_iterations") and earlier and earlier["proposal"]:
@@ -84,22 +93,27 @@ def _run_specialist(name: str, state: dict) -> dict:
         # same incident, and the cited chunks were retrieved this turn, so both carry into the second attempt
         decisions, retrieved = dict(earlier["decisions"]), dict(earlier["cited"])
         problems = [f"- {r.claim}: {r.problem}" for r in state["reviews"][-1].rejections if r.worker == name]
-        task = (f"{GOALS[name]}\n\nYour proposal was rejected:\n{json.dumps(earlier['proposal'])}\n\n"
-                "The Reviewer's problems with it:\n" + "\n".join(problems) +
-                f"\n\nFix only these, then propose again: {task}\nYour rule decisions and cited chunks still stand.")
+        feedback = (f"Your proposal was rejected:\n{json.dumps(earlier['proposal'])}\n\n"
+                    "The Reviewer's problems with it:\n" + "\n".join(problems) +
+                    f"\n\nFix only these, then propose again: {narrowed or GOALS[name]}\n"
+                    "Your rule decisions and cited chunks still stand.")
+    # the user turn carries only the goal; the Reviewer's feedback goes in the worker's system message. As a user turn,
+    # "your proposal was rejected, fix these" read as an injection to the Bedrock Prompt Attacks filter, which blocked
+    # the re-dispatch's first call, so a rejected leg came back empty
+    task = GOALS[name]
     try:
         result = get_specialists()[name].invoke(
-            {"task": task, "incident": state["incident"], "gateway": state.get("gateway"), "messages": [], "rounds": 0,
-             "decisions": decisions, "retrieved": retrieved, "proposal": None},
+            {"task": task, "feedback": feedback, "incident": state["incident"], "gateway": state.get("gateway"),
+             "messages": [], "rounds": 0, "decisions": decisions, "retrieved": retrieved, "proposal": None},
             {"recursion_limit": settings.bounds.max_graph_recursion_depth},
         )
     except GraphRecursionError:
         # the independent hard cap: a worker that hits it ends with no proposal, not a crash
-        return {"dossier": {name: DossierLeg(task=task, proposal=None, decisions={}, cited={})}}
+        return {"dossier": {name: DossierLeg(task=recorded(task, feedback), proposal=None, decisions={}, cited={})}}
 
     proposal = result["proposal"]
     leg = DossierLeg(
-        task=task,
+        task=recorded(task, feedback),
         proposal=proposal,
         decisions=result["decisions"],
         cited={chunk_id: result["retrieved"][chunk_id] for chunk_id in proposal["chunk_ids"]} if proposal else {},

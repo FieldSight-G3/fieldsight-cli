@@ -39,6 +39,7 @@ class SpecialistState(TypedDict):
 
     # input
     task: str
+    feedback: str | None    # a re-dispatch's Reviewer feedback: it rides in the system message, never a user turn
     incident: dict
     gateway: dict | None    # this turn's Gateway reads (aws/gateway_reads); None when no Gateway is configured
     messages: Annotated[list[AnyMessage], add_messages]
@@ -92,7 +93,7 @@ def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer:
         # it. The warning goes in the system message: as a user turn, "stop searching, a run that ends without one
         # fails" reads as an injection to the Bedrock Prompt Attacks filter, which blocked the call and lost the leg
         warned = state.get("rounds", 0) >= MAX_SPECIALIST_TOOL_ROUNDS - 3
-        system = f"{brief}\n\n{WIND_DOWN}" if warned else brief
+        system = "\n\n".join(part for part in (brief, state.get("feedback"), WIND_DOWN if warned else None) if part)
 
         reply = model.invoke([SystemMessage(system)] + history)
         return {"messages": seed + [reply], "rounds": state.get("rounds", 0) + 1, "run_start": start}
