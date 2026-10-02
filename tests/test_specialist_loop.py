@@ -57,3 +57,31 @@ def test_a_reused_thread_sends_only_the_current_run_with_the_current_brief(monke
     # the thread itself still keeps both runs
     stored = reviewer.get_state(config).values["messages"]
     assert [m.content for m in stored if isinstance(m, HumanMessage)] == ["first dossier", "second dossier"]
+
+
+class Searching(Model):
+    """ asks for a search every call, so the run reaches the wind-down """
+
+    def invoke(self, messages):
+        self.calls.append(messages)
+        return AIMessage(content="", tool_calls=[{"name": "noop", "args": {}, "id": f"c{len(self.calls)}"}])
+
+
+def test_the_wind_down_goes_in_the_system_message_never_a_user_turn(monkeypatch):
+    from langchain_core.tools import tool
+
+    @tool
+    def noop() -> str:
+        """ does nothing """
+        return "ok"
+
+    model = Searching()
+    monkeypatch.setattr(specialists.clients, "chat_model", lambda: model)
+    monkeypatch.setattr(specialists, "MAX_SPECIALIST_TOOL_ROUNDS", 4)
+    worker = specialists.build_specialist("recordability", "the brief", [noop])
+    worker.invoke({"task": "the task", "rounds": 0, "proposal": None})
+
+    # the Prompt Attacks filter screens user turns, and blocked the warning there
+    assert all(specialists.WIND_DOWN not in str(m.content) for call in model.calls for m in call
+               if isinstance(m, HumanMessage))
+    assert specialists.WIND_DOWN in model.calls[-1][0].content and specialists.WIND_DOWN not in model.calls[0][0].content

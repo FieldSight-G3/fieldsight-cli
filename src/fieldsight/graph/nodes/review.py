@@ -40,8 +40,11 @@ def reviewer_node(state: dict) -> dict:
     reviewer = get_reviewer()
     seen = len(reviewer.get_state(config).values.get("messages", []))
     try:
-        result = reviewer.invoke(
-            {"task": json.dumps(state["dossier"]), "rounds": 0, "proposal": None}, config)
+        # the Coordinator's plan goes with the dossier: without it, a leg the plan skipped (reportability on a case
+        # with no 1904.39 event) read as missing, and the Reviewer rejected a complete dossier
+        plan = (state.get("plans") or [{}])[-1]
+        task = {"dispatched": plan.get("dispatches") or [], "dossier": state["dossier"]}
+        result = reviewer.invoke({"task": json.dumps(task), "rounds": 0, "proposal": None}, config)
         verdict = ReviewVerdict.model_validate(result["proposal"]) if result["proposal"] else None
         tools, calls = record("reviewer", result["messages"][seen:], config["configurable"]["thread_id"])
     except GraphRecursionError:

@@ -43,6 +43,7 @@ def main() -> None:
     parser.add_argument("--command", choices=["analyze", "ask"], default="analyze")
     parser.add_argument("--question")
     parser.add_argument("--session-id", help="reuse a session to continue it; AgentCore needs 33+ characters")
+    parser.add_argument("--full", action="store_true", help="print the whole result, not just its first 3,000 characters")
     args = parser.parse_args()
 
     session = boto3.Session()
@@ -68,7 +69,17 @@ def main() -> None:
         print(f"refused: {result['refusal'].get('reason')}: {result['refusal'].get('message')}")
     escalation = result.get("escalation") or {}
     print(f"requires review: {escalation.get('requires_review')}")
-    print(json.dumps(result, indent=2, default=str)[:3000])
+    # the summary a dossier is checked by, before the JSON (which is cut short unless --full)
+    for worker, leg in (result.get("dossier") or {}).items():
+        proposal = leg.get("proposal") or {}
+        outcome_fields = {key: proposal.get(key) for key in ("outcome", "log_column", "day_count", "deadline", "exclusion")
+                          if proposal.get(key) is not None}
+        print(f"leg {worker}: {outcome_fields or 'no proposal'}, cites {len(proposal.get('chunk_ids') or [])} chunks")
+    print(f"blocked: {result.get('blocked') or 'none'}")
+    print(f"unavailable: {result.get('unavailable') or 'none'}")
+    print(f"triggers fired: {escalation.get('fired') or 'none'}")
+    text = json.dumps(result, indent=2, default=str)
+    print(text if args.full else text[:3000] + ("\n... (cut short; --full prints all of it)" if len(text) > 3000 else ""))
 
 
 if __name__ == "__main__":

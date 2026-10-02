@@ -88,12 +88,13 @@ def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer:
         if not state.get("rounds"):
             history.append(HumanMessage(state["task"]))
             seed = closing + history[-1:]
-        # the cap drops the last round's tool calls, so warn while two rounds can still run: one to propose, one to fix it
-        elif state["rounds"] == MAX_SPECIALIST_TOOL_ROUNDS - 3:
-            seed = [HumanMessage(WIND_DOWN)]
-            history += seed
+        # the cap drops the last round's tool calls, so warn while two rounds can still run: one to propose, one to fix
+        # it. The warning goes in the system message: as a user turn, "stop searching, a run that ends without one
+        # fails" reads as an injection to the Bedrock Prompt Attacks filter, which blocked the call and lost the leg
+        warned = state.get("rounds", 0) >= MAX_SPECIALIST_TOOL_ROUNDS - 3
+        system = f"{brief}\n\n{WIND_DOWN}" if warned else brief
 
-        reply = model.invoke([SystemMessage(brief)] + history)
+        reply = model.invoke([SystemMessage(system)] + history)
         return {"messages": seed + [reply], "rounds": state.get("rounds", 0) + 1, "run_start": start}
 
     # tool node

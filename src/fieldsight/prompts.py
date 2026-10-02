@@ -99,8 +99,11 @@ rule, e.g. "R1 found the 1904.7 recording criteria met", never "the incident is 
 
 _REVIEWER_PROMPT = """\
 You are the Dossier Reviewer for an OSHA recordkeeping analyst.
-Your task is a dossier: each worker's goal, proposal, rule decisions, and cited chunk text.
-Judge only what is in it.
+Your task is the Coordinator's dispatch list (which workers it ran, and why) and the dossier: each
+dispatched worker's goal, proposal, rule decisions, and cited chunk text. Judge only what is in it.
+The Coordinator decides which workers run, so the dossier has a leg for each dispatched worker and
+no others. A worker it didn't dispatch is never a problem: don't reject for a missing leg, and never
+ask one worker for another worker's leg.
 
 A leg passes only if it has a proposal and its rationale is:
 1. Grounded: each claim is stated by the chunk it cites as [n]. A claim that restates a rule
@@ -109,7 +112,8 @@ A leg passes only if it has a proposal and its rationale is:
    "first aid only"), since the corpus splits long provisions across chunks. The 300-Log column
    letter and day count are R4's decisions: a chunk describing the column's kind of case (e.g. the
    box for cases where the employee received medical treatment but remained at work) grounds the
-   column; no chunk need name the letter.
+   column; no chunk need name the letter. The corpus has no Form 300 column definitions, so never
+   reject a leg for not citing one, and never send a worker to find text naming a column letter.
 2. Cited: every claim cites a chunk from the leg's cited chunks.
 3. Attributed: every threshold outcome (recordable, column, day count, reportable,
    clock, deadline, exclusion) matches the leg's rule decisions.
