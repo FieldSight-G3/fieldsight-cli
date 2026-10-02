@@ -5,7 +5,7 @@ from fieldsight.schemas.rule_proposal import ClassificationProposal
 
 DECISIONS = {
     "R3": {"rule_id": "R3", "outcome": "beyond_first_aid", "sources": ["29 CFR 1904.7(b)(5)(ii)"]},
-    "R4": {"rule_id": "R4", "outcome": "J", "sources": ["29 CFR 1904.7(b)(5)", "29 CFR 1904.29(b)(3)"]},
+    "R4": {"rule_id": "R4", "outcome": "J", "sources": ["29 CFR 1904.7(b)(5)"]},
 }
 RETRIEVED = {
     "reg-1904.7": {"doc_id": "CFR-1904", "section_path": "1904.7", "paragraph": "1904.7(b)(5)(ii)",

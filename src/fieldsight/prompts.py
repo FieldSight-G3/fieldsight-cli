@@ -20,6 +20,9 @@ Steps:
    first-aid and medical-treatment text), R1's (the recording criteria) and R4's (the column).
    search_knowledge_base at most twice, only for what those don't cover. Any chunk id read or
    searched this run can be cited.
+   In the rationale, describe R4's column by the box its 1904.7(b) paragraph describes, e.g. "R4
+   selected the box for cases with medical treatment beyond first aid under 1904.7(b)(5) [n]". Don't
+   write the column letter there: it goes in log_column, and the regulation never names the letters.
 4. As soon as the rules have decided and each decision has a supporting chunk, call
    propose_classification with the rules' outcome, column and day count, a rationale,
    and the chunk ids it cites. Don't keep searching for more: your tool rounds are capped,
@@ -110,6 +113,11 @@ dispatched worker's goal, proposal, rule decisions, and cited chunk text. Judge 
 The Coordinator decides which workers run, so the dossier has a leg for each dispatched worker and
 no others. A worker it didn't dispatch is never a problem: don't reject for a missing leg, and never
 ask one worker for another worker's leg.
+
+verified_rule_citations lists, per leg, the sentences restating a rule decision that the system has
+already checked: each one's cited chunk states the provision named in grounded_by, a provision that
+rule applied. Treat those sentences as grounded and cited; judge only their wording (item 4) and
+whether their outcome matches the rule decisions (item 3).
 
 A leg passes only if it has a proposal and its rationale is:
 1. Grounded: each claim is stated by the chunk it cites as [n]. A claim that restates a rule

@@ -103,6 +103,25 @@ def grounds(source: str, hit: dict) -> bool:
     return False
 
 
+def rule_sentences(rationale: str, chunk_ids: list[str], decisions: dict[str, dict],
+                   retrieved: dict[str, dict]) -> list[dict]:
+    """ each sentence that restates a rule decision: its rules, their source provisions, and the provision and chunk
+        that ground it, if any of its citations states a provision one of those rules applied """
+
+    checked = []
+    for sentence in re.split(r"(?<=[.!?])\s+", rationale.strip()):
+        rules = list(dict.fromkeys(f"R{n}" for n in RULE_MENTION.findall(sentence) if f"R{n}" in decisions))
+        if not rules:
+            continue
+        sources = list(dict.fromkeys(source for rule in rules for source in decisions[rule].get("sources") or []))
+        cited = [chunk_ids[int(n) - 1] for n in CITATION.findall(sentence) if 0 < int(n) <= len(chunk_ids)]
+        grounding = next(((source, chunk_id) for source in sources for chunk_id in cited
+                          if grounds(source, retrieved.get(chunk_id) or {})), None)
+        checked.append({"sentence": sentence, "rules": rules, "sources": sources,
+                        "provision": grounding[0] if grounding else None, "chunk_id": grounding[1] if grounding else None})
+    return checked
+
+
 def rule_citation_problems(proposal: Proposal, decisions: dict[str, dict], retrieved: dict[str, dict]) -> list[str]:
     """ each sentence that restates a rule decision cites a chunk of a provision that rule applied
 
@@ -111,14 +130,7 @@ def rule_citation_problems(proposal: Proposal, decisions: dict[str, dict], retri
         problem names the provisions so the worker can read_provision them and cite the result.
     """
 
-    problems = []
-    for sentence in re.split(r"(?<=[.!?])\s+", proposal.rationale.strip()):
-        rules = list(dict.fromkeys(f"R{n}" for n in RULE_MENTION.findall(sentence) if f"R{n}" in decisions))
-        if not rules:
-            continue
-        sources = list(dict.fromkeys(source for rule in rules for source in decisions[rule].get("sources") or []))
-        cited = [proposal.chunk_ids[int(n) - 1] for n in CITATION.findall(sentence) if 0 < int(n) <= len(proposal.chunk_ids)]
-        if not any(grounds(source, retrieved.get(chunk_id) or {}) for source in sources for chunk_id in cited):
-            problems.append(f'"{sentence[:80]}" restates {"/".join(rules)} but cites no chunk stating a provision it '
-                            f"applied: read_provision({sources}) and cite a chunk it returns")
-    return problems
+    return [f'"{check["sentence"][:80]}" restates {"/".join(check["rules"])} but cites no chunk stating a provision it '
+            f"applied: read_provision({check['sources']}) and cite a chunk it returns"
+            for check in rule_sentences(proposal.rationale, proposal.chunk_ids, decisions, retrieved)
+            if check["provision"] is None]

@@ -81,7 +81,8 @@ def test_two_incidents_reviewed_concurrently_keep_separate_threads(reviewer):
         thread = {"configurable": {"thread_id": f"{analyst}:{incident}:reviewer"}}
         messages = review.get_reviewer().get_state(thread).values["messages"]
         # every turn on this thread saw this incident's dossier (with the Coordinator's dispatch list) and nothing else
-        task = json.dumps({"dispatched": [], "dossier": _dossier(incident)})
+        task = json.dumps({"dispatched": [], "dossier": _dossier(incident),
+                           "verified_rule_citations": {"recordability": []}})
         assert [m.content for m in messages if isinstance(m, HumanMessage)] == [task] * iterations
 
 

@@ -1,11 +1,10 @@
 from fieldsight.schemas.rule_decision import RuleDecision
 from fieldsight.schemas.rule_input import R4Inputs
 
-# the regulation paragraphs only: the corpus has no Form 300 column definitions, and listing them sent workers and the
-# Reviewer searching for a document that isn't there, which made every column J case slow and often rejected
+# the 1904.7(b) paragraphs only. The corpus has no Form 300 column definitions, and 1904.29(b)(3) is the 7-day rule
+# for how quickly a case is recorded, not the columns; citing either sent workers searching and the Reviewer rejecting
 SOURCES = [
     "29 CFR 1904.7(b)(3)",
-    "29 CFR 1904.29(b)(3)",
 ]
 
 # the 1904.7(b) paragraph that says how each column's kind of case is entered on the log
@@ -18,9 +17,9 @@ COLUMN_PROVISIONS = {
 
 
 def column_sources(column: str) -> list[str]:
-    """ the provisions a column decision applied: the paragraph for that kind of case, then the log's column rules """
+    """ the provision a column decision applied: the 1904.7(b) paragraph for that kind of case """
 
-    return [COLUMN_PROVISIONS[column], "29 CFR 1904.29(b)(3)"]
+    return [COLUMN_PROVISIONS[column]]
 
 
 def log_classification(data: R4Inputs) -> RuleDecision:

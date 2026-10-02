@@ -8,6 +8,7 @@ from langgraph.errors import GraphRecursionError
 from ...checkpoint import postgres_checkpointer, thread_id
 from ...config import settings
 from ...prompts import GOALS, PROMPTS
+from ...rules.proposal_review import rule_sentences
 from ...schemas.review import Rejection, ReviewVerdict
 from ...tools.tools import TOOLSETS
 from ..specialists import build_specialist
@@ -39,6 +40,25 @@ def no_proposals(state: dict) -> ReviewVerdict | None:
                   narrowed_goal=GOALS[worker]) for worker in legs])
 
 
+def verified(dossier: dict) -> dict[str, list[dict]]:
+    """ per leg, the sentences restating a rule decision whose citation the propose tool already checked: the cited
+        chunk states a provision that rule applied
+
+        The Reviewer kept rejecting these (column J "not in the chunk") although the check had confirmed them; it
+        gets the check's evidence, sentence by sentence, instead of only an instruction not to
+    """
+
+    found = {}
+    for worker, leg in dossier.items():
+        proposal = leg.get("proposal") or {}
+        if proposal.get("rationale"):
+            found[worker] = [{"sentence": check["sentence"], "rules": check["rules"], "grounded_by": check["provision"]}
+                             for check in rule_sentences(proposal["rationale"], proposal.get("chunk_ids") or [],
+                                                         leg.get("decisions") or {}, leg.get("cited") or {})
+                             if check["provision"]]
+    return found
+
+
 def reviewer_node(state: dict) -> dict:
     """ judge the dossier only, never a worker's transcript, on the Reviewer's own thread """
 
@@ -61,7 +81,8 @@ def reviewer_node(state: dict) -> dict:
         # the Coordinator's plan goes with the dossier: without it, a leg the plan skipped (reportability on a case
         # with no 1904.39 event) read as missing, and the Reviewer rejected a complete dossier
         plan = (state.get("plans") or [{}])[-1]
-        task = {"dispatched": plan.get("dispatches") or [], "dossier": state["dossier"]}
+        task = {"dispatched": plan.get("dispatches") or [], "dossier": state["dossier"],
+                "verified_rule_citations": verified(state["dossier"])}
         result = reviewer.invoke({"task": json.dumps(task), "rounds": 0, "proposal": None}, config)
         verdict = ReviewVerdict.model_validate(result["proposal"]) if result["proposal"] else None
         tools, calls = record("reviewer", result["messages"][seen:], config["configurable"]["thread_id"])
