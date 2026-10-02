@@ -1,6 +1,7 @@
 """ defining the tools for the specialists to use; each reads its subject from the injected graph state, never from an argument """
 
 import json
+import re
 from typing import Annotated
 
 from langchain_core.messages import ToolMessage
@@ -195,6 +196,36 @@ def propose(proposal: BaseModel, problems: list[str], tool_call_id: str) -> Comm
     return respond({"status": "accepted", "proposal": accepted}, tool_call_id, proposal=accepted)
 
 
+# a citation written as the chunk id itself, e.g. [CFR-1904-d6bf67b0d2f6] or [CFR-1904-..., CPL-172-...]
+CHUNK_ID = r"[A-Z][A-Z0-9-]*-[0-9a-f]{12}"
+CITED_BY_ID = re.compile(rf"\[\s*({CHUNK_ID}(?:\s*,\s*{CHUNK_ID})*)\s*\]")
+
+
+def numbered(proposal: BaseModel, retrieved: dict) -> BaseModel:
+    """ the proposal with each citation by chunk id rewritten as its [n] position in chunk_ids
+
+        Workers sometimes cite [CFR-1904-d6bf67b0d2f6] instead of [1]. The checks only read [n], so a correct citation
+        was rejected over its format until the worker ran out of rounds. A cited id retrieved this run but missing
+        from chunk_ids is added; one never retrieved is left as written, so the checks still catch it.
+    """
+
+    rationale = getattr(proposal, "rationale", None)
+    if not rationale or not CITED_BY_ID.search(rationale):
+        return proposal
+    chunk_ids = list(proposal.chunk_ids)
+
+    def position(match: re.Match) -> str:
+        ids = [chunk_id.strip() for chunk_id in match.group(1).split(",")]
+        if not all(chunk_id in chunk_ids or chunk_id in retrieved for chunk_id in ids):
+            return match.group(0)
+        for chunk_id in ids:
+            if chunk_id not in chunk_ids:
+                chunk_ids.append(chunk_id)
+        return "".join(f"[{chunk_ids.index(chunk_id) + 1}]" for chunk_id in ids)
+
+    return proposal.model_copy(update={"rationale": CITED_BY_ID.sub(position, rationale), "chunk_ids": chunk_ids})
+
+
 @tool(parse_docstring=True)
 def propose_classification(
     proposal: ClassificationProposal,
@@ -210,6 +241,7 @@ def propose_classification(
         proposal: The outcome, column and day count exactly as the rules returned them, a rationale, and its chunk ids.
     """
 
+    proposal = numbered(proposal, state["retrieved"])
     problems = proposal_review.review_classification(proposal, state["decisions"], set(state["retrieved"]))
     problems += proposal_review.rule_citation_problems(proposal, state["decisions"], state["retrieved"])
     return propose(proposal, problems, tool_call_id)
@@ -230,6 +262,7 @@ def propose_reporting_determination(
         proposal: The outcome, clock, deadline and exclusion exactly as R2 returned them, a rationale, and its chunk ids.
     """
 
+    proposal = numbered(proposal, state["retrieved"])
     problems = proposal_review.review_reporting(proposal, state["decisions"], set(state["retrieved"]))
     problems += proposal_review.rule_citation_problems(proposal, state["decisions"], state["retrieved"])
     return propose(proposal, problems, tool_call_id)
@@ -252,6 +285,7 @@ def propose_hazard_control(
         proposal: The outcome, control type, provision, a rationale, its chunk ids with the provision's chunk first, and any precedents.
     """
 
+    proposal = numbered(proposal, state["retrieved"])
     problems = proposal_review.review_hazard_control(proposal, set(state["retrieved"]))
     found = {item["incident_id"] for item in (state.get("gateway") or {}).get("similar") or []}
     problems += [f"precedent {precedent} wasn't returned by find_similar_incidents this run"

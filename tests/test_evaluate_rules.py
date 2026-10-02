@@ -31,3 +31,21 @@ def test_a_rule_run_out_of_order_is_an_error_for_that_rule_only():
 
     assert "error" in decisions["R4"] and decisions["R3"]["outcome"] == "beyond_first_aid"
     assert set(command.update["decisions"]) == {"R3"}
+
+
+def test_a_citation_by_chunk_id_is_read_as_its_position():
+    from fieldsight.schemas.rule_proposal import ClassificationProposal
+    from fieldsight.tools.tools import numbered
+
+    proposal = ClassificationProposal.model_validate({
+        "outcome": "recordable", "log_column": "J", "day_count": 0, "chunk_ids": ["CFR-1904-d6bf67b0d2f6"],
+        "rationale": "R3 applied 1904.7(b)(5)(ii) [CFR-1904-d6bf67b0d2f6]. R4 applied 1904.7(b)(5) [CFR-1904-147835e4d134]. "
+                     "Nothing cites [CFR-1904-000000000000]."})
+    retrieved = {"CFR-1904-d6bf67b0d2f6": {}, "CFR-1904-147835e4d134": {}}
+
+    fixed = numbered(proposal, retrieved)
+
+    assert fixed.rationale == ("R3 applied 1904.7(b)(5)(ii) [1]. R4 applied 1904.7(b)(5) [2]. "
+                               "Nothing cites [CFR-1904-000000000000].")
+    # a cited chunk retrieved this run joins chunk_ids; one never retrieved is left for the checks to catch
+    assert fixed.chunk_ids == ["CFR-1904-d6bf67b0d2f6", "CFR-1904-147835e4d134"]
