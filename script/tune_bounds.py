@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 
 # the caps in force before this script raises any, read the way settings reads them
 load_dotenv()
-from fieldsight.harness.bounds import BoundsConfig  # noqa: E402
+from fieldsight.harness.bounds import BoundsConfig
 
 CURRENT = BoundsConfig.from_environment()
 CURRENT_MAX_CHUNKS = int(os.environ["FIELDSIGHT_RETRIEVAL_MAX_CHUNKS"])
@@ -47,12 +47,12 @@ EXPLORE = {"FIELDSIGHT_BOUNDS_MAX_GRAPH_RECURSION_DEPTH": "80", "FIELDSIGHT_BOUN
 if CHOSEN:
     os.environ.update(EXPLORE)
 
-from sqlalchemy import select  # noqa: E402
+from sqlalchemy import select
 
-from fieldsight.config import settings  # noqa: E402
-from fieldsight.harness.metering.meter import CHARS_PER_TOKEN  # noqa: E402
-from fieldsight.repository import RunRepository  # noqa: E402
-from fieldsight.schemas.agents import AgentName  # noqa: E402
+from fieldsight.config import settings
+from fieldsight.harness.metering.meter import CHARS_PER_TOKEN
+from fieldsight.repository import RunRepository
+from fieldsight.schemas.agents import AgentName
 
 # a bound is a hard cap, so the largest measured value has to clear it with room to spare
 HEADROOM = 1.5

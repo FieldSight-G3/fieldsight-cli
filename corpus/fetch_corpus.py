@@ -31,7 +31,7 @@ import re
 import sys
 import textwrap
 import xml.etree.ElementTree as ET
-from datetime import date
+from datetime import UTC, datetime
 from html import unescape
 from pathlib import Path
 
@@ -592,7 +592,7 @@ def main() -> int:
     for doc_id, pages, got in summary:
         log(f"  {doc_id:12} {pages:>3} pages   {len(got)} excerpt(s)")
     log(f"  {'TOTAL':12} {total:>3} pages")
-    log(f"  retrieved {date.today().isoformat()} | eCFR issue date {issue_date}")
+    log(f"  retrieved {datetime.now(UTC).date().isoformat()} | eCFR issue date {issue_date}")
 
     # A filtered run leaves the other documents' text stale, so the topic lists
     # would be checked against a corpus that is only partly this run's output.
