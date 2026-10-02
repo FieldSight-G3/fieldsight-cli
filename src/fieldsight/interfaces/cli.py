@@ -1,6 +1,7 @@
 """The fieldsight command line: each command maps its arguments to one harness call and prints the shaped result."""
 
 import argparse
+import os
 from collections.abc import Callable
 from pathlib import Path
 from uuid import UUID
@@ -107,7 +108,8 @@ def parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = parser().parse_args()
-    configure_logging()
+    # logs go to a file, so the terminal shows only the result; FIELDSIGHT_CLI_LOG moves it
+    configure_logging(path=Path(os.environ.get("FIELDSIGHT_CLI_LOG") or Path.home() / ".fieldsight" / "cli.log"))
     try:
         # on the Runtime the analyst is resolved there, from the caller proof, never here
         analyst = None if remote.runtime_id() and args.command in REMOTE else current_analyst()

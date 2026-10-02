@@ -5,8 +5,7 @@ from fieldsight.schemas.rule_proposal import ClassificationProposal
 
 DECISIONS = {
     "R3": {"rule_id": "R3", "outcome": "beyond_first_aid", "sources": ["29 CFR 1904.7(b)(5)(ii)"]},
-    "R4": {"rule_id": "R4", "outcome": "J", "sources": ["29 CFR 1904.7(b)(3)", "29 CFR 1904.29(b)(3)",
-                                                         "OSHA Form 300 column definitions"]},
+    "R4": {"rule_id": "R4", "outcome": "J", "sources": ["29 CFR 1904.7(b)(5)", "29 CFR 1904.29(b)(3)"]},
 }
 RETRIEVED = {
     "reg-1904.7": {"doc_id": "CFR-1904", "section_path": "1904.7", "paragraph": "1904.7(b)(5)(ii)",
@@ -37,8 +36,10 @@ def test_a_chunk_from_the_right_section_but_the_wrong_paragraph_is_sent_back():
     assert rule_citation_problems(proposal("R3 found sutures beyond first aid [1].", ["list-opening"]), DECISIONS, RETRIEVED)
 
 
-def test_the_column_can_rest_on_the_form_300_column_definitions():
-    assert rule_citation_problems(proposal("R4 placed it in column J [1].", ["form-301"]), DECISIONS, RETRIEVED) == []
+def test_the_column_rests_on_its_1904_7_paragraph_not_a_form():
+    # the corpus has no Form 300 column definitions, so R4 no longer lists them and a form chunk grounds nothing
+    assert rule_citation_problems(proposal("R4 placed it in column J [1].", ["list-opening"]), DECISIONS, RETRIEVED) == []
+    assert rule_citation_problems(proposal("R4 placed it in column J [1].", ["form-301"]), DECISIONS, RETRIEVED)
 
 
 def test_a_sentence_naming_no_rule_is_left_to_the_reviewer():

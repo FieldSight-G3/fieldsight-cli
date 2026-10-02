@@ -1,10 +1,11 @@
 from fieldsight.schemas.rule_decision import RuleDecision
 from fieldsight.schemas.rule_input import R4Inputs
 
+# the regulation paragraphs only: the corpus has no Form 300 column definitions, and listing them sent workers and the
+# Reviewer searching for a document that isn't there, which made every column J case slow and often rejected
 SOURCES = [
     "29 CFR 1904.7(b)(3)",
     "29 CFR 1904.29(b)(3)",
-    "OSHA Form 300 column definitions",
 ]
 
 # the 1904.7(b) paragraph that says how each column's kind of case is entered on the log
@@ -19,7 +20,7 @@ COLUMN_PROVISIONS = {
 def column_sources(column: str) -> list[str]:
     """ the provisions a column decision applied: the paragraph for that kind of case, then the log's column rules """
 
-    return [COLUMN_PROVISIONS[column], "29 CFR 1904.29(b)(3)", "OSHA Form 300 column definitions"]
+    return [COLUMN_PROVISIONS[column], "29 CFR 1904.29(b)(3)"]
 
 
 def log_classification(data: R4Inputs) -> RuleDecision:

@@ -90,19 +90,17 @@ def review_hazard_control(proposal: HazardControlProposal, retrieved: set[str]) 
 RULE_MENTION = re.compile(r"\bR([1-4])\b")
 CITATION = re.compile(r"\[(\d+)\]")
 PROVISION = re.compile(r"(\d{4}\.\d+)((?:\([^)]+\))*)")
-# a source that names no CFR provision, and the document that states it
-NAMED_SOURCES = {"OSHA Form 300 column definitions": "FORM-301"}
 
 
 def grounds(source: str, hit: dict) -> bool:
     """ whether a retrieved chunk states a rule's source provision: a regulation chunk of that paragraph (or of a
-        paragraph under it, or a parent chunk holding its lines), or the named document """
+        paragraph under it, or a parent chunk holding its lines) """
 
     found = PROVISION.search(source)
     if found:
         return hit.get("doc_id", "").startswith("CFR-") and covers(
             hit.get("paragraph") or hit.get("section_path", ""), hit.get("text", ""), found.group(1) + found.group(2))
-    return hit.get("doc_id") == NAMED_SOURCES.get(source)
+    return False
 
 
 def rule_citation_problems(proposal: Proposal, decisions: dict[str, dict], retrieved: dict[str, dict]) -> list[str]:

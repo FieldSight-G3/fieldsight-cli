@@ -10,6 +10,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import UTC, datetime
 from functools import wraps
+from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
 from uuid import uuid4
 
@@ -78,13 +79,19 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(entry, ensure_ascii=False, default=lambda value: redact_text(str(value), "log"))
 
 
-def configure_logging(level: int | str = logging.INFO) -> None:
-    """One JSON handler on the root logger; calling it again changes nothing."""
+def configure_logging(level: int | str = logging.INFO, path: Path | None = None) -> None:
+    """One JSON handler on the root logger; calling it again changes nothing.
+
+    The services log to the console, which CloudWatch collects. The CLI passes a path so its logs go to a file and the
+    terminal shows only the command's result.
+    """
     root = logging.getLogger()
     root.setLevel(level)
     if any(isinstance(handler.formatter, JsonFormatter) for handler in root.handlers):
         return
-    handler = logging.StreamHandler()
+    if path is not None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    handler = logging.FileHandler(path, encoding="utf-8") if path is not None else logging.StreamHandler()
     handler.addFilter(CorrelationFilter())
     handler.setFormatter(JsonFormatter())
     root.addHandler(handler)
