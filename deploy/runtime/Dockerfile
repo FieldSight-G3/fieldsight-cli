@@ -20,6 +20,9 @@ COPY deploy/runtime/runtime-requirements.txt /tmp/runtime-requirements.txt
 RUN python -m pip install --no-cache-dir --no-index --find-links=/wheels fieldsight -r /tmp/runtime-requirements.txt \
     && rm -rf /wheels /tmp/runtime-requirements.txt \
     && useradd --create-home --uid 10001 fieldsight
+# retrieval reads the corpus manifest (the letters of interpretation a chunk can cite) at runtime
+COPY corpus/sources.json /home/fieldsight/corpus/sources.json
+ENV FIELDSIGHT_CORPUS_SOURCES=/home/fieldsight/corpus/sources.json
 USER 10001
 WORKDIR /home/fieldsight
 EXPOSE 8080

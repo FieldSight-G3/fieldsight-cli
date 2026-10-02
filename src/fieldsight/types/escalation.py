@@ -28,7 +28,7 @@ class EscalationPolicy(BaseModel):
     confidence_margin_absolute: Score = 0.02
     reporting_24h_margin_hours: float = Field(default=1.0, ge=0.0)
     fatality_30d_margin_days: float = Field(default=1.0, ge=0.0)
-    log_180d_margin_days: int = Field(default=1, ge=0)
+    log_180d_margin_days: int = Field(default=7, ge=0)
     retrieval_score_threshold: Score = 0.60
 
 

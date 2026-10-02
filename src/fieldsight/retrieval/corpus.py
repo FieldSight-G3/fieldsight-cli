@@ -6,6 +6,7 @@
     threshold gates on that.
 """
 
+import re
 from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 
@@ -16,12 +17,14 @@ from ..aws import clients
 from ..aws.errors import raises
 from ..config import settings
 from ..errors import RetrievalError
+from ..ingest.corpus.outline import covers
 
 
-def kb_filter(doc_type: str | None, section_path: str | None) -> dict | None:
-    """ KB filter for whichever of doc_type and section_path are given """
+def kb_filter(doc_type: str | None, section_path: str | None, paragraph: str | None = None) -> dict | None:
+    """ KB filter for whichever of doc_type, section_path and paragraph are given """
 
-    conditions = [{"equals": {"key": key, "value": value}} for key, value in (("doc_type", doc_type), ("section_path", section_path)) if value]
+    conditions = [{"equals": {"key": key, "value": value}}
+                  for key, value in (("doc_type", doc_type), ("section_path", section_path), ("paragraph", paragraph)) if value]
     if len(conditions) > 1:
         return {"andAll": conditions}
     return conditions[0] if conditions else None
@@ -33,10 +36,10 @@ def meta(hit: Document) -> dict:
     return hit.metadata["source_metadata"]
 
 
-def build_retriever(doc_type: str | None = None, section_path: str | None = None) -> BaseRetriever:
+def build_retriever(doc_type: str | None = None, section_path: str | None = None, paragraph: str | None = None) -> BaseRetriever:
     """ corpus KB retriever, optionally filtered; ungated, because search gates on its own score """
 
-    return clients.corpus_retriever(kb_filter(doc_type, section_path))
+    return clients.corpus_retriever(kb_filter(doc_type, section_path, paragraph))
 
 
 @lru_cache(maxsize=2048)
@@ -73,3 +76,29 @@ def search(query: str, *, doc_type: str | None = None, section_path: str | None 
     if not gated:
         return hits
     return [hit for hit in hits if hit.metadata["score"] >= settings.retrieval_score_threshold]
+
+
+# a CFR provision as rule sources name it: "29 CFR 1904.7(b)(5)(ii)" -> section 1904.7, path 1904.7(b)(5)(ii)
+PROVISION = re.compile(r"(\d{4}\.\d+)((?:\([^)]+\))*)")
+
+
+@raises(RetrievalError, "the corpus Knowledge Base couldn't be searched")
+def provision_text(provision: str) -> list[Document]:
+    """ the regulation chunks that state a provision: its own paragraph's, or, when its text sits in a parent chunk
+        with its siblings (a short list is chunked whole), that parent's; for a bare section, its paragraphs """
+
+    found = PROVISION.search(provision)
+    if not found:
+        return []
+    section, path = found.group(1), found.group(1) + found.group(2)
+    candidate = path
+    while True:
+        hits = build_retriever("regulation", section, candidate).invoke(path)
+        hits = [hit for hit in hits if covers(meta(hit).get("paragraph", ""), hit.page_content, path)]
+        if hits or candidate == section:
+            break
+        candidate = candidate[:candidate.rindex("(")]
+    if not hits and candidate == section:
+        hits = [hit for hit in build_retriever("regulation", section).invoke(path)
+                if covers(meta(hit).get("paragraph", ""), hit.page_content, path)]
+    return rescore(clients.embeddings().embed_query(provision), hits)

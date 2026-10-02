@@ -1,0 +1,35 @@
+{
+  "knowledgeBaseId": "9QETDBJ9ZT",
+  "name": "fieldsight-corpus-whole-chunks",
+  "description": "The corpus chunks exactly as FieldSight stages them: chunking NONE, so each file is one indexed chunk",
+  "dataDeletionPolicy": "DELETE",
+  "dataSourceConfiguration": {
+    "type": "MANAGED_KNOWLEDGE_BASE_CONNECTOR",
+    "managedKnowledgeBaseConnectorConfiguration": {
+      "deletionProtectionConfiguration": {
+        "deletionProtectionStatus": "DISABLED"
+      },
+      "mediaExtractionConfiguration": {
+        "imageExtractionConfiguration": {"imageExtractionStatus": "ENABLED"},
+        "audioExtractionConfiguration": {"audioExtractionStatus": "ENABLED"},
+        "videoExtractionConfiguration": {"videoExtractionStatus": "ENABLED"}
+      },
+      "connectorParameters": {
+        "type": "S3",
+        "version": "1",
+        "connectionConfiguration": {
+          "bucketName": "field-sight-bucket",
+          "bucketOwnerAccountId": "397345411365"
+        },
+        "filterConfiguration": {
+          "inclusionPrefixes": ["kb/corpus/"],
+          "maxFileSizeInMegaBytes": "10240"
+        }
+      }
+    }
+  },
+  "vectorIngestionConfiguration": {
+    "chunkingConfiguration": {"chunkingStrategy": "NONE"},
+    "parsingConfiguration": {"parsingStrategy": "SMART_PARSING"}
+  }
+}

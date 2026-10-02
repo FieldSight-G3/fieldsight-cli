@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-ReadinessLabel = Literal["policy_question", "classify", "action", "out_of_scope"]
+ReadinessLabel = Literal["policy_question", "classify", "follow_up", "action", "out_of_scope"]
 
 
 class ReadinessClassification(BaseModel):

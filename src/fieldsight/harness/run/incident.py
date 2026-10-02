@@ -31,3 +31,15 @@ def photo_contradicts(stored: IncidentRecord | None) -> bool | None:
     if not verdicts:
         return None
     return any(verdict["verdict"] == "contradicts" for verdict in verdicts)
+
+
+def submit_attacked(stored: IncidentRecord | None) -> bool:
+    """ whether the Prompt Attacks screen withheld anything when the incident's packet was submitted """
+
+    if stored is None:
+        return False
+    from ...repository import RunRepository
+
+    record = RunRepository().latest(stored.incident_id, ("submit",))
+    screen = ((record or {}).get("escalation_triggers") or {}).get("submit_screen") or {}
+    return bool(screen.get("prompt_attack_detected"))

@@ -1,11 +1,15 @@
 """ corpus documents and their local and S3 locations """
 
 import json
+import os
 from pathlib import Path
 
 from ...types.corpus import CORPUS_DOC, CorpusDoc
 
-CORPUS_SOURCES = Path(__file__).resolve().parents[4] / "corpus" / "sources.json"
+# the repo's corpus/sources.json; an installed package (the Runtime image) has no repo around it, so the image copies
+# the file in and names it with FIELDSIGHT_CORPUS_SOURCES
+CORPUS_SOURCES = Path(os.environ.get("FIELDSIGHT_CORPUS_SOURCES")
+                      or Path(__file__).resolve().parents[4] / "corpus" / "sources.json")
 
 
 def corpus_docs() -> list[CorpusDoc]:

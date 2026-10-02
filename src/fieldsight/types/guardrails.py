@@ -30,7 +30,7 @@ class TurnRequest(TypedDict):
 
 
 Stage = Literal["input_validation", "prompt_attack", "readiness", "output"]
-Remedy = Literal["refused", "withheld", "routed_to_analyst", "regenerated", "rule_run", "redacted", "appended", "gate_miss", "blocked"]
+Remedy = Literal["refused", "withheld", "routed_to_analyst", "regenerated", "rule_run", "redacted", "appended", "gate_miss", "blocked", "removed"]
 
 
 class GuardrailEvent(TypedDict):
@@ -56,7 +56,7 @@ class Refusal(TypedDict):
 
 
 # what each readiness label leads to; route_to_analyst is the deterministic override
-Route = Literal["answer_from_retrieval", "run_workflow", "route_to_analyst", "refuse"]
+Route = Literal["answer_from_retrieval", "answer_from_record", "run_workflow", "route_to_analyst", "refuse"]
 
 
 TURN_REQUEST = TypeAdapter(TurnRequest)

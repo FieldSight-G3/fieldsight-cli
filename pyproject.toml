@@ -21,6 +21,7 @@ dependencies = [
     "python-dotenv==1.2.3",
     "SQLAlchemy>=2.0,<3.0",
     "langgraph-checkpoint-postgres==3.1.2",
+    "pillow>=11.0",
 ]
 [project.scripts]
 fieldsight = "fieldsight.interfaces.cli:main"
@@ -30,6 +31,7 @@ dev = [
     "pytest>=7.4",
     "pre-commit>=3.5",
     "ruff",
+    "PyYAML>=6.0",
 ]
 
 [tool.setuptools.packages.find]

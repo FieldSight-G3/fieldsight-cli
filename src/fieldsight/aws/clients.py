@@ -27,11 +27,14 @@ EMBEDDING_DIMENSIONS = 1024
 RETRIES = Config(retries={"mode": "adaptive", "max_attempts": 4}, connect_timeout=5, read_timeout=30)
 
 
-def chat_model(*, fast: bool = False, temperature: float = 0.0) -> BaseChatModel:
-    """ the reasoning tier for the workers; fast=True is the fast tier, for the readiness gate """
+def chat_model(*, fast: bool = False, multimodal: bool = False, temperature: float = 0.0) -> BaseChatModel:
+    """ the reasoning tier for the workers; fast=True is the fast tier, for the readiness gate; multimodal=True is the
+        model that reads photos, for corroboration """
 
+    model_id = (settings.bedrock_fast_model_id if fast else
+                settings.bedrock_multimodal_model_id if multimodal else settings.bedrock_model_id)
     return ChatBedrockConverse(
-        model_id=settings.bedrock_fast_model_id if fast else settings.bedrock_model_id,
+        model_id=model_id,
         region_name=settings.aws_region,
         config=RETRIES,
         temperature=temperature,
@@ -42,6 +45,13 @@ def chat_model(*, fast: bool = False, temperature: float = 0.0) -> BaseChatModel
         },
     )
 
+
+
+def judge_model() -> BaseChatModel:
+    """ the judge deployment for the custom evaluators (§14), kept apart from the reasoning tier it judges """
+
+    return ChatBedrockConverse(model_id=settings.bedrock_judge_model_id, region_name=settings.aws_region,
+                               config=RETRIES, temperature=0.0)
 
 @lru_cache(maxsize=1)
 def embeddings() -> Embeddings:

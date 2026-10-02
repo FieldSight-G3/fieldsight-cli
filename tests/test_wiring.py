@@ -72,16 +72,17 @@ def test_a_meter_refusal_ends_the_workflow_instead_of_raising():
     assert harness_workflow(spent)(READY, None, "c-1") == WorkflowResult(dossier={})
 
 
-def test_objections_are_carried_into_the_regenerated_question():
+def test_objections_reach_the_model_but_never_the_search():
     seen = []
-    chain = SimpleNamespace(invoke=lambda inputs: seen.append(inputs["question"]) or "answer")
+    chain = SimpleNamespace(invoke=lambda inputs: seen.append(inputs) or "answer")
     answer = rag_answerer(chain)
 
     assert answer("What counts as first aid?", []) == "answer"
     answer("What counts as first aid?", ["uncited claim: 'sutures are first aid'"])
 
-    assert seen[0] == "What counts as first aid?"
-    assert "uncited claim: 'sutures are first aid'" in seen[1] and seen[1].startswith("What counts as first aid?")
+    # the question searched stays the analyst's, so a retry retrieves what the first try did
+    assert [inputs["question"] for inputs in seen] == ["What counts as first aid?"] * 2
+    assert seen[0]["objections"] == "" and "uncited claim: 'sutures are first aid'" in seen[1]["objections"]
 
 
 @pytest.fixture
@@ -130,3 +131,16 @@ def test_a_turn_without_a_grant_is_denied_before_anything_is_read_or_written(gra
     runs = RunRepository()
     with runs.engine.connect() as connection:
         assert connection.execute(runs.table.select().where(runs.table.c.incident_id == incident_id)).first() is None
+
+
+def test_a_malformed_incident_id_is_denied_so_no_turn_runs_without_a_session(granted):
+    analyst, _ = granted
+
+    def never(*_):
+        raise AssertionError("nothing may run, or spend, for an id that names no incident")
+
+    with pytest.raises(ToolDenied) as denied:
+        turn({"command": "ask", "incident_id": "INC-2026-0412", "question": "What counts as first aid?"},
+             analyst_id=analyst, workflow=never, answerer=never)
+
+    assert denied.value.code == "unauthenticated"

@@ -12,18 +12,18 @@ A reference document, not an essay. Fill every section.
 | Decision | Value | Unit | Reasoning |
 |---|---|---|---|
 | max tokens per call — coordinator / each worker / reviewer | | tokens | |
-| max tool invocations per turn | 10 model calls per specialist (`MAX_SPECIALIST_TOOL_ROUNDS`) | rounds | Hard cap independent of the model stopping |
+| max tool invocations per turn | 54 per turn (`max_tool_invocations_per_turn`); 10 model calls per specialist (`MAX_SPECIALIST_TOOL_ROUNDS`) | calls / rounds | Per turn: the most measured in a recorded turn (36) × 1.5 headroom (`script/tune_bounds.py`). Per specialist: a hard cap independent of the model stopping; 5 left workers without a proposal after a rejection |
 | max graph recursion depth | | steps | |
 | max reviewer iterations | | iterations | |
-| max retrieved chunks / tokens | `RETRIEVAL_MAX_CHUNKS` per search, max 3 hops | chunks | Bounds context size |
-| per-turn wall clock / per-call HTTP timeout | TBD / 5 connect, 30 read, 4 attempts | s | Adaptive retry absorbs throttling |
+| max retrieved chunks / tokens | 113 chunks / 25,767 tokens per turn (`max_retrieved_chunks_per_turn`, `max_retrieved_tokens_per_turn`); `RETRIEVAL_MAX_CHUNKS` per search, max 3 hops | chunks / tokens | The most measured in a recorded turn (75 chunks, 17,178 tokens) × 1.5 headroom (`script/tune_bounds.py`); whole letters and ungated hops raised both well above the first guesses of 16 / 8,000 |
+| per-turn wall clock / per-call HTTP timeout | 300 (`max_turn_wall_clock_seconds`) / 5 connect, 30 read, 4 attempts | s | Measured: a turn with one Reviewer rejection and re-dispatch took 110–170 s (worker, Reviewer, worker again, Reviewer again), so 120 cut it off before the second verdict; 300 leaves room for that cycle on a slow Bedrock day. Adaptive retry absorbs throttling |
 | session cost ceiling | | USD | |
 | near-boundary margin — 24h clock | 1.0 (`reporting_24h_margin_hours`) | hours | Measured on incident → in-patient admission, amputation or loss of eye. Both timestamps come from packet text, often rounded to the hour, so a one-hour error can decide whether a 1904.39 report is due; escalates at 23–25 h inclusive |
 | near-boundary margin — 30-day fatality window | 1.0 (`fatality_30d_margin_days`) | days | Measured on incident → death. Dates are often recorded without a time or time zone, so ±1 day covers that imprecision; escalates at 29–31 days inclusive |
-| near-boundary margin — 180-day cap | 1 (`log_180d_margin_days`) | days | Measured on days away + restricted days for recordable cases. Whole-day counts, and the day-count convention (is the return day counted?) can move the total by one; escalates at 179–181 days inclusive |
+| near-boundary margin — 180-day cap | 7 (`log_180d_margin_days`) | days | Measured on days away + restricted days for recordable cases. The total rests on a return-to-work date that packets often state loosely, so it can be off by days, not just by the day-count convention; escalates at 173–187 days inclusive |
 | near-boundary margin — 0.60 floor | 0.02 (`confidence_margin_absolute`) | confidence (absolute) | Measured on the extracted field whose confidence is closest to 0.60; escalates at 0.58–0.62 inclusive. A starting value, not yet tuned against extraction data |
-| similarity refusal threshold | TBD (`script/tune_threshold.py`) | score | see evaluation report |
-| chunk size / overlap | 1800 / 300 | chars | ~One provision per chunk; tables kept whole |
+| similarity refusal threshold | 0.483 (`FIELDSIGHT_RETRIEVAL_SCORE_THRESHOLD`) | score | `script/tune_threshold.py` on the paragraph-chunked KB: answerable top scores 0.490–0.800, out-of-corpus 0.415–0.476, 0 of 12 on the wrong side. Re-tune whenever the chunking changes |
+| chunk size / overlap | Part 1904: one paragraph per chunk, short child lists kept with their stem, 2,600 cap; other documents 1800 / 300; tables split by rows under their header | chars | Each chunk states one provision, so a citation can be checked at paragraph level. The KB data source uses chunking NONE so Bedrock doesn't re-split these chunks |
 | boundary inclusivity (24h, 30 days) | | | |
 | day-count convention (is return day counted?) | | | |
 | model tier per agent | retrieval, recordability, reportability: standard, temp 0 | | Citation accuracy over speed |

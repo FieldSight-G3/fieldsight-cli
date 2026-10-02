@@ -15,7 +15,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-AgentName = Literal["coordinator", "recordability", "reportability", "hazard_control", "reviewer"]
+from ..schemas.agents import AgentName
+
 LegKind = Literal["model", "tool", "retrieval", "graph", "reviewer"]
 BoundName = Literal[
     "session_cost_usd", "turn_wall_clock_seconds", "agent_tokens_per_call",
@@ -34,13 +35,13 @@ class BoundsConfig(BaseModel):
     reportability_max_tokens_per_call: int = Field(default=6144, gt=0)
     hazard_control_max_tokens_per_call: int = Field(default=6144, gt=0)
     reviewer_max_tokens_per_call: int = Field(default=4096, gt=0)
-    max_tool_invocations_per_turn: int = Field(default=12, gt=0)
+    max_tool_invocations_per_turn: int = Field(default=54, gt=0)
     max_specialist_tool_rounds: int = Field(default=10, gt=0)
     max_graph_recursion_depth: int = Field(default=32, gt=0)
     max_reviewer_iterations: int = Field(default=2, gt=0)
-    max_retrieved_chunks_per_turn: int = Field(default=16, gt=0)
-    max_retrieved_tokens_per_turn: int = Field(default=8000, gt=0)
-    max_turn_wall_clock_seconds: float = Field(default=120.0, gt=0)
+    max_retrieved_chunks_per_turn: int = Field(default=113, gt=0)
+    max_retrieved_tokens_per_turn: int = Field(default=25767, gt=0)
+    max_turn_wall_clock_seconds: float = Field(default=300.0, gt=0)
     http_timeout_seconds: float = Field(default=20.0, gt=0)
     sts_timeout_seconds: float = Field(default=3.0, gt=0)
     session_cost_ceiling_usd: Decimal = Field(default=Decimal("5.00"), gt=0)

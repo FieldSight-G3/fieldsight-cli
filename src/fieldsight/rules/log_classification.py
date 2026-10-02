@@ -1,11 +1,25 @@
 from fieldsight.schemas.rule_decision import RuleDecision
 from fieldsight.schemas.rule_input import R4Inputs
 
+# the 1904.7(b) paragraphs only. The corpus has no Form 300 column definitions, and 1904.29(b)(3) is the 7-day rule
+# for how quickly a case is recorded, not the columns; citing either sent workers searching and the Reviewer rejecting
 SOURCES = [
     "29 CFR 1904.7(b)(3)",
-    "29 CFR 1904.29(b)(3)",
-    "OSHA Form 300 column definitions",
 ]
+
+# the 1904.7(b) paragraph that says how each column's kind of case is entered on the log
+COLUMN_PROVISIONS = {
+    "G": "29 CFR 1904.7(b)(2)",
+    "H": "29 CFR 1904.7(b)(3)",
+    "I": "29 CFR 1904.7(b)(4)",
+    "J": "29 CFR 1904.7(b)(5)",
+}
+
+
+def column_sources(column: str) -> list[str]:
+    """ the provision a column decision applied: the 1904.7(b) paragraph for that kind of case """
+
+    return [COLUMN_PROVISIONS[column]]
 
 
 def log_classification(data: R4Inputs) -> RuleDecision:
@@ -66,7 +80,7 @@ def log_classification(data: R4Inputs) -> RuleDecision:
         rule_id="R4",
         outcome=column,
         inputs=inputs,
-        sources=SOURCES,
+        sources=column_sources(column),
         log_column=column,
         day_count=day_count,
     )

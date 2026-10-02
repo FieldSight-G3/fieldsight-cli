@@ -1,5 +1,8 @@
 """ check a specialist's proposal against this run's rule decisions and retrieved chunks; nothing is written """
 
+import re
+
+from ..ingest.corpus.outline import covers
 from ..schemas.rule_decision import RuleDecision
 from ..schemas.rule_proposal import (
     ClassificationProposal,
@@ -81,3 +84,53 @@ def review_hazard_control(proposal: HazardControlProposal, retrieved: set[str]) 
     if not (in_paragraph or in_table):
         problems.append(f"{proposal.control_type} rests on {paragraph}, not {proposal.provision}")
     return problems
+
+
+# a sentence that restates a rule decision, and the citations in it
+RULE_MENTION = re.compile(r"\bR([1-4])\b")
+CITATION = re.compile(r"\[(\d+)\]")
+PROVISION = re.compile(r"(\d{4}\.\d+)((?:\([^)]+\))*)")
+
+
+def grounds(source: str, hit: dict) -> bool:
+    """ whether a retrieved chunk states a rule's source provision: a regulation chunk of that paragraph (or of a
+        paragraph under it, or a parent chunk holding its lines) """
+
+    found = PROVISION.search(source)
+    if found:
+        return hit.get("doc_id", "").startswith("CFR-") and covers(
+            hit.get("paragraph") or hit.get("section_path", ""), hit.get("text", ""), found.group(1) + found.group(2))
+    return False
+
+
+def rule_sentences(rationale: str, chunk_ids: list[str], decisions: dict[str, dict],
+                   retrieved: dict[str, dict]) -> list[dict]:
+    """ each sentence that restates a rule decision: its rules, their source provisions, and the provision and chunk
+        that ground it, if any of its citations states a provision one of those rules applied """
+
+    checked = []
+    for sentence in re.split(r"(?<=[.!?])\s+", rationale.strip()):
+        rules = list(dict.fromkeys(f"R{n}" for n in RULE_MENTION.findall(sentence) if f"R{n}" in decisions))
+        if not rules:
+            continue
+        sources = list(dict.fromkeys(source for rule in rules for source in decisions[rule].get("sources") or []))
+        cited = [chunk_ids[int(n) - 1] for n in CITATION.findall(sentence) if 0 < int(n) <= len(chunk_ids)]
+        grounding = next(((source, chunk_id) for source in sources for chunk_id in cited
+                          if grounds(source, retrieved.get(chunk_id) or {})), None)
+        checked.append({"sentence": sentence, "rules": rules, "sources": sources,
+                        "provision": grounding[0] if grounding else None, "chunk_id": grounding[1] if grounding else None})
+    return checked
+
+
+def rule_citation_problems(proposal: Proposal, decisions: dict[str, dict], retrieved: dict[str, dict]) -> list[str]:
+    """ each sentence that restates a rule decision cites a chunk of a provision that rule applied
+
+        A rule decision lists the provisions it applied (its sources). A sentence attributing an outcome to a rule is
+        grounded by one of those provisions, at paragraph level, not by whatever a search turned up nearby; the
+        problem names the provisions so the worker can read_provision them and cite the result.
+    """
+
+    return [f'"{check["sentence"][:80]}" restates {"/".join(check["rules"])} but cites no chunk stating a provision it '
+            f"applied: read_provision({check['sources']}) and cite a chunk it returns"
+            for check in rule_sentences(proposal.rationale, proposal.chunk_ids, decisions, retrieved)
+            if check["provision"] is None]

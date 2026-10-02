@@ -33,6 +33,7 @@ class ChunkMetadata(TypedDict):
     title: str
     doc_type: DocType
     section_path: str
+    paragraph: str      # the paragraph the chunk states, e.g. 1904.7(b)(5)(ii); the section for unoutlined docs
     page: int
     chunk_id: str
 

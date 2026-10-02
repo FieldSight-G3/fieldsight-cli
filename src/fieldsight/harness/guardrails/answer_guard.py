@@ -9,27 +9,46 @@ from ...schemas.incidents import NormalizedIncident
 from ...schemas.retrieval import DraftAnswer
 from ...schemas.run_records import RuleInvocation
 from ...types.guardrails import GuardrailEvent
-from .common import DETERMINATION, DISCLOSURE, citation_problems, emit, latest, refuse
+from .common import (
+    DETERMINATION,
+    DISCLOSURE,
+    citation_problems,
+    claims,
+    emit,
+    latest,
+    refuse,
+)
 
 MAX_REGENERATIONS = 2
 
 # threshold outcomes only the rules engine may produce, by the rule that produces them
 THRESHOLDS = {
-    "R1": re.compile(r"\b(?:is|was|are|be) (?:not )?recordable\b", re.IGNORECASE),
-    "R2": re.compile(r"\b(?:is|was|are|be) (?:not )?reportable\b|\breporting deadline\b", re.IGNORECASE),
+    "R1": re.compile(r"\b(?:is|was|are|be) (?:not )?(?:an? )?recordable\b", re.IGNORECASE),
+    "R2": re.compile(r"\b(?:is|was|are|be) (?:not )?(?:an? )?reportable\b|\breporting deadline\b", re.IGNORECASE),
     "R3": re.compile(r"\bbeyond first aid\b|\b(?:is|was) (?:only )?first aid\b", re.IGNORECASE),
     "R4": re.compile(r"\bcolumn [GHIJ]\b|\bday count\b", re.IGNORECASE),
 }
 
 
-def guard_answer(generate: Callable[[list[str]], DraftAnswer], *, incident: NormalizedIncident | None,
+def guard_answer(generate: Callable[[list[str]], DraftAnswer], *,
+                 incident: NormalizedIncident | Callable[[], NormalizedIncident | None] | None,
                  retrieved: set[str], rule_invocations: list[RuleInvocation], names: set[str],
                  correlation_id: str) -> dict:
     """ generate(objections) drafts the answer again with the objections attached
 
         returns the text safe to show (or a refusal), citations_supported for EscalationSignals,
         this turn's rule invocations including any the guard ran, and the events
+
+        incident is the facts the answer's thresholds are attributed to; a callable is resolved only when a threshold
+        needs them, so a turn that states none never pays for reading them
     """
+
+    facts: list[NormalizedIncident | None] = []
+
+    def subject() -> NormalizedIncident | None:
+        if not facts:
+            facts.append(incident() if callable(incident) else incident)
+        return facts[0]
 
     def result(text: str | None, refusal: dict | None) -> dict:
         return {"text": text, "refusal": refusal, "citations_supported": citations_supported,
@@ -50,8 +69,8 @@ def guard_answer(generate: Callable[[list[str]], DraftAnswer], *, incident: Norm
 
         # a threshold outcome with no rules-engine invocation: run the rules (the harness path), inject, regenerate
         unattributed = [rule for rule, pattern in THRESHOLDS.items() if pattern.search(draft.answer) and rule not in latest(invocations)]
-        if unattributed and incident:
-            invocations += evaluate_incident(incident).invocations
+        if unattributed and subject():
+            invocations += evaluate_incident(subject()).invocations
             emit(events, correlation_id, "output", "unattributed_threshold", "rule_run", ",".join(unattributed))
         decisions = latest(invocations)
         objections += [f"{rule} returned {decisions[rule]['outcome']}; state only that, attributed to {rule}" if rule in decisions
@@ -64,9 +83,20 @@ def guard_answer(generate: Callable[[list[str]], DraftAnswer], *, incident: Norm
             return result(None, refuse("output_blocked", "The answer kept stating a determination."))
         if determination:
             retried_determination = True
-            objections.append(f'Describe what the regulation says instead of concluding: "{determination.group()}"')
+            # say how to rewrite it, not only what's wrong: a bare "stop concluding" got the same sentence back
+            objections.append(f'"{determination.group()}" decides this employer\'s case. Rewrite it about the provision '
+                              'or the kind of injury, e.g. "1904.7(b)(1) requires recording an injury that results in '
+                              'loss of consciousness" or "an injury involving loss of consciousness is recordable '
+                              'under 1904.7(b)(1)", never with "the case", "this case" or "the incident" as the subject')
 
         if not objections:
+            break
+        # the last draft's only problem is sentences it didn't cite: remove them, as the objection asked, when a
+        # cited claim is left; removing a claim can't add a threshold or a determination
+        if attempt == MAX_REGENERATIONS and len(objections) == len(uncited) and len(uncited) < len(claims(draft.answer)):
+            draft = draft.model_copy(update={"answer": " ".join(c for c in claims(draft.answer) if c not in uncited)})
+            for claim in uncited:
+                emit(events, correlation_id, "output", "uncited_claim", "removed", claim[:200])
             break
         if attempt == MAX_REGENERATIONS:
             emit(events, correlation_id, "output", "unfixed_output", "refused", "; ".join(objections)[:200])

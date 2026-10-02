@@ -1,9 +1,15 @@
 """ factory to create the specialist agents (graphs): the Recordability, Reportability and Hazard Control Workers """
 
 import operator
-from typing import Annotated, TypedDict
+from typing import Annotated, TypedDict, get_args
 
-from langchain_core.messages import AIMessage, AnyMessage, HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    AnyMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_core.tools import BaseTool
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
@@ -13,12 +19,19 @@ from langgraph.prebuilt import ToolNode
 from ..aws import clients
 from ..config import settings
 from ..prompts import PROMPTS
+from ..schemas.agents import Worker
 from ..tools.tools import TOOLSETS
 
 MAX_SPECIALIST_TOOL_ROUNDS = settings.bounds.max_specialist_tool_rounds
 
 # the workers get_specialists builds; each one's brief is PROMPTS[name] and its tools TOOLSETS[name]
-WORKERS = ("recordability", "reportability", "hazard_control")
+WORKERS = get_args(Worker)
+
+# the result a tool call gets when its run stopped before it ran
+NOT_RUN = "Not run: the previous run stopped before this tool call ran."
+
+WIND_DOWN = ("Two tool rounds are left. Stop searching: call your propose tool (or submit_review) now with what you "
+             "already have, citing chunks your searches returned. A run that ends without one fails.")
 
 
 class SpecialistState(TypedDict):
@@ -26,9 +39,12 @@ class SpecialistState(TypedDict):
 
     # input
     task: str
+    feedback: str | None    # a re-dispatch's Reviewer feedback: it rides in the system message, never a user turn
     incident: dict
+    gateway: dict | None    # this turn's Gateway reads (aws/gateway_reads); None when no Gateway is configured
     messages: Annotated[list[AnyMessage], add_messages]
     rounds: int
+    run_start: int          # where this run's messages begin on a reused thread; earlier runs stay stored, unsent
 
     # what the tools found, written by the tools themselves
     decisions: Annotated[dict[str, dict], operator.or_]     # keyed by rule id; the rules are deterministic, so a re-run just repeats
@@ -38,6 +54,19 @@ class SpecialistState(TypedDict):
     proposal: dict | None
 
 
+def unanswered(history: list[AnyMessage]) -> list[ToolMessage]:
+    """ a "not run" result for each tool call a reused thread ends on
+
+        The round cap or the recursion limit can stop a run after the model asked for tools and before they ran.
+        Bedrock refuses a toolUse with no toolResult after it, so the thread's next run would fail without these.
+    """
+
+    last = history[-1] if history else None
+    if not (isinstance(last, AIMessage) and last.tool_calls):
+        return []
+    return [ToolMessage(NOT_RUN, tool_call_id=call["id"]) for call in last.tool_calls]
+
+
 def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer: BaseCheckpointSaver | None = None):
     """ each specialist is just its own graph. this is a factory function that can build multiple types of specialists """
 
@@ -45,15 +74,29 @@ def build_specialist(name: str, brief: str, tools: list[BaseTool], checkpointer:
 
     # node for prompting the model: it investigates with its tools, then proposes its finding through its propose tool
     def agent(state: SpecialistState) -> dict:
-        history = list(state.get("messages") or [])
+        messages = list(state.get("messages") or [])
+        # a reused thread's last run can end on tool calls the cap stopped; they're closed on the thread first, so
+        # the stored thread stays valid for Bedrock, and this run starts after them
+        closing = unanswered(messages) if not state.get("rounds") else []
+        # a reused thread (the Reviewer's) keeps every earlier run, but the model sees only this one: replaying them
+        # all grew each call past 30K tokens, and the task already holds everything this run judges
+        start = len(messages) + len(closing) if not state.get("rounds") else state.get("run_start", 0)
+        # the brief goes in fresh on every call, never into the thread: a reused thread would otherwise keep the
+        # brief it was first run with, and a changed prompt would never reach it
+        history = [message for message in messages[start:] if not isinstance(message, SystemMessage)]
         seed: list = []
-        # every run starts with its task; a thread that's reused (the Reviewer's) already has the brief
+        # every run starts with its task
         if not state.get("rounds"):
-            seed = ([] if history else [SystemMessage(brief)]) + [HumanMessage(state["task"])]
-            history += seed
+            history.append(HumanMessage(state["task"]))
+            seed = closing + history[-1:]
+        # the cap drops the last round's tool calls, so warn while two rounds can still run: one to propose, one to fix
+        # it. The warning goes in the system message: as a user turn, "stop searching, a run that ends without one
+        # fails" reads as an injection to the Bedrock Prompt Attacks filter, which blocked the call and lost the leg
+        warned = state.get("rounds", 0) >= MAX_SPECIALIST_TOOL_ROUNDS - 3
+        system = "\n\n".join(part for part in (brief, state.get("feedback"), WIND_DOWN if warned else None) if part)
 
-        reply = model.invoke(history)
-        return {"messages": seed + [reply], "rounds": state.get("rounds", 0) + 1}
+        reply = model.invoke([SystemMessage(system)] + history)
+        return {"messages": seed + [reply], "rounds": state.get("rounds", 0) + 1, "run_start": start}
 
     # tool node
     def run_tools(state: SpecialistState, config) -> dict:

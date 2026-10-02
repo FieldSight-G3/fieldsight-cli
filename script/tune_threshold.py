@@ -1,17 +1,14 @@
 """ tune the retrieval threshold: the score that best separates answerable from out-of-corpus golden cases
 
-    run from the repo root once evals/golden/ is populated:  python script/tune_threshold.py
+    run from the repo root once evals/golden/ and evals/escalation/ are populated:  python script/tune_threshold.py
     then set FIELDSIGHT_RETRIEVAL_SCORE_THRESHOLD to the printed value and record it in docs/evaluation-report.md
 """
 
-import json
 from itertools import pairwise
-from pathlib import Path
 
+from fieldsight.evaluation.golden import EVALS, load_all
 from fieldsight.retrieval.corpus import search
 from fieldsight.retrieval.references import pick_filter
-
-GOLDEN = Path(__file__).resolve().parents[1] / "evals" / "golden"
 
 # categories the score alone must refuse or answer; the rest (determination probes, adversarial,
 # multi-turn) are handled by the harness, so they don't tune it
@@ -22,8 +19,10 @@ ANSWER = {"single_document", "multi_hop", "threshold", "incident_backed", "near_
 def golden_cases() -> list[dict]:
     """ single-query golden cases the score decides """
 
-    cases = [json.loads(path.read_text(encoding="utf-8")) for path in sorted(GOLDEN.glob("*.json"))]
-    return [case for case in cases if "query" in case and case["category"] in REFUSE | ANSWER]
+    # a single ask turn with no incident: the question alone decides whether it clears the threshold
+    cases = [{**case, "query": case["turns"][0]["query"]} for case in load_all()
+             if len(case.get("turns") or []) == 1 and case["turns"][0].get("command") == "ask" and not case.get("incident_id")]
+    return [case for case in cases if case["category"] in REFUSE | ANSWER]
 
 
 def top_score(query: str) -> float:
@@ -53,7 +52,7 @@ def separate(answer: list[float], refuse: list[float]) -> float:
 if __name__ == "__main__":
     cases = golden_cases()
     if not cases:
-        raise SystemExit(f"no golden cases in {GOLDEN}; the golden set has to be written before the threshold can be tuned")
+        raise SystemExit(f"no golden cases under {EVALS}; the golden set has to be written before the threshold can be tuned")
 
     scored = [(case, top_score(case["query"])) for case in cases]
     answer = [score for case, score in scored if case["category"] in ANSWER]

@@ -50,7 +50,7 @@ def note() -> str:
 def bedrock(monkeypatch):
     """ stands in for Bedrock: the Prompt Attacks filter blocks the text that carries an instruction to the model """
 
-    monkeypatch.setattr(turn_check, "screen", lambda text: BLOCKED if "INSTRUCTION FOR THE AI" in text else CLEAN)
+    monkeypatch.setattr(turn_check, "screen", lambda text: BLOCKED if "INSTRUCTION FOR THE AI" in text else {**CLEAN, "text": text})
     monkeypatch.setattr(turn_check, "classify", lambda question: "classify")
 
 
@@ -62,10 +62,13 @@ def test_the_poisoned_statement_is_withheld_and_the_turn_goes_on(bedrock, note):
     assert turn["refusal"] is None
     assert turn["route"] == "run_workflow"
     assert turn["prompt_attack_detected"] is True
-    # nothing downstream ever sees the poisoned text; the clean form field still goes through
-    assert set(turn["texts"]) == {"form: date of injury"}
+    # nothing downstream ever sees the poisoned paragraph; the statement's other paragraphs, which carry the
+    # facts, and the clean form field still go through
+    assert set(turn["texts"]) == {"supervisor-note.txt", "form: date of injury"}
+    assert "INSTRUCTION FOR THE AI" not in turn["texts"]["supervisor-note.txt"]
+    assert "Inova Fairfax" in turn["texts"]["supervisor-note.txt"]
     [event] = [e for e in turn["events"] if e["stage"] == "prompt_attack"]
-    assert event["remedy"] == "withheld"
+    assert event["remedy"] == "withheld" and event["trigger"].startswith("supervisor-note.txt paragraph ")
 
 
 def test_the_rules_still_decide_reportable_and_the_case_still_escalates(note):

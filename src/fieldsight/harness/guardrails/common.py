@@ -35,11 +35,16 @@ def refuse(reason: GuardrailRefusal, message: str) -> Refusal:
     return Refusal(reason=reason, message=message, escalation=ESCALATION)
 
 
+def claims(text: str) -> list[str]:
+    """ the text's sentences, each a claim that must carry a citation """
+
+    return [s for s in re.split(r"(?<=[.!?])\s+", text.replace(DISCLOSURE, "").strip()) if s]
+
+
 def citation_problems(text: str, chunk_ids: list[str], retrieved: set[str]) -> tuple[list[str], list[str]]:
     """ (uncited claims, citations that don't resolve to a chunk retrieved this turn) """
 
-    claims = [s for s in re.split(r"(?<=[.!?])\s+", text.replace(DISCLOSURE, "").strip()) if s]
-    uncited = [claim for claim in claims if not CITATION.search(claim)]
+    uncited = [claim for claim in claims(text) if not CITATION.search(claim)]
     unresolved = [f"[{n}]" for n in sorted({int(n) for n in CITATION.findall(text)})
                   if not 1 <= n <= len(chunk_ids) or chunk_ids[n - 1] not in retrieved]
     return uncited, unresolved

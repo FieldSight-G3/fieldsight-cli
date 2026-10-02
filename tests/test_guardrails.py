@@ -30,7 +30,7 @@ CLEAN = {"action": "NONE", "assessments": []}
 def stub(monkeypatch):
     """ no Bedrock: the guardrail blocks any text containing "ignore", and the classifier returns the given label """
 
-    monkeypatch.setattr(turn_check, "screen", lambda text: BLOCKED if "ignore" in text.lower() else CLEAN)
+    monkeypatch.setattr(turn_check, "screen", lambda text: BLOCKED if "ignore" in text.lower() else {**CLEAN, "text": text})
 
     def label(value):
         monkeypatch.setattr(turn_check, "classify", lambda question: value)
@@ -119,6 +119,22 @@ def test_an_uncited_claim_is_regenerated_and_the_disclosure_appended():
     assert len(calls) == 2 and "Cite this claim" in calls[1][0]
     assert result["text"].endswith(DISCLOSURE)
     assert result["citations_supported"]
+
+
+def test_uncited_claims_left_after_the_last_regeneration_are_removed_not_refused():
+    generate, calls = drafts(*["Section 1904.7 covers days away [1]. So this falls under it."] * 3)
+
+    result = guard(generate)
+
+    assert len(calls) == 3 and result["refusal"] is None
+    assert result["text"].startswith("Section 1904.7 covers days away [1].") and "So this" not in result["text"]
+    assert [e["remedy"] for e in result["events"] if e["failure"] == "uncited_claim"] == ["removed"]
+
+
+def test_an_answer_with_no_cited_claim_is_still_refused():
+    generate, _ = drafts(*["Section 1904.7 covers days away."] * 3)
+
+    assert guard(generate)["refusal"]["reason"] == "output_blocked"
 
 
 def test_an_unattributed_threshold_runs_the_rules_then_regenerates():

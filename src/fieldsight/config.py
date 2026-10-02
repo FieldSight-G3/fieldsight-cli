@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     bedrock_model_id: str = Field(min_length=1)
     bedrock_fast_model_id: str = Field(min_length=1)
     bedrock_judge_model_id: str = Field(min_length=1)
+    # photo corroboration needs a model that reads images; the reasoning model when unset
+    bedrock_multimodal_model_id: str = Field(min_length=1)
     bedrock_embedding_model_id: str = Field(min_length=1)
     bedrock_kb_id: str = Field(min_length=1)
     bedrock_kb_data_source_id: str = Field(min_length=1)
@@ -42,6 +44,7 @@ class Settings(BaseSettings):
     bounds: BoundsConfig = Field(default_factory=BoundsConfig.from_environment)
     reasoning_price: ModelPrice
     fast_price: ModelPrice
+    multimodal_price: ModelPrice | None = None
 
 
 settings = Settings(
@@ -51,6 +54,7 @@ settings = Settings(
     bedrock_model_id=os.environ["FIELDSIGHT_BEDROCK_MODEL_ID"],
     bedrock_fast_model_id=os.environ["FIELDSIGHT_BEDROCK_FAST_MODEL_ID"],
     bedrock_judge_model_id=os.environ["FIELDSIGHT_BEDROCK_JUDGE_MODEL_ID"],
+    bedrock_multimodal_model_id=os.environ.get("FIELDSIGHT_BEDROCK_MULTIMODAL_MODEL_ID") or os.environ["FIELDSIGHT_BEDROCK_MODEL_ID"],
     bedrock_embedding_model_id=os.environ["FIELDSIGHT_BEDROCK_EMBEDDING_MODEL_ID"],
     bedrock_kb_id=os.environ["FIELDSIGHT_BEDROCK_KB_ID"],
     bedrock_kb_data_source_id=os.environ["FIELDSIGHT_BEDROCK_KB_DATA_SOURCE_ID"],
@@ -63,6 +67,20 @@ settings = Settings(
     retrieval_max_chunks=int(os.environ["FIELDSIGHT_RETRIEVAL_MAX_CHUNKS"]),
     gateway_api_key=os.environ["FIELDSIGHT_GATEWAY_API_KEY"],
     allow_dev_identity=os.environ["FIELDSIGHT_ALLOW_DEV_IDENTITY"].lower() == "true",
-    reasoning_price=ModelPrice(input_per_mtok=os.environ["FIELDSIGHT_REASONING_PRICE_IN"],output_per_mtok=os.environ["FIELDSIGHT_REASONING_PRICE_OUT"]),
-    fast_price=ModelPrice(input_per_mtok=os.environ["FIELDSIGHT_FAST_PRICE_IN"],output_per_mtok=os.environ["FIELDSIGHT_FAST_PRICE_OUT"])
+    reasoning_price=ModelPrice(
+        input_per_mtok=Decimal(os.environ["FIELDSIGHT_REASONING_PRICE_IN"]),
+        output_per_mtok=Decimal(os.environ["FIELDSIGHT_REASONING_PRICE_OUT"]),
+    ),
+    fast_price=ModelPrice(
+        input_per_mtok=Decimal(os.environ["FIELDSIGHT_FAST_PRICE_IN"]),
+        output_per_mtok=Decimal(os.environ["FIELDSIGHT_FAST_PRICE_OUT"]),
+    ),
+    multimodal_price=(
+        ModelPrice(
+            input_per_mtok=Decimal(os.environ["FIELDSIGHT_MULTIMODAL_PRICE_IN"]),
+            output_per_mtok=Decimal(os.environ["FIELDSIGHT_MULTIMODAL_PRICE_OUT"]),
+        )
+        if os.environ.get("FIELDSIGHT_MULTIMODAL_PRICE_IN")
+        else None
+    ),
 )

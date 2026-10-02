@@ -11,14 +11,18 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
+from ...aws.gateway_reads import GatewayReads, gateway_configured, read_through_gateway
+from ...checkpoint import thread_id
 from ...config import settings
 from ...graph.graph import graph_workflow
+from ...ingest.embedding import embed_narrative
 from ...ingest.submit import ingest_packet, packet_artifacts
 from ...repository import (
     IncidentRepository,
     ReviewQueueRecord,
     ReviewQueueRepository,
     RunRepository,
+    SessionRepository,
 )
 from ...schemas.incidents import NormalizedIncident
 from ...security.entitlement import require_grant, submit_establishment
@@ -26,8 +30,8 @@ from ...types.artifacts import SubmitResult
 from ...types.run import TurnRun, WorkflowResult
 from ..bounds import BoundsConfig, SessionUsage, TurnUsage
 from ..bounds_runtime import BoundStopped
+from ..escalation.pending import PendingReview
 from ..escalation.review import (
-    PendingReview,
     ReviewConflict,
     ReviewDecision,
     ReviewRequest,
@@ -35,14 +39,18 @@ from ..escalation.review import (
     submit_review,
 )
 from ..guardrails.common import refuse
-from ..guardrails.turn_check import screen_texts, validate_request
+from ..guardrails.turn_check import screen_review, screen_texts, validate_request
 from ..metering.meter import metered
 from ..metering.pricing import PricingConfig
 from .answer import Answerer
 from .lifecycle import run_turn
+from .record import metered_calls
 from .workflow import Workflow
 
 logger = logging.getLogger(__name__)
+
+# where a submit's run record keeps what its Prompt Attacks screen found
+SUBMIT_SCREEN = "submit_screen"
 
 def harness_workflow(workflow: Workflow) -> Workflow:
     """ the graph's workflow as the harness runs it: a meter refusal ends the turn instead of raising, and the cited
@@ -62,47 +70,62 @@ def harness_workflow(workflow: Workflow) -> Workflow:
 
 
 def rag_answerer(chain: Any = None) -> Answerer:
-    """ the retrieval chain as run_turn's answerer; a regeneration carries the guard's objections into the question """
+    """ the retrieval chain as run_turn's answerer; a regeneration carries the guard's objections to the model,
+        never into the search, so a retry retrieves what the question did """
 
     built: list[Any] = [chain]
 
-    def answer(question: str, objections: list[str]) -> Any:
+    def answer(question: str, objections: list[str], seed: list[dict] | None = None) -> Any:
         if built[0] is None:
             from ...retrieval.chain import build_rag_chain
 
             built[0] = build_rag_chain()
-        if objections:
-            question += "\n\nYour previous answer was refused. Fix these before answering again:\n" + "\n".join(f"- {o}" for o in objections)
-        return built[0].invoke({"question": question})
+        fixes = ("\n\nYour previous answer was refused. Fix these before answering again:\n"
+                 + "\n".join(f"- {o}" for o in objections)) if objections else ""
+        # a follow-up's seed is the chunks the incident's analysis cited; they lead the evidence (retrieval/evidence.py)
+        return built[0].invoke({"question": question, "objections": fixes, "seed": seed or []})
 
     return answer
 
 
-def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = None, usage: SessionUsage | None = None,
+def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = None,
          workflow: Workflow | None = None, answerer: Answerer | None = None, limits: BoundsConfig | None = None,
-         pricing: PricingConfig | None = None) -> TurnRun:
+         pricing: PricingConfig | None = None, gateway: GatewayReads | None = None) -> TurnRun:
     """ one command as the verified analyst; raises ToolDenied before anything is read if they hold no grant
 
-        Every model call is metered against the session's cost ceiling and the turn's wall clock. The returned
-        TurnRun's usage carries the session's spend, including this turn's, for the next turn to start from.
+        Every model call is metered against the session's cost ceiling and the turn's wall clock. The session is the
+        analyst's Coordinator thread on the incident: its spend is read from Postgres before the turn and this turn's
+        added after, so the ceiling accumulates across commands. The returned TurnRun's usage carries that total.
         workflow defaults to the Coordinator's graph for this analyst; tests pass a stand-in.
+        gateway is what the AgentCore Runtime read through the Gateway with its invoker's proof; without it, a turn on
+        the real graph reads the Gateway itself with a proof this process signs (the CLI, as the analyst's own role).
     """
 
     analyst = UUID(str(analyst_id))
     incident_id = raw.get("incident_id")
-    try:
-        incident = UUID(str(incident_id).strip()) if incident_id is not None else None
-    except ValueError:
-        incident = None
-    if incident is not None:
-        require_grant(analyst, incident)
+    incident = None
+    if incident_id is not None:
+        # any id the request carries is checked, a malformed one included, so every turn that can spend has a session
+        require_grant(analyst, str(incident_id).strip())
+        incident = UUID(str(incident_id).strip())
+        if gateway is None and workflow is None and gateway_configured():
+            gateway = analyst_gateway_reads(analyst, incident)
     limits = limits or settings.bounds
-    start = SessionUsage(session_id=usage.session_id if usage else str(incident or analyst),
-                         incident_id=usage.incident_id if usage else incident or UUID(int=0),
-                         cost_usd=usage.cost_usd if usage else Decimal(0), turn=TurnUsage(turn_id=str(uuid4())))
+    # only a request stage 1 refuses before any model call comes without an incident, so it has no session to charge
+    sessions = SessionRepository()
+    session = thread_id(analyst, incident, "coordinator") if incident is not None else None
+    # the meter's budget is Decimal; str() keeps the stored float's digits instead of its binary expansion
+    spent = Decimal(str(sessions.session_cost(session))) if session else Decimal(0)
+    start = SessionUsage(session_id=session or str(analyst), incident_id=incident or UUID(int=0),
+                         cost_usd=spent, turn=TurnUsage(turn_id=str(uuid4())))
     with metered(start, limits, pricing) as meter:
-        result = run_turn(raw, workflow=harness_workflow(workflow or graph_workflow(analyst)), answerer=answerer or rag_answerer(),
-                          cracked=cracked, usage=usage, analyst_id=analyst)
+        try:
+            result = run_turn(raw, workflow=harness_workflow(workflow or graph_workflow(analyst, gateway)), answerer=answerer or rag_answerer(),
+                              cracked=cracked, usage=start, analyst_id=analyst, metered=meter.calls)
+        finally:
+            # even a turn that fails partway spent what it spent
+            if session:
+                sessions.add_cost(session, analyst, incident, "coordinator", float(meter.spent_this_turn))
     for call in meter.calls:
         logger.info("model call priced", extra={"model_id": call.model_id, "input_tokens": call.input_tokens,
                                                "output_tokens": call.output_tokens, "cost_usd": str(call.cost_usd),
@@ -113,6 +136,22 @@ def turn(raw: dict, *, analyst_id: UUID | str, cracked: dict[str, str] | None = 
     if meter.stopped is not None and result.refusal is None:
         update["refusal"] = refuse("bound_reached", f"This session's {meter.stopped.reason_code} limit ({meter.stopped.limit}) is spent.")
     return result.model_copy(update=update) if update else result
+
+
+def analyst_gateway_reads(analyst_id: UUID, incident_id: UUID) -> GatewayReads:
+    """ the Gateway reads for a turn this process runs as the analyst: a fresh proof on a new thread, used at once """
+
+    from ...security.iam_caller_proof import issue_proof
+
+    thread = f"cli-{uuid4()}"
+    try:
+        proof = issue_proof(thread, settings.aws_region)
+    except (RuntimeError, ValueError) as error:
+        # credentials that can't sign an analyst proof: the Gateway tools are gone this turn, and the turn continues
+        logger.warning("gateway reads skipped: %s", type(error).__name__)
+        reason = "This process can't sign an analyst caller proof, so the Gateway can't be called as the analyst"
+        return GatewayReads(unavailable=dict.fromkeys(("get_incident_extraction", "find_similar_incidents"), reason))
+    return read_through_gateway(analyst_id, incident_id, thread_id=thread, caller_proof=proof)
 
 
 def latest_run(incident_id: UUID | str, *, analyst_id: UUID | str,
@@ -145,8 +184,8 @@ def record_review(incident_id: UUID | str, request: ReviewRequest, *, analyst_id
     queue_id = queue.pending_queue_id(UUID(str(incident_id)))
     if queue_id is None:
         raise ReviewConflict(f"No pending review for {incident_id}")
-    return submit_review(request, queue_id=queue_id, verified_reviewer_id=UUID(str(analyst_id)), store=queue,
-                         source_for_chunk=document_for_chunk)
+    return submit_review(screen_review(request), queue_id=queue_id, verified_reviewer_id=UUID(str(analyst_id)),
+                         store=queue, source_for_chunk=document_for_chunk)
 
 
 def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None = None,
@@ -168,16 +207,25 @@ def submit(folder: Path, *, analyst_id: UUID | str, limits: BoundsConfig | None 
         return SubmitResult(incident_id=None, establishment=establishment, report=None, withheld=[], photos=[],
                             refusal=validated["refusal"])
 
+    attacked: list[bool] = []
+
     def screen(cracked: dict[str, str]) -> dict[str, str]:
-        return screen_texts(validated["request"], cracked, correlation_id=str(correlation_id))["texts"]
+        screened = screen_texts(validated["request"], cracked, correlation_id=str(correlation_id))
+        attacked.append(screened["prompt_attack_detected"])
+        return screened["texts"]
 
     start = SessionUsage(session_id=str(analyst), incident_id=UUID(int=0), turn=TurnUsage(turn_id=str(correlation_id)))
-    with metered(start, limits or settings.bounds, pricing):
+    with metered(start, limits or settings.bounds, pricing) as meter:
         packet = ingest_packet(supported, skipped, screen=screen)
     incident_id = IncidentRepository().create(establishment, packet["incident"].model_dump(mode="json", exclude={"incident_id"}),
                                               packet["narrative"], owner_analyst_id=analyst,
                                               # no judged photo means the photo trigger is unevaluated, not clear
-                                              photo_verdicts={"items": packet["photos"]} if packet["photos"] else None)
-    RunRepository().create(correlation_id, "submit", incident_id=incident_id)
+                                              photo_verdicts={"items": packet["photos"]} if packet["photos"] else None,
+                                              # what find_similar_incidents searches with for this incident
+                                              embedding=embed_narrative(packet["narrative"]))
+    # the normalizer's and the photo checks' calls, priced by the meter
+    # an attack withheld here is a signal every later turn on the incident escalates on, so the submit records it
+    RunRepository().create(correlation_id, "submit", incident_id=incident_id, model_calls=metered_calls("submit", meter.calls),
+                           escalation_triggers={SUBMIT_SCREEN: {"prompt_attack_detected": any(attacked)}})
     return SubmitResult(incident_id=str(incident_id), establishment=establishment, report=packet["report"],
                         withheld=packet["withheld"], photos=packet["photos"], refusal=None)

@@ -28,6 +28,13 @@ def excerpt_path(doc: CorpusDoc, page: int) -> str | None:
 
 
 def section_path(doc: CorpusDoc, page: int, header: str | None) -> str:
-    """ the excerpt's path for page-range docs (finer designations aren't printed), else the header's designation """
+    """ the excerpt's path for page-range docs (finer designations aren't printed), else the header's designation
 
+        In a doc that is one section (its title names exactly one, e.g. 29 CFR 1910.269), a header that names no
+        section, like a table's title, belongs to that section: so a search filtered to 1910.269 finds its tables.
+    """
+
+    own = DESIGNATION.findall(doc["title"])
+    if header and not DESIGNATION.search(header) and len(own) == 1:
+        return excerpt_path(doc, page) or own[0]
     return excerpt_path(doc, page) or (section_label(header) if header else doc["doc_id"])

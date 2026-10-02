@@ -4,7 +4,8 @@ import re
 from decimal import Decimal
 from typing import Any
 
-from ..harness.escalation.review import PendingReview, ReviewDecision
+from ..harness.escalation.pending import PendingReview
+from ..harness.escalation.review import ReviewDecision
 from ..harness.guardrails.common import CITATION
 from ..types.artifacts import SubmitResult
 from ..types.guardrails import Refusal
@@ -73,6 +74,7 @@ def turn(run: TurnRun) -> str:
               for number, source in enumerate(run.sources, 1)]
     lines += dossier_lines(run.dossier or {})
     lines += [f"{worker}: withheld ({'; '.join(problems)})" for worker, problems in run.blocked.items()]
+    lines += [f"Unavailable this turn: {tool} ({why})" for tool, why in run.unavailable.items()]
     if run.escalation and run.escalation.requires_review:
         lines.append(f"Escalated to the review queue: {', '.join(run.escalation.fired)}")
     elif run.escalation:

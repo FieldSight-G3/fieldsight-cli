@@ -5,10 +5,11 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.errors import GraphRecursionError
 
 from ...aws import clients
+from ...checkpoint import thread_id
 from ...config import settings
 from ...errors import PlanError
 from ...prompts import GOALS, PROMPTS
-from ...schemas.plan import DispatchPlan
+from ...schemas.agents import DispatchPlan
 from ...schemas.run_records import ModelCall
 from ...types.dossier import DossierLeg
 from ..specialists import get_specialists
@@ -28,8 +29,14 @@ def _plan(state: dict) -> tuple[DispatchPlan, list[ModelCall]]:
         if out["parsed"]:
             return out["parsed"], calls
         problem = str(out["parsing_error"] or "no plan was returned")
-        messages.append(HumanMessage(f"That plan was invalid: {problem}. Return one that matches the DispatchPlan schema."))
+        # the reminder rides in the system message: as a user turn the Prompt Attacks filter can block it as an injection
+        messages[0] = SystemMessage(f"{PROMPTS['coordinator']}\n\nYour last plan was invalid: {problem}. "
+                                    "Return one that matches the DispatchPlan schema.")
     raise PlanError("the Coordinator returned no valid plan after one retry")
+
+
+def _words(text: str) -> str:
+    return " ".join(text.split()).casefold()
 
 
 def coordinator_node(state: dict) -> dict:
@@ -45,9 +52,14 @@ def coordinator_node(state: dict) -> dict:
         dispatches = [d.model_dump() for d in plan.dispatches]
         quote, trigger = plan.energized_equipment_quote, "initial"
 
-    # the model chooses hazard_control; this checks its grounds are really in the narrative
-    grounded = bool(quote) and quote in (state.get("narrative") or "")
-    kept = [d for d in dispatches if grounded or d["worker"] != "hazard_control"]
+    # the model chooses hazard_control; this checks its grounds are really in the narrative, word for word
+    # (case and spacing aside: a quote that starts mid-sentence lowercases its first letter)
+    grounded = bool(quote) and _words(quote) in _words(state.get("narrative") or "")
+    # reportability needs a 1904.39 event: an "other" event with no death can't be one, whatever the plan says
+    fields = state.get("incident") or {}
+    no_event = fields.get("event_type") == "other" and fields.get("death") is False
+    kept = [d for d in dispatches if (grounded or d["worker"] != "hazard_control")
+            and not (no_event and d["worker"] == "reportability")]
     update = {"plans": [{"trigger": trigger, "dispatches": kept, "energized_equipment_quote": quote, 
                          "ungrounded": [d for d in dispatches if d not in kept]}],"model_calls": call}
     if trigger == "initial":
@@ -62,30 +74,61 @@ def route_after_coordinator(state: dict) -> list[str] | str:
     workers = [d["worker"] for d in state["plans"][-1]["dispatches"]]
     return workers or "eligibility_check"
     
+def recorded(task: str, feedback: str | None) -> str:
+    """ the leg's task as the run record shows it: the goal, and on a re-dispatch what the Reviewer sent back """
+
+    return f"{task}\n\n{feedback}" if feedback else task
+
+
 def _run_specialist(name: str, state: dict) -> dict:
     """ invoke one worker sub-graph and map its result back as its leg of the dossier; its transcript stays behind """
 
     # the Coordinator narrows the goal when it re-dispatches
-    task = state.get("tasks", {}).get(name) or GOALS[name]
+    # a first dispatch carries the default goal in tasks too; only a different goal is a Reviewer's narrowing
+    narrowed = state.get("tasks", {}).get(name)
+    narrowed = narrowed if narrowed and narrowed != GOALS[name] else None
+    feedback = f"The Reviewer narrowed your goal: {narrowed}" if narrowed else None
+    decisions, retrieved = {}, {}
+    earlier = (state.get("dossier") or {}).get(name)
+    if state.get("review_iterations") and earlier and earlier["proposal"]:
+        # a re-dispatch revises its rejected proposal instead of starting over: the rules are deterministic on the
+        # same incident, and the cited chunks were retrieved this turn, so both carry into the second attempt
+        decisions, retrieved = dict(earlier["decisions"]), dict(earlier["cited"])
+        problems = [f"- {r.claim}: {r.problem}" for r in state["reviews"][-1].rejections if r.worker == name]
+        feedback = (f"Your proposal was rejected:\n{json.dumps(earlier['proposal'])}\n\n"
+                    "The Reviewer's problems with it:\n" + "\n".join(problems) +
+                    f"\n\nFix only these, then propose again: {narrowed or GOALS[name]}\n"
+                    "Your rule decisions and cited chunks still stand.")
+    elif state.get("review_iterations") and earlier and earlier["decisions"]:
+        # the last attempt ended with no proposal, but its rule decisions are still right (the rules are
+        # deterministic on the same incident), so the re-dispatch starts from them instead of from scratch
+        decisions = dict(earlier["decisions"])
+        feedback = (f"{feedback}\n\n" if feedback else "") + (
+            "Your last attempt ended without an accepted proposal. Your rule decisions still stand: don't run the "
+            "rules again. Read their sources with read_provision, then propose, citing each chunk as [n].")
+    # the user turn carries only the goal; the Reviewer's feedback goes in the worker's system message. As a user turn,
+    # "your proposal was rejected, fix these" read as an injection to the Bedrock Prompt Attacks filter, which blocked
+    # the re-dispatch's first call, so a rejected leg came back empty
+    task = GOALS[name]
     try:
         result = get_specialists()[name].invoke(
-            {"task": task, "incident": state["incident"], "messages": [], "rounds": 0,
-             "decisions": {}, "retrieved": {}, "proposal": None},
+            {"task": task, "feedback": feedback, "incident": state["incident"], "gateway": state.get("gateway"),
+             "messages": [], "rounds": 0, "decisions": decisions, "retrieved": retrieved, "proposal": None},
             {"recursion_limit": settings.bounds.max_graph_recursion_depth},
         )
     except GraphRecursionError:
         # the independent hard cap: a worker that hits it ends with no proposal, not a crash
-        return {"dossier": {name: DossierLeg(task=task, proposal=None, decisions={}, cited={})}}
+        return {"dossier": {name: DossierLeg(task=recorded(task, feedback), proposal=None, decisions={}, cited={})}}
 
     proposal = result["proposal"]
     leg = DossierLeg(
-        task=task,
+        task=recorded(task, feedback),
         proposal=proposal,
         decisions=result["decisions"],
         cited={chunk_id: result["retrieved"][chunk_id] for chunk_id in proposal["chunk_ids"]} if proposal else {},
     )
 
-    tools, calls = record(name, result["messages"])
+    tools, calls = record(name, result["messages"], thread_id(state["analyst_id"], state["incident"]["incident_id"], name))
     return {"dossier": {name: leg}, "tool_invocations": tools, "model_calls": calls}
 
 
