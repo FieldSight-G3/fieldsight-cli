@@ -10,15 +10,23 @@ from ..harness.guardrails.common import DISCLOSURE
 from ..harness.run import wiring
 from ..logging_context import configure_logging
 from ..security.identity import current_analyst
-from . import requests, responses
+from . import remote, requests, responses
 
 
 def cmd_submit(args: argparse.Namespace, analyst_id: UUID) -> str:
     return responses.submitted(wiring.submit(Path(args.folder), analyst_id=analyst_id))
 
 
-def cmd_analyze(args: argparse.Namespace, analyst_id: UUID) -> str:
-    return responses.turn(wiring.turn(requests.turn_request("analyze", args.incident_id), analyst_id=analyst_id))
+def run_turn(request: dict, analyst_id: UUID | None) -> str:
+    """ a turn here, or on the deployed Runtime when FIELDSIGHT_RUNTIME_ID is set """
+
+    if runtime := remote.runtime_id():
+        return responses.turn(remote.turn(request, runtime))
+    return responses.turn(wiring.turn(request, analyst_id=analyst_id))
+
+
+def cmd_analyze(args: argparse.Namespace, analyst_id: UUID | None) -> str:
+    return run_turn(requests.turn_request("analyze", args.incident_id), analyst_id)
 
 
 def cmd_dossier(args: argparse.Namespace, analyst_id: UUID) -> str:
@@ -26,9 +34,8 @@ def cmd_dossier(args: argparse.Namespace, analyst_id: UUID) -> str:
     return responses.dossier(run, args.incident_id)
 
 
-def cmd_ask(args: argparse.Namespace, analyst_id: UUID) -> str:
-    request = requests.turn_request("ask", args.incident_id, args.question)
-    return responses.turn(wiring.turn(request, analyst_id=analyst_id))
+def cmd_ask(args: argparse.Namespace, analyst_id: UUID | None) -> str:
+    return run_turn(requests.turn_request("ask", args.incident_id, args.question), analyst_id)
 
 
 def cmd_sources(args: argparse.Namespace, analyst_id: UUID) -> str:
@@ -53,7 +60,10 @@ def cmd_review(args: argparse.Namespace, analyst_id: UUID) -> str:
     return responses.decision(wiring.record_review(args.incident_id, request, analyst_id=analyst_id))
 
 
-COMMANDS: dict[str, Callable[[argparse.Namespace, UUID], str]] = {
+# the turns the deployed Runtime serves; the rest read and write the database this process is configured for
+REMOTE = {"analyze", "ask"}
+
+COMMANDS: dict[str, Callable[[argparse.Namespace, UUID | None], str]] = {
     "submit": cmd_submit,
     "analyze": cmd_analyze,
     "dossier": cmd_dossier,
@@ -99,8 +109,10 @@ def main() -> None:
     args = parser().parse_args()
     configure_logging()
     try:
-        print(COMMANDS[args.command](args, current_analyst()))
-    except ToolDenied as denied:
+        # on the Runtime the analyst is resolved there, from the caller proof, never here
+        analyst = None if remote.runtime_id() and args.command in REMOTE else current_analyst()
+        print(COMMANDS[args.command](args, analyst))
+    except (ToolDenied, remote.RemoteDenied) as denied:
         print(responses.denied(denied.code, str(denied)))
     except (FieldSightError, ValueError) as error:
         # a review conflict, an unentitled reviewer, or an edit that changes a determination: an answer, not a crash
