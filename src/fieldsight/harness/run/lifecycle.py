@@ -73,7 +73,8 @@ def run_turn(raw: dict, *, workflow: Workflow, answerer: Answerer, cracked: dict
     elif run["refusal"] is None and run["route"] in ("answer_from_retrieval", "answer_from_record"):
         follow_up = run["route"] == "answer_from_record"
         answered = answer_question(request["question"], answerer, incident=incident, rule_invocations=invocations + recorded,
-                                   correlation_id=cid, about_incident=follow_up)
+                                   correlation_id=cid, about_incident=follow_up,
+                                   seed=recorded_citations(incident) if follow_up and incident else None)
         invocations, events = answered.pop("rule_invocations"), answered.pop("events")
         run |= {**answered, "events": run["events"] + events}
 
@@ -96,6 +97,15 @@ def run_turn(raw: dict, *, workflow: Workflow, answerer: Answerer, cracked: dict
                       dossier=run.get("dossier"), metered=metered)
     
     return TurnRun(run_id=run_id, correlation_id=correlation_id, command=command, escalation=decision, usage=usage, **run)
+
+
+def recorded_citations(incident: NormalizedIncident) -> list[dict]:
+    """ the chunks the incident's latest analyze turn cited, across its dossier legs, for a follow-up to answer from """
+
+    record = RunRepository().latest(UUID(incident.incident_id), ("analyze",))
+    legs = ((record or {}).get("dossier") or {}).values()
+    cited = {chunk_id: hit for leg in legs if isinstance(leg, dict) for chunk_id, hit in (leg.get("cited") or {}).items()}
+    return list(cited.values())
 
 
 def recorded_decisions(incident: NormalizedIncident) -> list[RuleInvocation]:

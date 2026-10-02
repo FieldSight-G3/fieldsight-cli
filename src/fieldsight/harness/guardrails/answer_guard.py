@@ -83,7 +83,11 @@ def guard_answer(generate: Callable[[list[str]], DraftAnswer], *,
             return result(None, refuse("output_blocked", "The answer kept stating a determination."))
         if determination:
             retried_determination = True
-            objections.append(f'Describe what the regulation says instead of concluding: "{determination.group()}"')
+            # say how to rewrite it, not only what's wrong: a bare "stop concluding" got the same sentence back
+            objections.append(f'"{determination.group()}" decides this employer\'s case. Rewrite it about the provision '
+                              'or the kind of injury, e.g. "1904.7(b)(1) requires recording an injury that results in '
+                              'loss of consciousness" or "an injury involving loss of consciousness is recordable '
+                              'under 1904.7(b)(1)", never with "the case", "this case" or "the incident" as the subject')
 
         if not objections:
             break

@@ -75,14 +75,15 @@ def rag_answerer(chain: Any = None) -> Answerer:
 
     built: list[Any] = [chain]
 
-    def answer(question: str, objections: list[str]) -> Any:
+    def answer(question: str, objections: list[str], seed: list[dict] | None = None) -> Any:
         if built[0] is None:
             from ...retrieval.chain import build_rag_chain
 
             built[0] = build_rag_chain()
         fixes = ("\n\nYour previous answer was refused. Fix these before answering again:\n"
                  + "\n".join(f"- {o}" for o in objections)) if objections else ""
-        return built[0].invoke({"question": question, "objections": fixes})
+        # a follow-up's seed is the chunks the incident's analysis cited; they lead the evidence (retrieval/evidence.py)
+        return built[0].invoke({"question": question, "objections": fixes, "seed": seed or []})
 
     return answer
 

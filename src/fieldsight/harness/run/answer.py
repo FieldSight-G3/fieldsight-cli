@@ -47,17 +47,22 @@ def question_facts(question: str, incident_id: str) -> NormalizedIncident | None
 
 
 def answer_question(question: str, answerer: Answerer, *, incident: NormalizedIncident | None,
-                    rule_invocations: list[RuleInvocation], correlation_id: str, about_incident: bool = False) -> dict:
+                    rule_invocations: list[RuleInvocation], correlation_id: str, about_incident: bool = False,
+                    seed: list[dict] | None = None) -> dict:
     """ returns the answer safe to show (or a refusal), its sources, this turn's rule invocations, and the events;
         a retrieval refusal is already an answer, so it skips the guard
 
         incident is the open one; a threshold in the answer is attributed to the facts the question states, read
         only if the answer states one, never to the open incident's. about_incident is a follow-up on the incident's
         own analysis: its thresholds are attributed to the incident, and rule_invocations already carry what that
-        analysis recorded, so nothing is decided again.
+        analysis recorded, so nothing is decided again. seed is the chunks that analysis cited, the evidence a
+        follow-up is answered from.
     """
 
-    grounded = [answerer(question, [])]
+    def ask(objections: list[str]) -> GroundedAnswer:
+        return answerer(question, objections, seed) if seed else answerer(question, objections)
+
+    grounded = [ask([])]
     if grounded[0].refusal_reason:
         # the refusal text is the answer the analyst reads; the reason is kept so the turn can be told apart from one
         return {"answer": grounded[0].answer, "sources": [], "refusal": None, "retrieval_refusal": grounded[0].refusal_reason,
@@ -68,7 +73,7 @@ def answer_question(question: str, answerer: Answerer, *, incident: NormalizedIn
 
     def generate(objections: list[str]) -> DraftAnswer:
         if objections:
-            grounded.append(answerer(question, objections))
+            grounded.append(ask(objections))
             if grounded[-1].refusal_reason:
                 # the retry couldn't ground an answer: that refusal is the honest result, not a draft to cite
                 raise _Refused(grounded[-1])

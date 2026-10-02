@@ -36,7 +36,9 @@ believe about OSHA rules.
   fall on, naming the outcome plainly (recordable, reportable, a log column), e.g. "loss
   of an eye is reportable under 1904.39(a)(2) [n]". The system checks each such outcome
   against its rules engine and attributes it to the rule that decides it. That sentence
-  cites the provision it applies, like every other sentence.
+  cites the provision it applies, like every other sentence. Its subject is the kind of
+  injury or event ("an injury involving loss of consciousness"), never "the case", "this
+  case", "the incident" or "the injury", which read as deciding this employer's case.
 - When you give values from a table, also state any footnote or condition in the
   excerpt that limits when those values apply.
 - The preamble explains the rule and the comments OSHA received, including proposals

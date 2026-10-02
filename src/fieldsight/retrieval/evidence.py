@@ -88,23 +88,55 @@ def whole_letters(question: str, docs: list[Document], retrievals: list[Retrieva
     return list(unique.values())
 
 
+def seeded(question: str, seed: list[dict], retrievals: list[Retrieval]) -> list[Document]:
+    """ the chunks an incident's analysis already cited, as evidence for a follow-up about that analysis
+
+        A follow-up asks why the analysis came out as it did, and the answer is in what it cited. A fresh search on
+        the follow-up's wording often missed those chunks (asking about "the medical treatment column" found the
+        days-away paragraphs), so they go in first and are recorded as a retrieval this turn, which the citation
+        checks require.
+    """
+
+    docs = [Document(page_content=hit.get("text") or "", metadata={
+        "score": hit.get("score"),
+        "source_metadata": {"chunk_id": hit["chunk_id"], "doc_id": hit.get("doc_id", ""), "doc_type": hit.get("doc_type"),
+                            "section_path": hit.get("section_path", ""), "title": hit.get("title", ""),
+                            "page": hit.get("page", "")}})
+            for hit in seed if hit.get("chunk_id") and hit.get("text")]
+    if docs:
+        retrievals.append(Retrieval(query=question, reason="cited by the incident's latest analysis",
+                                    scores={meta(doc)["chunk_id"]: float(doc.metadata["score"] or 1.0) for doc in docs}))
+    return docs
+
+
 def gather(inputs: dict) -> dict:
-    """ chunks for a question, the searches behind them, and a refusal reason if there are none """
+    """ chunks for a question, the searches behind them, and a refusal reason if there are none
+
+        inputs["seed"], on a follow-up, is the chunks the incident's analysis cited: they lead the evidence, and the
+        search adds to them, so a follow-up is answered from the analysis even when the search finds nothing new
+    """
 
     question = inputs["question"]
     retrievals: list[Retrieval] = []
+    seed = seeded(question, inputs.get("seed") or [], retrievals)
     doc_type, section_path, reason = pick_filter(question)
     try:
         docs = run(question, retrievals, doc_type, section_path, reason)
         if not docs and (doc_type or section_path):
-            retrievals[0] = retrievals[0].model_copy(update={"superseded": True})
+            retrievals[-1] = retrievals[-1].model_copy(update={"superseded": True})
             docs = run(question, retrievals, reason="the filtered search found nothing above threshold")
         if docs and retrievals[-1].doc_type is None and retrievals[-1].section_path is None:
             docs = diversify(question, docs, retrievals)
         if docs:
             docs = whole_letters(question, follow_references(question, docs, retrievals), retrievals)
-        refusal: RefusalReason | None = None if docs else "below_threshold"
     except RetrievalError:
-        docs, refusal = [], "retrieval_unavailable"
+        if not seed:
+            return {**inputs, "question": question, "docs": [], "retrievals": retrievals, "refusal": "retrieval_unavailable"}
+        docs = []
+    unique: dict[str, Document] = {}
+    for doc in seed + docs:
+        unique.setdefault(meta(doc)["chunk_id"], doc)
+    docs = list(unique.values())
+    refusal: RefusalReason | None = None if docs else "below_threshold"
     # anything else the caller passed (a regeneration's objections) rides along to the prompt, never the search
     return {**inputs, "question": question, "docs": docs, "retrievals": retrievals, "refusal": refusal}
